@@ -12,6 +12,8 @@ typedef struct {
     double sum_sign;
     unsigned long long accept_accepted;
     unsigned long long accept_attempts;
+    unsigned long long global_accepted;
+    unsigned long long global_attempts;
     int count;
 } ReplicaBin;
 
@@ -57,5 +59,10 @@ int replica_result_szz_bin_values(const ReplicaResult *result, int bin,
 int replica_result_sperp_bin_values(const ReplicaResult *result, int bin,
                                     double *out, int nq);
 void replica_result_free(ReplicaResult *result);
+
+void replica_bin_add_global(ReplicaBin *bin, unsigned long long accepted,
+                            unsigned long long attempts);
+double replica_bins_global_acceptance(const ReplicaBin *bins, int nbins,
+                                      unsigned long long *attempts);
 
 #endif
