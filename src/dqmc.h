@@ -83,6 +83,9 @@ typedef struct {
     unsigned long long sweep_count;
     unsigned long long accept_attempts;
     unsigned long long accept_accepted;
+    unsigned long long global_attempts;
+    unsigned long long global_accepted;
+
     DqmcStabDrift stab_drift;
     DqmcUdvScaleDiag udv_scale_diag;
     DqmcUdvCenteredDiag udv_centered_diag;
@@ -106,5 +109,21 @@ int dqmc_enable_udv_centered_diag(Dqmc *D, const char *path, int beta_index,
                                   unsigned long long seed);
 void dqmc_set_green_rebuild_mode(Dqmc *D, GreenRebuildMode mode);
 void dqmc_sweep(Dqmc *D);
+
+/* log|W| and sign(W) of the current field, W = det(1+A_up) det(1+A_down).
+   Uses the PH identity when D->use_ph. Does not modify the Green functions. */
+int dqmc_log_weight(Dqmc *D, double *logw, int *sign);
+/* One proposal for site i: flip its world line, accept iff delta >= 0 or
+   u < exp(delta), otherwise restore the field. u must be a uniform number in
+   [0,1); *logw and *sign hold the current weight and are updated on
+   acceptance. Counts the attempt. On numerical failure the field is restored,
+   D->status is set and nonzero is returned (a failure is never a rejection).
+   Does not rebuild the Green functions: only dqmc_global_site_pass does. */
+int dqmc_global_site_step(Dqmc *D, int i, double u, double *logw, int *sign,
+                          int *accepted);
+/* One fixed-order pass of site world-line flips with exact Metropolis
+   acceptance (spec 3.3). Leaves Gu/Gd/sign rebuilt at l=0 and carried stacks
+   invalid. Returns nonzero and sets D->status on numerical failure. */
+int dqmc_global_site_pass(Dqmc *D);
 
 #endif

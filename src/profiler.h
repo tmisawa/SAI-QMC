@@ -35,6 +35,7 @@ typedef enum {
     PROF_LA_GEMM,
     PROF_LA_INVERSE,
     PROF_LA_EXPM_SYM,
+    PROF_DQMC_GLOBAL,
     PROF_REGION_COUNT
 } ProfRegion;
 
