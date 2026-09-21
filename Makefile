@@ -100,7 +100,7 @@ test_szz_parallel: dqmc dqmc_omp dqmc_mpi dqmc_hybrid
 test_sperp_parallel: dqmc dqmc_omp dqmc_mpi dqmc_hybrid
 	@printf "%-35s " tests/test_sperp_parallel.sh; sh tests/test_sperp_parallel.sh
 
-test: $(TESTBIN) test_szz test_sperp test_scalar test_dat
+test: $(TESTBIN) test_szz test_sperp test_scalar test_dat test_global_default
 	@fail=0; for t in $(TESTBIN); do printf "%-28s " $$t; ./$$t || fail=1; done; \
 	  if [ $$fail -ne 0 ]; then echo "SOME TESTS FAILED"; exit 1; fi; echo "ALL TESTS PASSED"
 
@@ -124,3 +124,9 @@ clean:
 	rm -f src/*.o src/*.omp.o src/*.mpi.o src/*.hybrid.o dqmc dqmc_omp dqmc_mpi dqmc_hybrid $(TESTBIN) $(SLOW_TESTBIN) $(TESTBIN_OMP) $(TESTBIN_MPI) $(TESTBIN_HYBRID)
 
 .PHONY: test test_szz test_sperp test_scalar test_dat test_dat_parallel test_scalar_parallel test_szz_parallel test_sperp_parallel test_slow test_omp test_mpi test_hybrid clean
+
+GLOBAL_DEFAULT_VARIANTS ?= omitted profile
+test_global_default: dqmc
+	@printf "%-28s " tests/test_global_default_unchanged.sh; sh tests/test_global_default_unchanged.sh $(GLOBAL_DEFAULT_VARIANTS)
+
+.PHONY: test_global_default
