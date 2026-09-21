@@ -1,0 +1,1050 @@
+{
+  "datetime": "2026-09-21 23:18 JST",
+  "model": "OpenAI GPT-6 (Codex)",
+  "summary": "Final fixed-criteria 4x2 assessment, retaining all replicas and verifying extension prefixes",
+  "geometry": {
+    "lattice": "square",
+    "Lx": 4,
+    "Ly": 2,
+    "pbc": true,
+    "t": -1,
+    "U": 8,
+    "mu": 4,
+    "ensemble": "grand canonical",
+    "interaction": "U n_up n_down",
+    "Ly2_bonds": "doubled"
+  },
+  "input_common": {
+    "nwarm": 5000,
+    "bin_sweeps": 2000,
+    "stab": 4,
+    "sweep_order": "alternating",
+    "green_rebuild": "combine",
+    "global_update": "site"
+  },
+  "binary_source_commit": "da6b65e0c3b08d7b87ed67888fa2349e07850a3c",
+  "binary_sha256": "fc65181654ac051aa0c8ee5f328c539e54bc70b546d854b3fa524e50a26fbddd",
+  "hopping_sha256": "52d69c565bd12324cda1312292105a505fdb9ff646859b6d62c0f4ec70666a58",
+  "full_report_sha256": "6009119a4c75287c53716c42b8073f113ef02e4d6088b0927bac49731b086459",
+  "ed_sha256": "9b344bedec7070df29d68cbf9c3b354cb92c0fa52162adedf8d33229a381c883",
+  "sz_ed_sha256": "580826c6b17d2fa1708e11b5469d7a54b4b6c8d851c9c1b12a991f1051c3fada",
+  "analysis_sha256": "58300f0654592040b89481a01bf588b018b3b14b6c47411c3249ac0978340365",
+  "analysis_r3_sha256": "c580b204087b2056a460f45cda17dc24f551e49d87d4ad1bba386a3e0e2cae70",
+  "scientific_status": "pass",
+  "default_status": "pass",
+  "conditions": [
+    {
+      "beta": 4.0,
+      "dtau": 0.025,
+      "interval": 10,
+      "replicas": 12,
+      "observables": {
+        "E": {
+          "mean": -0.8812005517987596,
+          "se": 0.0006058533508420817
+        },
+        "D": {
+          "mean": 0.07147940664392917,
+          "se": 8.366210267621332e-05
+        },
+        "Szz": {
+          "mean": 1.6663572516755898,
+          "se": 0.002396788774352456
+        },
+        "Sperp": {
+          "mean": 1.6511730145293018,
+          "se": 0.0070765001501047
+        },
+        "SU2": {
+          "mean": 0.015184237146288054,
+          "se": 0.007854510462887416
+        },
+        "Sz2": {
+          "mean": 0.10676773081902366,
+          "se": 0.000935011441872097
+        }
+      },
+      "mean_inner_se": 0.011845182745894533,
+      "replica_sd": 0.008302719864378381,
+      "sd_over_se": 0.7009364095506296,
+      "unstable_replicas": [],
+      "screened": 0,
+      "trapped": 0,
+      "global_acceptance": 0.0310109375,
+      "seconds_per_global_pass": 0.0013814106386881777,
+      "mean_wall_seconds": 140.21181135407338,
+      "nmeas_per_replica": 200000,
+      "seeds": [
+        20261725058,
+        20261725095,
+        20261725132,
+        20261725169,
+        20261725206,
+        20261725243,
+        20261725280,
+        20261725317,
+        20261725354,
+        20261725391,
+        20261725428,
+        20261725465
+      ]
+    },
+    {
+      "beta": 4.0,
+      "dtau": 0.05,
+      "interval": 10,
+      "replicas": 24,
+      "observables": {
+        "E": {
+          "mean": -0.9020385844567045,
+          "se": 0.0002987243420605169
+        },
+        "D": {
+          "mean": 0.07016953498541453,
+          "se": 2.9062560194308873e-05
+        },
+        "Szz": {
+          "mean": 1.6671510115369772,
+          "se": 0.0016075966236561436
+        },
+        "Sperp": {
+          "mean": 1.660368013333155,
+          "se": 0.006853332975957432
+        },
+        "SU2": {
+          "mean": 0.006782998203821977,
+          "se": 0.007351012560090171
+        },
+        "Sz2": {
+          "mean": 0.10540821064215929,
+          "se": 0.0005870522988223022
+        }
+      },
+      "mean_inner_se": 0.010614660822519304,
+      "replica_sd": 0.007875582880357185,
+      "sd_over_se": 0.7419533239958938,
+      "unstable_replicas": [],
+      "screened": 0,
+      "trapped": 0,
+      "global_acceptance": 0.030041145833333335,
+      "seconds_per_global_pass": 0.0007048155162237373,
+      "mean_wall_seconds": 68.63264412153512,
+      "nmeas_per_replica": 200000,
+      "seeds": [
+        20261725042,
+        20261725079,
+        20261725116,
+        20261725153,
+        20261725190,
+        20261725227,
+        20261725264,
+        20261725301,
+        20261725338,
+        20261725375,
+        20261725412,
+        20261725449,
+        21261725042,
+        21261725079,
+        21261725116,
+        21261725153,
+        21261725190,
+        21261725227,
+        21261725264,
+        21261725301,
+        21261725338,
+        21261725375,
+        21261725412,
+        21261725449
+      ]
+    },
+    {
+      "beta": 8.0,
+      "dtau": 0.025,
+      "interval": 10,
+      "replicas": 12,
+      "observables": {
+        "E": {
+          "mean": -0.8971974469689118,
+          "se": 0.0009256395414364102
+        },
+        "D": {
+          "mean": 0.07153371041016428,
+          "se": 4.4610218139646356e-05
+        },
+        "Szz": {
+          "mean": 1.6730980174244359,
+          "se": 0.005217974919192017
+        },
+        "Sperp": {
+          "mean": 1.665101712590467,
+          "se": 0.016525870864644705
+        },
+        "SU2": {
+          "mean": 0.007996304833968737,
+          "se": 0.018908854379242945
+        },
+        "Sz2": {
+          "mean": 0.005749978256523519,
+          "se": 0.0008105764343714469
+        }
+      },
+      "mean_inner_se": 0.024281814916775606,
+      "replica_sd": 0.018075595345321358,
+      "sd_over_se": 0.744408744044641,
+      "unstable_replicas": [],
+      "screened": 0,
+      "trapped": 0,
+      "global_acceptance": 0.00041875,
+      "seconds_per_global_pass": 0.0027455285130012215,
+      "mean_wall_seconds": 75.67688000015914,
+      "nmeas_per_replica": 50000,
+      "seeds": [
+        20261729058,
+        20261729095,
+        20261729132,
+        20261729169,
+        20261729206,
+        20261729243,
+        20261729280,
+        20261729317,
+        20261729354,
+        20261729391,
+        20261729428,
+        20261729465
+      ]
+    },
+    {
+      "beta": 8.0,
+      "dtau": 0.05,
+      "interval": 10,
+      "replicas": 12,
+      "observables": {
+        "E": {
+          "mean": -0.9181458374218899,
+          "se": 0.0006823404288948925
+        },
+        "D": {
+          "mean": 0.0700248307516585,
+          "se": 6.0309883702154186e-05
+        },
+        "Szz": {
+          "mean": 1.6677991107842398,
+          "se": 0.008814553227020972
+        },
+        "Sperp": {
+          "mean": 1.664019815495505,
+          "se": 0.0121361381498434
+        },
+        "SU2": {
+          "mean": 0.00377929528873479,
+          "se": 0.01883089724173591
+        },
+        "Sz2": {
+          "mean": 0.005800037744110911,
+          "se": 0.0008981449545539962
+        }
+      },
+      "mean_inner_se": 0.02376111400182332,
+      "replica_sd": 0.030534508070441058,
+      "sd_over_se": 1.2850621426292546,
+      "unstable_replicas": [],
+      "screened": 0,
+      "trapped": 0,
+      "global_acceptance": 0.000425,
+      "seconds_per_global_pass": 0.0013993777130928003,
+      "mean_wall_seconds": 37.292472875133775,
+      "nmeas_per_replica": 50000,
+      "seeds": [
+        20261729042,
+        20261729079,
+        20261729116,
+        20261729153,
+        20261729190,
+        20261729227,
+        20261729264,
+        20261729301,
+        20261729338,
+        20261729375,
+        20261729412,
+        20261729449
+      ]
+    },
+    {
+      "beta": 16.0,
+      "dtau": 0.025,
+      "interval": 10,
+      "replicas": 12,
+      "observables": {
+        "E": {
+          "mean": -0.8969499075793567,
+          "se": 0.0005801674492649443
+        },
+        "D": {
+          "mean": 0.07140775163499487,
+          "se": 3.9117069946773666e-05
+        },
+        "Szz": {
+          "mean": 1.6620382272129348,
+          "se": 0.004914869374363123
+        },
+        "Sperp": {
+          "mean": 1.6686082361819687,
+          "se": 0.010390368124561563
+        },
+        "SU2": {
+          "mean": -0.006570008969033929,
+          "se": 0.011869205200223517
+        },
+        "Sz2": {
+          "mean": -6.504744755345705e-16,
+          "se": 4.467021352849811e-16
+        }
+      },
+      "mean_inner_se": 0.023658465103509472,
+      "replica_sd": 0.017025606937922377,
+      "sd_over_se": 0.7196412304615999,
+      "unstable_replicas": [],
+      "screened": 0,
+      "trapped": 0,
+      "global_acceptance": 0.0,
+      "seconds_per_global_pass": 0.005549716969062998,
+      "mean_wall_seconds": 154.13815186102875,
+      "nmeas_per_replica": 50000,
+      "seeds": [
+        20261737058,
+        20261737095,
+        20261737132,
+        20261737169,
+        20261737206,
+        20261737243,
+        20261737280,
+        20261737317,
+        20261737354,
+        20261737391,
+        20261737428,
+        20261737465
+      ]
+    },
+    {
+      "beta": 16.0,
+      "dtau": 0.05,
+      "interval": 10,
+      "replicas": 12,
+      "observables": {
+        "E": {
+          "mean": -0.9199332356099856,
+          "se": 0.0010537162701904793
+        },
+        "D": {
+          "mean": 0.06988290770770843,
+          "se": 0.00011357398713995392
+        },
+        "Szz": {
+          "mean": 1.6760080930215429,
+          "se": 0.0009604952835738535
+        },
+        "Sperp": {
+          "mean": 1.6971503940768113,
+          "se": 0.023649026857447603
+        },
+        "SU2": {
+          "mean": -0.021142301055268396,
+          "se": 0.02350959743001221
+        },
+        "Sz2": {
+          "mean": -1.113584614608537e-16,
+          "se": 1.0452263778109057e-16
+        }
+      },
+      "mean_inner_se": 0.005553049588460835,
+      "replica_sd": 0.0033272532631603816,
+      "sd_over_se": 0.5991758600669389,
+      "unstable_replicas": [],
+      "screened": 0,
+      "trapped": 0,
+      "global_acceptance": 0.0,
+      "seconds_per_global_pass": 0.002762637072478037,
+      "mean_wall_seconds": 1091.307007038112,
+      "nmeas_per_replica": 800000,
+      "seeds": [
+        20261737042,
+        20261737079,
+        20261737116,
+        20261737153,
+        20261737190,
+        20261737227,
+        20261737264,
+        20261737301,
+        20261737338,
+        20261737375,
+        20261737412,
+        20261737449
+      ]
+    },
+    {
+      "beta": 16.0,
+      "dtau": 0.05,
+      "interval": 100,
+      "replicas": 12,
+      "observables": {
+        "E": {
+          "mean": -0.9193941880219014,
+          "se": 0.00042421635378933625
+        },
+        "D": {
+          "mean": 0.0700028737168976,
+          "se": 2.87443668572938e-05
+        },
+        "Szz": {
+          "mean": 1.6805343211788628,
+          "se": 0.002319493881117215
+        },
+        "Sperp": {
+          "mean": 1.689115214700257,
+          "se": 0.01488492221887913
+        },
+        "SU2": {
+          "mean": -0.008580893521394212,
+          "se": 0.014778897433343948
+        },
+        "Sz2": {
+          "mean": -5.153177427915097e-16,
+          "se": 6.695860427113183e-16
+        }
+      },
+      "mean_inner_se": 0.01016220483030468,
+      "replica_sd": 0.008034962499880283,
+      "sd_over_se": 0.7906711815057343,
+      "unstable_replicas": [],
+      "screened": 0,
+      "trapped": 0,
+      "global_acceptance": 0.0,
+      "seconds_per_global_pass": 0.0027795956075963814,
+      "mean_wall_seconds": 222.56799195846543,
+      "nmeas_per_replica": 200000,
+      "seeds": [
+        20261737042,
+        20261737079,
+        20261737116,
+        20261737153,
+        20261737190,
+        20261737227,
+        20261737264,
+        20261737301,
+        20261737338,
+        20261737375,
+        20261737412,
+        20261737449
+      ]
+    }
+  ],
+  "scientific_criteria": [
+    {
+      "beta": 4.0,
+      "dtau": 0.025,
+      "interval": 10,
+      "replicas": 12,
+      "criterion": "long_lived",
+      "value": 0,
+      "required": 0,
+      "status": "pass"
+    },
+    {
+      "beta": 4.0,
+      "dtau": 0.025,
+      "interval": 10,
+      "replicas": 12,
+      "criterion": "replica_SD_over_inner_SE",
+      "value": 0.7009364095506296,
+      "required": 2,
+      "unstable_replicas": [],
+      "status": "pass"
+    },
+    {
+      "beta": 4.0,
+      "dtau": 0.025,
+      "interval": 10,
+      "replicas": 12,
+      "criterion": "paired_SU2",
+      "mean": 0.015184237146288054,
+      "se": 0.007854510462887416,
+      "exact": 0,
+      "required_se": 0.04,
+      "status": "pass"
+    },
+    {
+      "beta": 4.0,
+      "dtau": 0.05,
+      "interval": 10,
+      "replicas": 24,
+      "criterion": "long_lived",
+      "value": 0,
+      "required": 0,
+      "status": "pass"
+    },
+    {
+      "beta": 4.0,
+      "dtau": 0.05,
+      "interval": 10,
+      "replicas": 24,
+      "criterion": "replica_SD_over_inner_SE",
+      "value": 0.7419533239958938,
+      "required": 2,
+      "unstable_replicas": [],
+      "status": "pass"
+    },
+    {
+      "beta": 4.0,
+      "dtau": 0.05,
+      "interval": 10,
+      "replicas": 24,
+      "criterion": "paired_SU2",
+      "mean": 0.006782998203821977,
+      "se": 0.007351012560090171,
+      "exact": 0,
+      "required_se": 0.04,
+      "status": "pass"
+    },
+    {
+      "beta": 8.0,
+      "dtau": 0.025,
+      "interval": 10,
+      "replicas": 12,
+      "criterion": "long_lived",
+      "value": 0,
+      "required": 0,
+      "status": "pass"
+    },
+    {
+      "beta": 8.0,
+      "dtau": 0.025,
+      "interval": 10,
+      "replicas": 12,
+      "criterion": "replica_SD_over_inner_SE",
+      "value": 0.744408744044641,
+      "required": 2,
+      "unstable_replicas": [],
+      "status": "pass"
+    },
+    {
+      "beta": 8.0,
+      "dtau": 0.025,
+      "interval": 10,
+      "replicas": 12,
+      "criterion": "paired_SU2",
+      "mean": 0.007996304833968737,
+      "se": 0.018908854379242945,
+      "exact": 0,
+      "required_se": 0.04,
+      "status": "pass"
+    },
+    {
+      "beta": 8.0,
+      "dtau": 0.05,
+      "interval": 10,
+      "replicas": 12,
+      "criterion": "long_lived",
+      "value": 0,
+      "required": 0,
+      "status": "pass"
+    },
+    {
+      "beta": 8.0,
+      "dtau": 0.05,
+      "interval": 10,
+      "replicas": 12,
+      "criterion": "replica_SD_over_inner_SE",
+      "value": 1.2850621426292546,
+      "required": 2,
+      "unstable_replicas": [],
+      "status": "pass"
+    },
+    {
+      "beta": 8.0,
+      "dtau": 0.05,
+      "interval": 10,
+      "replicas": 12,
+      "criterion": "paired_SU2",
+      "mean": 0.00377929528873479,
+      "se": 0.01883089724173591,
+      "exact": 0,
+      "required_se": 0.04,
+      "status": "pass"
+    },
+    {
+      "beta": 16.0,
+      "dtau": 0.025,
+      "interval": 10,
+      "replicas": 12,
+      "criterion": "long_lived",
+      "value": 0,
+      "required": 0,
+      "status": "pass"
+    },
+    {
+      "beta": 16.0,
+      "dtau": 0.025,
+      "interval": 10,
+      "replicas": 12,
+      "criterion": "replica_SD_over_inner_SE",
+      "value": 0.7196412304615999,
+      "required": 2,
+      "unstable_replicas": [],
+      "status": "pass"
+    },
+    {
+      "beta": 16.0,
+      "dtau": 0.025,
+      "interval": 10,
+      "replicas": 12,
+      "criterion": "paired_SU2",
+      "mean": -0.006570008969033929,
+      "se": 0.011869205200223517,
+      "exact": 0,
+      "required_se": 0.04,
+      "status": "pass"
+    },
+    {
+      "beta": 16.0,
+      "dtau": 0.05,
+      "interval": 10,
+      "replicas": 12,
+      "criterion": "long_lived",
+      "value": 0,
+      "required": 0,
+      "status": "pass"
+    },
+    {
+      "beta": 16.0,
+      "dtau": 0.05,
+      "interval": 10,
+      "replicas": 12,
+      "criterion": "replica_SD_over_inner_SE",
+      "value": 0.5991758600669389,
+      "required": 2,
+      "unstable_replicas": [],
+      "status": "pass"
+    },
+    {
+      "beta": 16.0,
+      "dtau": 0.05,
+      "interval": 10,
+      "replicas": 12,
+      "criterion": "paired_SU2",
+      "mean": -0.021142301055268396,
+      "se": 0.02350959743001221,
+      "exact": 0,
+      "required_se": 0.04,
+      "status": "pass"
+    },
+    {
+      "beta": 4,
+      "interval": 10,
+      "criterion": "dtau_squared_extrapolation",
+      "observable": "E",
+      "mean": -0.8742545409127779,
+      "se": 0.0008139184204386925,
+      "exact": -0.8731757583041778,
+      "required_se": 0.003,
+      "status": "pass"
+    },
+    {
+      "beta": 4,
+      "interval": 10,
+      "criterion": "dtau_squared_extrapolation",
+      "observable": "D",
+      "mean": 0.07191603053010072,
+      "se": 0.00011196933667171363,
+      "exact": 0.07199913047407148,
+      "required_se": 0.0005,
+      "status": "pass"
+    },
+    {
+      "beta": 4,
+      "interval": 10,
+      "criterion": "dtau_squared_extrapolation",
+      "observable": "Szz",
+      "mean": 1.6660926650551273,
+      "se": 0.0032403345123301667,
+      "exact": 1.6594597925894496,
+      "required_se": 0.03,
+      "status": "pass"
+    },
+    {
+      "beta": 4,
+      "interval": 10,
+      "criterion": "dtau_squared_extrapolation",
+      "observable": "Sperp",
+      "mean": 1.6481080149280174,
+      "se": 0.009707945445013669,
+      "exact": 1.6594597925894496,
+      "required_se": 0.03,
+      "status": "pass"
+    },
+    {
+      "beta": 4,
+      "interval": 10,
+      "criterion": "dtau_squared_extrapolation",
+      "observable": "SU2",
+      "mean": 0.01798465012711008,
+      "se": 0.010755519200465974,
+      "exact": 0,
+      "required_se": 0.04,
+      "status": "pass"
+    },
+    {
+      "beta": 4,
+      "interval": 10,
+      "criterion": "dtau_squared_extrapolation",
+      "observable": "Sz2",
+      "mean": 0.1072209042113118,
+      "se": 0.0012619461488977322,
+      "exact": 0.10964558792089917,
+      "required_se": 0.01,
+      "status": "pass"
+    },
+    {
+      "beta": 8,
+      "interval": 10,
+      "criterion": "dtau_squared_extrapolation",
+      "observable": "E",
+      "mean": -0.8902146501512523,
+      "se": 0.0012549690315627618,
+      "exact": -0.8900146154147714,
+      "required_se": 0.003,
+      "status": "pass"
+    },
+    {
+      "beta": 8,
+      "interval": 10,
+      "criterion": "dtau_squared_extrapolation",
+      "observable": "D",
+      "mean": 0.07203667029633287,
+      "se": 6.278572650216031e-05,
+      "exact": 0.07189010912946736,
+      "required_se": 0.0005,
+      "status": "pass"
+    },
+    {
+      "beta": 8,
+      "interval": 10,
+      "criterion": "dtau_squared_extrapolation",
+      "observable": "Szz",
+      "mean": 1.6748643196378346,
+      "se": 0.007552281073431883,
+      "exact": 1.6711643754743633,
+      "required_se": 0.03,
+      "status": "pass"
+    },
+    {
+      "beta": 8,
+      "interval": 10,
+      "criterion": "dtau_squared_extrapolation",
+      "observable": "Sperp",
+      "mean": 1.6654623449554542,
+      "se": 0.022402768614989157,
+      "exact": 1.6711643754743633,
+      "required_se": 0.03,
+      "status": "pass"
+    },
+    {
+      "beta": 8,
+      "interval": 10,
+      "criterion": "dtau_squared_extrapolation",
+      "observable": "SU2",
+      "mean": 0.009401974682380052,
+      "se": 0.025981444391239127,
+      "exact": 0,
+      "required_se": 0.04,
+      "status": "pass"
+    },
+    {
+      "beta": 8,
+      "interval": 10,
+      "criterion": "dtau_squared_extrapolation",
+      "observable": "Sz2",
+      "mean": 0.005733291760661054,
+      "se": 0.0011214678305548223,
+      "exact": 0.0059780939909770126,
+      "required_se": 0.004,
+      "status": "pass"
+    },
+    {
+      "beta": 16,
+      "interval": 10,
+      "criterion": "dtau_squared_extrapolation",
+      "observable": "E",
+      "mean": -0.8892887982358136,
+      "se": 0.0008495636975039732,
+      "exact": -0.8908366237367478,
+      "required_se": 0.003,
+      "status": "pass"
+    },
+    {
+      "beta": 16,
+      "interval": 10,
+      "criterion": "dtau_squared_extrapolation",
+      "observable": "D",
+      "mean": 0.07191603294409034,
+      "se": 6.444754381527744e-05,
+      "exact": 0.07186977912473584,
+      "required_se": 0.0005,
+      "status": "pass"
+    },
+    {
+      "beta": 16,
+      "interval": 10,
+      "criterion": "dtau_squared_extrapolation",
+      "observable": "Szz",
+      "mean": 1.657381605276732,
+      "se": 0.006560975593636195,
+      "exact": 1.6707270618606316,
+      "required_se": 0.03,
+      "status": "pass"
+    },
+    {
+      "beta": 16,
+      "interval": 10,
+      "criterion": "dtau_squared_extrapolation",
+      "observable": "Sperp",
+      "mean": 1.6590941835503543,
+      "se": 0.015939581994821563,
+      "exact": 1.6707270618606316,
+      "required_se": 0.03,
+      "status": "pass"
+    },
+    {
+      "beta": 16,
+      "interval": 10,
+      "criterion": "dtau_squared_extrapolation",
+      "observable": "SU2",
+      "mean": -0.00171257827362244,
+      "se": 0.01765958878557811,
+      "exact": 0,
+      "required_se": 0.04,
+      "status": "pass"
+    },
+    {
+      "beta": 16,
+      "interval": 10,
+      "criterion": "dtau_squared_extrapolation",
+      "observable": "Sz2",
+      "mean": -8.301798135591427e-16,
+      "se": 5.966210172946476e-16,
+      "exact": 1.774630509362282e-05,
+      "required_se": 0.004,
+      "status": "pass",
+      "upper_2_5sigma": 6.613727296774763e-16,
+      "agreement_with_exact": "undetermined"
+    },
+    {
+      "criterion": "beta4_previous_run",
+      "observable": "E",
+      "beta": 4,
+      "dtau": 0.05,
+      "interval": 10,
+      "difference": 0.0008904375918767545,
+      "se": 0.001173890960682247,
+      "status": "pass",
+      "uncertainty": "SE of replica differences paired by the historical seed mapping"
+    },
+    {
+      "criterion": "beta4_previous_run",
+      "observable": "D",
+      "beta": 4,
+      "dtau": 0.05,
+      "interval": 10,
+      "difference": -2.2531830190406405e-05,
+      "se": 6.294743375322501e-05,
+      "status": "pass",
+      "uncertainty": "SE of replica differences paired by the historical seed mapping"
+    },
+    {
+      "criterion": "beta4_previous_run",
+      "observable": "Szz",
+      "beta": 4,
+      "dtau": 0.05,
+      "interval": 10,
+      "difference": -0.016839285209105253,
+      "se": 0.008198370137523737,
+      "status": "pass",
+      "uncertainty": "SE of replica differences paired by the historical seed mapping"
+    },
+    {
+      "criterion": "beta4_previous_run",
+      "observable": "Sperp",
+      "beta": 4,
+      "dtau": 0.05,
+      "interval": 10,
+      "difference": 0.018969050410914196,
+      "se": 0.00967735399722982,
+      "status": "pass",
+      "uncertainty": "SE of replica differences paired by the historical seed mapping"
+    },
+    {
+      "beta": 4,
+      "dtau": 0.05,
+      "interval": 10,
+      "criterion": "extended_independent_SU2_confirmation",
+      "mean": 0.0065915887642324315,
+      "se": 0.011390630072061113,
+      "exact": 0,
+      "required_se": 0.04,
+      "status": "pass"
+    }
+  ],
+  "default_criteria": [
+    {
+      "beta": 16.0,
+      "dtau": 0.05,
+      "interval": 100,
+      "replicas": 12,
+      "criterion": "long_lived",
+      "value": 0,
+      "required": 0,
+      "status": "pass"
+    },
+    {
+      "beta": 16.0,
+      "dtau": 0.05,
+      "interval": 100,
+      "replicas": 12,
+      "criterion": "replica_SD_over_inner_SE",
+      "value": 0.7906711815057343,
+      "required": 2,
+      "unstable_replicas": [],
+      "status": "pass"
+    },
+    {
+      "beta": 16.0,
+      "dtau": 0.05,
+      "interval": 100,
+      "replicas": 12,
+      "criterion": "paired_SU2",
+      "mean": -0.008580893521394212,
+      "se": 0.014778897433343948,
+      "exact": 0,
+      "required_se": 0.04,
+      "status": "pass"
+    }
+  ],
+  "frequency_comparison": [
+    {
+      "observable": "E",
+      "interval10": {
+        "mean": -0.9199332356099856,
+        "se": 0.0010537162701904793
+      },
+      "interval100": {
+        "mean": -0.9193941880219014,
+        "se": 0.00042421635378933625
+      },
+      "difference": 0.0005390475880842535,
+      "se": 0.001270836473786125,
+      "uncertainty": "SE of the 12 matched-seed replica differences; measurement lengths differ"
+    },
+    {
+      "observable": "D",
+      "interval10": {
+        "mean": 0.06988290770770843,
+        "se": 0.00011357398713995392
+      },
+      "interval100": {
+        "mean": 0.0700028737168976,
+        "se": 2.87443668572938e-05
+      },
+      "difference": 0.00011996600918917517,
+      "se": 0.00011993392215973702,
+      "uncertainty": "SE of the 12 matched-seed replica differences; measurement lengths differ"
+    },
+    {
+      "observable": "Szz",
+      "interval10": {
+        "mean": 1.6760080930215429,
+        "se": 0.0009604952835738535
+      },
+      "interval100": {
+        "mean": 1.6805343211788628,
+        "se": 0.002319493881117215
+      },
+      "difference": 0.004526228157320085,
+      "se": 0.0025882229490837893,
+      "uncertainty": "SE of the 12 matched-seed replica differences; measurement lengths differ"
+    },
+    {
+      "observable": "Sperp",
+      "interval10": {
+        "mean": 1.6971503940768113,
+        "se": 0.023649026857447603
+      },
+      "interval100": {
+        "mean": 1.689115214700257,
+        "se": 0.01488492221887913
+      },
+      "difference": -0.008035179376554125,
+      "se": 0.02948079480054617,
+      "uncertainty": "SE of the 12 matched-seed replica differences; measurement lengths differ"
+    },
+    {
+      "observable": "SU2",
+      "interval10": {
+        "mean": -0.021142301055268396,
+        "se": 0.02350959743001221
+      },
+      "interval100": {
+        "mean": -0.008580893521394212,
+        "se": 0.014778897433343948
+      },
+      "difference": 0.012561407533874183,
+      "se": 0.030066760227681944,
+      "uncertainty": "SE of the 12 matched-seed replica differences; measurement lengths differ"
+    },
+    {
+      "observable": "Sz2",
+      "interval10": {
+        "mean": -1.113584614608537e-16,
+        "se": 1.0452263778109057e-16
+      },
+      "interval100": {
+        "mean": -5.153177427915097e-16,
+        "se": 6.695860427113183e-16
+      },
+      "difference": -4.0395928133065604e-16,
+      "se": 6.990899904961453e-16,
+      "uncertainty": "SE of the 12 matched-seed replica differences; measurement lengths differ"
+    }
+  ],
+  "verified_extension_prefixes": 60,
+  "selected_run_paths": 96,
+  "raw_equilibrium_runs": 168,
+  "non_equilibrium_diagnostic_runs": 24,
+  "history": [
+    {
+      "stage": "initial",
+      "scientific": "fail",
+      "default": "undetermined"
+    },
+    {
+      "stage": "r1",
+      "scientific": "fail",
+      "default": "pass"
+    },
+    {
+      "stage": "r2",
+      "scientific": "undetermined",
+      "default": "pass"
+    },
+    {
+      "stage": "r3",
+      "scientific": "pass",
+      "default": "pass"
+    }
+  ],
+  "limitations": [
+    "4x2 cluster only",
+    "Two dtau points do not test O(dtau^4)",
+    "Rare large conditional transverse-spin estimators can dominate empirical uncertainty",
+    "The beta16 Sz2 upper-bound screen does not establish agreement with its tiny nonzero exact value",
+    "Extension conditions were selected after examining earlier results; no single-look significance guarantee is claimed."
+  ]
+}
