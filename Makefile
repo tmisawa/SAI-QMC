@@ -100,7 +100,7 @@ test_szz_parallel: dqmc dqmc_omp dqmc_mpi dqmc_hybrid
 test_sperp_parallel: dqmc dqmc_omp dqmc_mpi dqmc_hybrid
 	@printf "%-35s " tests/test_sperp_parallel.sh; sh tests/test_sperp_parallel.sh
 
-test: $(TESTBIN) test_szz test_sperp test_scalar test_dat test_global_default
+test: $(TESTBIN) test_szz test_sperp test_scalar test_dat test_global_default test_global_output
 	@fail=0; for t in $(TESTBIN); do printf "%-28s " $$t; ./$$t || fail=1; done; \
 	  if [ $$fail -ne 0 ]; then echo "SOME TESTS FAILED"; exit 1; fi; echo "ALL TESTS PASSED"
 
@@ -116,7 +116,7 @@ test_mpi: $(TESTBIN_MPI)
 	@fail=0; for t in $(TESTBIN_MPI); do printf "%-32s " $$t; $(MPIRUN) -np 1 ./$$t || fail=1; done; \
 	  if [ $$fail -ne 0 ]; then echo "SOME MPI TESTS FAILED"; exit 1; fi; echo "ALL MPI TESTS PASSED"
 
-test_hybrid: $(TESTBIN_HYBRID) test_szz_parallel test_sperp_parallel test_scalar_parallel test_dat_parallel
+test_hybrid: $(TESTBIN_HYBRID) test_szz_parallel test_sperp_parallel test_scalar_parallel test_dat_parallel test_global_parallel
 	@fail=0; for t in $(TESTBIN_HYBRID); do printf "%-35s " $$t; $(MPIRUN) -np 1 ./$$t || fail=1; done; \
 	  if [ $$fail -ne 0 ]; then echo "SOME HYBRID TESTS FAILED"; exit 1; fi; echo "ALL HYBRID TESTS PASSED"
 
@@ -130,3 +130,11 @@ test_global_default: dqmc
 	@printf "%-28s " tests/test_global_default_unchanged.sh; sh tests/test_global_default_unchanged.sh $(GLOBAL_DEFAULT_VARIANTS)
 
 .PHONY: test_global_default
+
+test_global_output: dqmc
+	@printf "%-28s " tests/test_global_output.sh; sh tests/test_global_output.sh
+
+test_global_parallel: dqmc dqmc_omp dqmc_mpi dqmc_hybrid
+	@printf "%-35s " tests/test_global_parallel.sh; sh tests/test_global_parallel.sh
+
+.PHONY: test_global_output test_global_parallel
