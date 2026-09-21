@@ -83,4 +83,11 @@ int la_inverse_work(int n, const double *A, double *Ainv, LinalgWork *w);
 int la_logdet_work(int n, double *A, int *sign, double *logabs,
                    LinalgWork *w);
 
+/* Computes log|det(1 + exp(log_offset) U diag(D) T)| and its sign from the
+   effective scales ell_i = log|D_i| + log_offset, without forming the
+   product. T must be unit upper triangular (as produced by udv_lmul*).
+   Returns nonzero on failure with *det_sign = 0 and *logabs = NAN. */
+int udv_logdet_one_plus_work(const UDV *s, int *det_sign, double *logabs,
+                             LinalgWork *w);
+
 #endif

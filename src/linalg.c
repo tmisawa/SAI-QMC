@@ -1396,3 +1396,96 @@ int udv_inv_one_plus(const UDV *s, double *g, int *det_sign)
     linalg_work_free(&w);
     return rc;
 }
+
+int udv_logdet_one_plus_work(const UDV *s, int *det_sign, double *logabs,
+                             LinalgWork *w)
+{
+    if (det_sign != NULL) {
+        *det_sign = 0;
+    }
+    if (logabs != NULL) {
+        *logabs = NAN;
+    }
+    if (s == NULL || det_sign == NULL || logabs == NULL) {
+        return 1;
+    }
+    const int n = s->n;
+    if (w == NULL || !w->ok || w->n != n) {
+        LinalgWork local;
+        linalg_work_init(&local, n);
+        if (!local.ok) {
+            linalg_work_free(&local);
+            return 1;
+        }
+        const int rc = udv_logdet_one_plus_work(s, det_sign, logabs, &local);
+        linalg_work_free(&local);
+        return rc;
+    }
+    if (w->failed || !isfinite(s->log_offset)) {
+        return 1;
+    }
+    double *inv_big = w->v1;
+    double *small = w->v2;
+    double *Tinv = w->A;
+    double *scratch = w->B;
+    double *M = w->C;
+    double big_sum = 0.0;
+
+    for (int i = 0; i < n; i++) {
+        if (!isfinite(s->D[i]) || s->D[i] == 0.0) {
+            return 1;
+        }
+        const double ell = log(fabs(s->D[i])) + s->log_offset;
+        if (!isfinite(ell)) {
+            return 1;
+        }
+        if (ell > 0.0) {
+            big_sum += ell;
+            inv_big[i] = exp(-ell);
+            small[i] = copysign(1.0, s->D[i]);
+        } else {
+            inv_big[i] = 1.0;
+            small[i] = copysign(exp(ell), s->D[i]);
+        }
+    }
+    memcpy(Tinv, s->T, sizeof(double) * (size_t)n * (size_t)n);
+    {
+        const char uplo = 'U';
+        const char diag = 'U';
+        int info = 0;
+        dtrtri_(&uplo, &diag, &n, Tinv, &n, &info);
+        if (info != 0) {
+            return 1;
+        }
+    }
+    la_gemm(n, 1, 0, 1.0, s->U, Tinv, 0.0, scratch);
+    for (int j = 0; j < n; j++) {
+        for (int i = 0; i < n; i++) {
+            M[i + j * n] = scratch[i + j * n] * inv_big[i];
+        }
+    }
+    for (int i = 0; i < n; i++) {
+        M[i + i * n] += small[i];
+    }
+    int su = 0;
+    int sm = 0;
+    double lu = 0.0;
+    double lm = 0.0;
+    memcpy(scratch, s->U, sizeof(double) * (size_t)n * (size_t)n);
+    if (la_logdet_work(n, scratch, &su, &lu, w) != 0 || su == 0 ||
+        !isfinite(lu)) {
+        return 1;
+    }
+    memcpy(scratch, M, sizeof(double) * (size_t)n * (size_t)n);
+    if (la_logdet_work(n, scratch, &sm, &lm, w) != 0 || sm == 0 ||
+        !isfinite(lm)) {
+        return 1;
+    }
+    const double total = lu + big_sum + lm;
+    if (!isfinite(total)) {
+        return 1; /* outputs keep their failure values */
+    }
+    *logabs = total;
+    *det_sign = su * sm;
+    return 0;
+}
