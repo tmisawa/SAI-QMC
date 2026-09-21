@@ -125,7 +125,7 @@ clean:
 
 .PHONY: test test_szz test_sperp test_scalar test_dat test_dat_parallel test_scalar_parallel test_szz_parallel test_sperp_parallel test_slow test_omp test_mpi test_hybrid clean
 
-GLOBAL_DEFAULT_VARIANTS ?= omitted profile
+GLOBAL_DEFAULT_VARIANTS ?= omitted none binonly profile
 test_global_default: dqmc
 	@printf "%-28s " tests/test_global_default_unchanged.sh; sh tests/test_global_default_unchanged.sh $(GLOBAL_DEFAULT_VARIANTS)
 

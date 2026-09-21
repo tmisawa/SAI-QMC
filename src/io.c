@@ -94,6 +94,10 @@ static void defaults(Params *p)
     strcpy(p->parallel, "serial");
     p->nrep = 1;
     p->replica_log[0] = '\0';
+    strcpy(p->global_update, "none");
+    p->global_interval = 100;
+    p->replica_bin_file[0] = '\0';
+
     strcpy(p->szz_q, "none");
     strcpy(p->szz_file, "szz.dat");
     strcpy(p->sperp_q, "none");
@@ -150,7 +154,10 @@ static int is_strict_string_key(const char *key)
     return strcmp(key, "output_file") == 0 ||
            strcmp(key, "szz_q") == 0 || strcmp(key, "szz_file") == 0 ||
            strcmp(key, "sperp_q") == 0 || strcmp(key, "sperp_file") == 0 ||
-           strcmp(key, "spin_consistency_file") == 0;
+           strcmp(key, "spin_consistency_file") == 0 ||
+           strcmp(key, "global_update") == 0 ||
+           strcmp(key, "global_interval") == 0 ||
+           strcmp(key, "replica_bin_file") == 0;
 }
 
 int params_read(Params *p, const char *path)
@@ -297,6 +304,19 @@ int params_read(Params *p, const char *path)
         } else if (strcmp(key, "replica_log") == 0) {
             strncpy(p->replica_log, val, sizeof p->replica_log - 1);
             p->replica_log[sizeof p->replica_log - 1] = '\0';
+        } else if (strcmp(key, "global_update") == 0) {
+            if (strlen(val) >= sizeof p->global_update) {
+                FAIL("ERROR: global_update must be none or site (got %s)\n", val);
+            }
+            strcpy(p->global_update, val);
+        } else if (strcmp(key, "global_interval") == 0) {
+            if (parse_int_value(val, &p->global_interval) ||
+                p->global_interval <= 0) {
+                FAIL("ERROR: global_interval must be a positive integer (got %s)\n",
+                     val);
+            }
+        } else if (strcmp(key, "replica_bin_file") == 0) {
+            memcpy(p->replica_bin_file, val, strlen(val) + 1); /* val < 256 by the strict parse */
         } else if (strcmp(key, "szz_q") == 0) {
             memcpy(p->szz_q, val, strlen(val) + 1);
         } else if (strcmp(key, "szz_file") == 0) {
@@ -378,6 +398,13 @@ int params_read(Params *p, const char *path)
                 p->sweep_order);
         return 1;
     }
+    if (strcmp(p->global_update, "none") != 0 &&
+        strcmp(p->global_update, "site") != 0) {
+        fprintf(stderr, "ERROR: global_update must be none or site (got %s)\n",
+                p->global_update);
+        return 1;
+    }
+
     if (strcmp(p->green_rebuild, "combine") != 0 &&
         strcmp(p->green_rebuild, "two_sided") != 0 &&
         strcmp(p->green_rebuild, "centered") != 0) {

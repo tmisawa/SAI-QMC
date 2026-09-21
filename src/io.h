@@ -27,6 +27,10 @@ typedef struct {
     char parallel[16];
     int nrep;
     char replica_log[256];
+    char global_update[16];
+    int global_interval;
+    char replica_bin_file[256];
+
     char szz_q[256];
     char szz_file[256];
     char sperp_q[256];
