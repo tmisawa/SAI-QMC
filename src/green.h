@@ -99,4 +99,9 @@ void green_update(Green *G, int i, double N);
 void green_wrap(Green *G);
 void green_wrap_backward(Green *G);
 
+/* log|det(1 + B_{L-1}...B_0)| and its sign for the current field, built from
+   stab-slice block products (same blocks as green_stack_build_prefix).
+   Does not modify G->g, G->cur_l, the delay buffer or G->det_sign. */
+int green_logdet_full(Green *G, int stab, int *det_sign, double *logabs);
+
 #endif
