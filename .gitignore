@@ -2,6 +2,7 @@
 .DS_Store
 
 # build artifacts
+/build/test-hooks/
 *.o
 /dqmc
 /dqmc_omp

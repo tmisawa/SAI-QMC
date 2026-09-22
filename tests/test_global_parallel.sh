@@ -93,7 +93,7 @@ if what.startswith("numerical"):
 PY
 }
 for mode in mpi hybrid; do
-  bin="$root/dqmc_$mode"
+  bin="$root/build/test-hooks/dqmc_$mode"
   write_input "$mode" 5
   sed -i.bak 's#^replica_bin_file=.*#replica_bin_file=/nonexistent_dir/bins.tsv#' "$tmp/input.in"
   expect_fail "open ($mode)" env OMP_NUM_THREADS=2 "$MPIRUN" -n 3 sh "$tmp/rank_exit.sh" "$bin" input.in
@@ -101,5 +101,10 @@ for mode in mpi hybrid; do
   expect_fail "write ($mode)" env OMP_NUM_THREADS=2 AFQMC_TEST_BIN_WRITE_FAIL=1 "$MPIRUN" -n 3 sh "$tmp/rank_exit.sh" "$bin" input.in
   expect_fail "close ($mode)" env OMP_NUM_THREADS=2 AFQMC_TEST_BIN_CLOSE_FAIL=1 "$MPIRUN" -n 3 sh "$tmp/rank_exit.sh" "$bin" input.in
   expect_fail "numerical ($mode)" env OMP_NUM_THREADS=2 AFQMC_TEST_GLOBAL_FAIL_AT=15 "$MPIRUN" -n 3 sh "$tmp/rank_exit.sh" "$bin" input.in
+done
+for mode in serial omp mpi hybrid; do
+  bin="$root/dqmc"
+  [ "$mode" = serial ] || bin="$root/dqmc_$mode"
+  sh "$root/tests/test_global_hook_isolation.sh" "$bin" "$mode" || fail=1
 done
 [ "$fail" -eq 0 ] && echo OK || exit 1

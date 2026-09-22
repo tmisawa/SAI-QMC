@@ -6,9 +6,15 @@ fix="$root/tests/fixtures/global_baseline"
 variants="${*:-omitted none binonly profile}"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
+# This explicit historical regression requires the old source; normal make test does not.
+if ! git -C "$root" cat-file -e '463dc75^{commit}' 2>/dev/null; then
+  echo "FAIL historical regression requires Git commit 463dc75; run make test for history-free tests" >&2
+  exit 1
+fi
 # clean baseline build in isolation: no object files are shared with the working tree
 mkdir "$work/base"
-git -C "$root" archive 463dc75 | tar -x -C "$work/base"
+git -C "$root" archive 463dc75 > "$work/base.tar"
+tar -xf "$work/base.tar" -C "$work/base"
 make -C "$work/base" dqmc >/dev/null 2>&1 || { echo "FAIL baseline build"; exit 1; }
 {
   echo "baseline_commit=463dc75"

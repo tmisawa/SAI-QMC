@@ -1,12 +1,13 @@
 ---
-date: 2026-09-21
-datetime: 2026-09-21 23:18 JST
+date: 2026-09-22
+datetime: 2026-09-22 10:03 JST
 model: OpenAI GPT-6 (Codex; revision), Codex GPT-5 (original)
 summary: |
   半充填ハバード模型の E(T) を grand-canonical ED/TPQ と比較する検証手順。
   アンサンブル整合・dtau→0 外挿・規約変換・符号/粒子数チェック・2D の ED サイズ制約をまとめる。
   Global HS update の実装検査、4×2 clusterの初回84 runと追加検証を記録した。
   追加測定後に科学的受入と既定頻度100の判定を通過。beta16の微小なSz2の厳密値との一致は未確定。
+  09-22にtest hook分離、履歴なしtest、two-spin検査を追加し、4形態と旧commit比較を再検証した。
 ---
 
 # 検証手順: E(T) を ED/TPQ と比較
@@ -197,7 +198,7 @@ productionのsourceとbinaryは変更していない。
 
 **科学的受入pass、既定頻度100の評価pass。** 指定した判定基準を変えずに評価した。
 最終選択は96 run pathで、各条件内に12本（beta4/dtau.05は24本）の独立replicaを持つ。
-長寿命状態は0/96、Szzの再block未安定は0、18個の外挿判定と旧beta4比較もすべてpass。
+長寿命状態は0/96、Szzの再block未安定は0、17個のED一致判定・1個の残留上限screenと旧beta4比較もすべてpass。
 beta16のSz2については残留上限screenのpassであり、微小な厳密値との一致は判定不能とする。
 この評価範囲では `global_interval` の既定値100を維持する。`global_update` の既定値は `none` のままとする。
 
@@ -270,3 +271,21 @@ specの残留上限判定と、厳密値約1.77e−5の一致を区別する。�
 同じseedを使う頻度10/100の比較では、対応するreplicaの差からSEを求めた。
 延長対象は前段の結果を見て選んでいるため、単回固定実験としての有意水準保証は主張しない。
 この検証は4×2に限る。4×4・6×6の効果は未検証で、受理率だけを混合の十分性の根拠にしない。
+
+### 2026-09-22の回帰検査の補強
+
+数値kernelと既存の科学的検証データは変更せず、次の検査を追加した。
+
+- 失敗注入の環境変数は`AFQMC_TEST_HOOKS`を定義した専用buildでのみ有効。
+  通常のserial/OpenMP/MPI/hybrid binaryでは4種類のhook変数を設定してもstdoutとbin出力がbyte一致する。
+  専用buildでの数値・書込み・close失敗とMPI全rankへの伝播は引き続き検査する。
+- 通常の`make test`はGit履歴なしでも実行可能。省略/none/bin-only/profileの一致を同一binaryで検査する。
+  `make test_global_default`はGit commit `463dc75`との同toolchainによる厳密なbyte比較を行う別targetとし、履歴不足では明示的に失敗する。
+- two-spin（`half=0, mu=U/2`）でも全256配置の受理境界・棄却復元・詳細釣り合い・定常分布を検査する。
+  forwardのcombine/centered/two-sidedとU=0でGu/Gdの再構築と次のlocal sweepの一致を確認する。
+  別コピーでGd再構築を省く変異を加えると、新しい状態検査が失敗することも確認した。
+
+macOS/Accelerate/Open MPIで`make test`、`test_omp`、`test_mpi`、`test_hybrid`、`test_global_default`が全て合格。
+`.git`を持たないsource snapshotでも`make test`が合格した。
+`/dev/full`検査はmacOSでSKIPのまま。今回slow/sanitizerと長い4×2科学的計算は再実行していない。
+旧検証のsource/binary checksumと数値結果は、その実行時点の記録として維持する。

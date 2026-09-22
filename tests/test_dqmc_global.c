@@ -129,11 +129,11 @@ static double dense_logw(Sys *s, Green *Gd_ref)
    independent dense weights. Test both sides of the acceptance boundary away
    from unity, and valid acceptance inputs near unity. Unconditional acceptance,
    an inverted ratio or a missing rollback fail here. */
-static void check_exact_kernels(void)
+static void check_exact_kernels(int half)
 {
     enum { NS = 2, LT = 4, NC = 256 };
     Sys s;
-    sys_make(&s, NS, 0, LT, 4.0, 1, DQMC_SWEEP_FORWARD, GREEN_REBUILD_COMBINE, 14);
+    sys_make(&s, NS, 0, LT, 4.0, half, DQMC_SWEEP_FORWARD, GREEN_REBUILD_COMBINE, 14);
     Green Gd;
     green_alloc(&Gd, &s.m, &s.f, -1.0);
     static double logw[NC], pi[NC], P[2][NC][NC], v[NC], u1[NC];
@@ -226,11 +226,12 @@ static void check_exact_kernels(void)
 /* spec 7.6: after a pass the object equals a fresh one built from the same field. */
 static int g_saw_none, g_saw_some, g_saw_all;
 
-static void check_state_after_pass(DqmcSweepMode sm, GreenRebuildMode gm,
+static void check_state_after_pass(int half, DqmcSweepMode sm, GreenRebuildMode gm,
                                    int presweeps, double U, uint64_t seed)
 {
     Sys s;
-    sys_make(&s, 4, 1, 10, U, 1, sm, gm, seed);
+    sys_make(&s, 4, 1, 10, U, half, sm, gm, seed);
+    CHECK(s.D.use_ph == half);
     for (int k = 0; k < presweeps; k++) {
         dqmc_sweep(&s.D);
     }
@@ -242,6 +243,10 @@ static void check_state_after_pass(DqmcSweepMode sm, GreenRebuildMode gm,
     CHECK(s.D.global_attempts == 4ULL);
     CHECK(s.D.Gu.cur_l == 0);
     CHECK(green_delay_count(&s.D.Gu) == 0);
+    if (!half) {
+        CHECK(s.D.Gd.cur_l == 0);
+        CHECK(green_delay_count(&s.D.Gd) == 0);
+    }
     CHECK(s.D.carried_prefix_valid == 0 && s.D.carried_suffix_valid == 0);
     /* every site is either fully flipped or untouched */
     int flipped_sites = 0;
@@ -259,7 +264,7 @@ static void check_state_after_pass(DqmcSweepMode sm, GreenRebuildMode gm,
 
     Sys ref;
     lattice_chain(&ref.L, 4, -1.0, 1);
-    model_init(&ref.m, &ref.L, U, 0.1, 1, 0.0);
+    model_init(&ref.m, &ref.L, U, 0.1, half, U / 2.0);
     rng_seed(&ref.r, 1);
     field_init(&ref.f, 4, 10, U, 0.1, &ref.r);
     memcpy(ref.f.s, s.f.s, 40);
@@ -277,6 +282,7 @@ static void check_state_after_pass(DqmcSweepMode sm, GreenRebuildMode gm,
     CHECK(memcmp(&s.r, &ref.r, sizeof(Rng)) == 0);
     for (int k = 0; k < 16; k++) {
         CHECK_CLOSE(s.D.Gu.g[k], ref.D.Gu.g[k], 1e-9);
+        CHECK_CLOSE(s.D.Gd.g[k], ref.D.Gd.g[k], 1e-9);
     }
     sys_free(&ref);
     sys_free(&s);
@@ -322,16 +328,21 @@ int main(void)
 {
     check_matches_local_ratio();
     check_weight_paths();
+    check_state_after_pass(0, DQMC_SWEEP_FORWARD, GREEN_REBUILD_COMBINE, 2, 4.0, 41);
+    check_state_after_pass(0, DQMC_SWEEP_FORWARD, GREEN_REBUILD_CENTERED, 2, 4.0, 42);
+    check_state_after_pass(0, DQMC_SWEEP_FORWARD, GREEN_REBUILD_TWO_SIDED, 2, 4.0, 43);
+    check_state_after_pass(0, DQMC_SWEEP_FORWARD, GREEN_REBUILD_COMBINE, 1, 0.0, 44);
     check_failure_sets_status();
-    check_exact_kernels();
-    check_state_after_pass(DQMC_SWEEP_FORWARD, GREEN_REBUILD_COMBINE, 0, 4.0, 21);
-    check_state_after_pass(DQMC_SWEEP_ALTERNATING, GREEN_REBUILD_COMBINE, 1, 4.0, 22); /* next: backward */
-    check_state_after_pass(DQMC_SWEEP_ALTERNATING, GREEN_REBUILD_COMBINE, 2, 4.0, 23); /* next: forward */
-    check_state_after_pass(DQMC_SWEEP_ALTERNATING, GREEN_REBUILD_CENTERED, 3, 4.0, 24);
-    check_state_after_pass(DQMC_SWEEP_FORWARD, GREEN_REBUILD_TWO_SIDED, 3, 4.0, 25);
-    check_state_after_pass(DQMC_SWEEP_ALTERNATING, GREEN_REBUILD_COMBINE, 1, 0.0, 26); /* U=0: delta=0, all accepted */
+    check_exact_kernels(1);
+    check_exact_kernels(0);
+    check_state_after_pass(1, DQMC_SWEEP_FORWARD, GREEN_REBUILD_COMBINE, 0, 4.0, 21);
+    check_state_after_pass(1, DQMC_SWEEP_ALTERNATING, GREEN_REBUILD_COMBINE, 1, 4.0, 22); /* next: backward */
+    check_state_after_pass(1, DQMC_SWEEP_ALTERNATING, GREEN_REBUILD_COMBINE, 2, 4.0, 23); /* next: forward */
+    check_state_after_pass(1, DQMC_SWEEP_ALTERNATING, GREEN_REBUILD_CENTERED, 3, 4.0, 24);
+    check_state_after_pass(1, DQMC_SWEEP_FORWARD, GREEN_REBUILD_TWO_SIDED, 3, 4.0, 25);
+    check_state_after_pass(1, DQMC_SWEEP_ALTERNATING, GREEN_REBUILD_COMBINE, 1, 0.0, 26); /* U=0: delta=0, all accepted */
     for (uint64_t seed = 40; seed < 60 && !(g_saw_none && g_saw_some); seed++) {
-        check_state_after_pass(DQMC_SWEEP_ALTERNATING, GREEN_REBUILD_COMBINE, 2, 8.0, seed);
+        check_state_after_pass(1, DQMC_SWEEP_ALTERNATING, GREEN_REBUILD_COMBINE, 2, 8.0, seed);
     }
     CHECK(g_saw_none);   /* an all-rejected pass was exercised */
     CHECK(g_saw_some);   /* a mixed pass was exercised */

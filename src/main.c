@@ -500,8 +500,11 @@ static int write_bin_view(FILE *fp, const ReplicaBinView *view,
     if (fp == NULL) {
         return 0;
     }
-    if (replica_bin_write(fp, view, meta, write_header) != 0 ||
-        getenv("AFQMC_TEST_BIN_WRITE_FAIL") != NULL) {
+    int write_failed = replica_bin_write(fp, view, meta, write_header) != 0;
+#ifdef AFQMC_TEST_HOOKS
+    write_failed |= getenv("AFQMC_TEST_BIN_WRITE_FAIL") != NULL;
+#endif
+    if (write_failed) {
         fprintf(stderr, "ERROR: failed to write replica_bin_file at beta_index=%d\n",
                 meta->beta_index);
         return 1;
@@ -630,9 +633,12 @@ static int close_outputs(const MpiEnv *env, FILE **scalar_fp,
             *consistency_fp = NULL;
         }
         if (bin_fp != NULL && *bin_fp != NULL) {
-            const int close_rc = fclose(*bin_fp);
+            int close_rc = fclose(*bin_fp);
             *bin_fp = NULL;
-            if (close_rc != 0 || getenv("AFQMC_TEST_BIN_CLOSE_FAIL") != NULL) {
+#ifdef AFQMC_TEST_HOOKS
+            close_rc |= getenv("AFQMC_TEST_BIN_CLOSE_FAIL") != NULL;
+#endif
+            if (close_rc != 0) {
                 fprintf(stderr, "ERROR: failed to close replica_bin_file\n");
                 failed = 1;
             }

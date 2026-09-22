@@ -183,12 +183,14 @@ int dqmc_run_replica(const Params *p, const Lattice *L, int beta_index,
     profiler_phase_set(prof, PROF_PHASE_WARMUP);
     const int use_global = (strcmp(p->global_update, "site") == 0);
     unsigned long long global_sweep = 0ULL; /* counts warmup + measurement */
+#ifdef AFQMC_TEST_HOOKS
     const char *fail_env = getenv("AFQMC_TEST_GLOBAL_FAIL_AT"); /* test hook only */
     const char *fail_beta_env = getenv("AFQMC_TEST_GLOBAL_FAIL_BETA");
     const int fail_beta = (fail_beta_env != NULL) ? atoi(fail_beta_env) : 0;
     const unsigned long long fail_at =
         (fail_env != NULL && fail_beta == beta_index)
             ? strtoull(fail_env, NULL, 10) : 0ULL;
+#endif
     for (int w = 0; w < p->nwarm; w++) {
         dqmc_sweep(&D);
         global_sweep++;
@@ -305,6 +307,7 @@ int dqmc_run_replica(const Params *p, const Lattice *L, int beta_index,
             global_sweep++;
             if (use_global && D.status == 0 &&
                 global_sweep % (unsigned long long)p->global_interval == 0ULL) {
+#ifdef AFQMC_TEST_HOOKS
                 const int inject_failure = fail_at != 0ULL && global_sweep == fail_at;
                 if (inject_failure) {
                     D.Gu.work.failed = 1;
@@ -315,6 +318,9 @@ int dqmc_run_replica(const Params *p, const Lattice *L, int beta_index,
                             "TEST_GLOBAL_FAIL beta_index=%d replica_id=%d sweep=%llu pass_rc=%d status=%d\n",
                             beta_index, replica_id, global_sweep, global_rc, D.status);
                 }
+#else
+                (void)dqmc_global_site_pass(&D);
+#endif
             }
             if (D.status != 0) {
                 fprintf(stderr,
