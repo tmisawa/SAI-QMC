@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <title>kugui i2cpu post-PH stab interval scan</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.55; margin: 32px; color: #202124; }
+    h1, h2 { line-height: 1.2; }
+    table { border-collapse: collapse; margin: 16px 0 24px; width: 100%; font-size: 14px; }
+    th, td { border: 1px solid #d0d7de; padding: 6px 8px; text-align: right; }
+    th:first-child, td:first-child, .left { text-align: left; }
+    th { background: #f6f8fa; }
+    code { background: #f6f8fa; padding: 1px 4px; border-radius: 4px; }
+    .ok { color: #116329; font-weight: 600; }
+    .warn { color: #9a6700; font-weight: 600; }
+    .bad { color: #a40e26; font-weight: 600; }
+    .note { color: #57606a; }
+  </style>
+</head>
+<body>
+  <h1>kugui i2cpu post-PH stab interval scan</h1>
+
+  <p>
+    対象: commit <code>c48fb91</code>,
+    PBS <code>844043.kugui-pbs</code>, queue <code>i2cpu</code>,
+    node <code>cpu121</code>, 2026-07-02 22:30:59-22:38:14 JST。
+    生データ:
+    <code>data/profiling_runs/kugui_i2cpu_post_ph_stab_scan_c48fb91_20260702_223059/</code>。
+  </p>
+
+  <h2>結論</h2>
+  <ul>
+    <li><span class="ok">16x16 U=4 では <code>stab=8</code> が有力候補。</span>
+      beta=16 の sweep は <code>1.503 -> 1.105 s/sweep</code>、<code>1.36x</code>。
+      beta=4/8 でも約 <code>1.38x</code>。</li>
+    <li><span class="bad"><code>stab=16</code> は不採用。</span>
+      速いが drift が beta=16 で <code>7.0</code>、U=12 stress で NaN も発生。</li>
+    <li><span class="warn">global default はまだ変えない。</span>
+      U=12 stress は <code>stab=4/8</code> でも wrapped G drift が大きい。
+      <code>stab=8</code> は当面、16x16 U=4 production candidate として扱う。</li>
+    <li>次の alternating sweep 実装は、decision gate どおり
+      <code>stab=4</code> と <code>stab=8</code> の両方で測る。</li>
+  </ul>
+
+  <h2>Validation</h2>
+  <p>
+    PBS 内で <code>make test</code> と <code>make test_slow</code> は通過。
+    profile 実行と drift 診断実行は分離したため、表の sweep 時間は追加
+    scratch rebuild で汚れていない。PH half filling の <code>sign=1</code> と
+    <code>dN=0</code> は sanity として確認されるが、stab 健全性の判定には使わない。
+  </p>
+
+  <h2>16x16 U=4 Performance</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>beta</th><th>stab</th><th>sweep s</th><th>speedup vs stab=4</th>
+        <th>stack_build s</th><th>from_stack s</th><th>udv_lmul s</th>
+        <th>udv_inv_one_plus s</th><th>wrap s</th><th>update s</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>4</td><td>2</td><td>0.555</td><td>0.65x</td><td>0.201</td><td>0.475</td><td>0.174</td><td>0.279</td><td>0.128</td><td>0.091</td></tr>
+      <tr><td>4</td><td>4</td><td>0.363</td><td>1.00x</td><td>0.128</td><td>0.234</td><td>0.088</td><td>0.140</td><td>0.130</td><td>0.091</td></tr>
+      <tr><td>4</td><td>8</td><td>0.262</td><td>1.38x</td><td>0.084</td><td>0.111</td><td>0.044</td><td>0.070</td><td>0.130</td><td>0.091</td></tr>
+      <tr><td>4</td><td>16</td><td>0.217</td><td>1.68x</td><td>0.057</td><td>0.063</td><td>0.026</td><td>0.042</td><td>0.130</td><td>0.091</td></tr>
+      <tr><td>8</td><td>2</td><td>1.134</td><td>0.66x</td><td>0.419</td><td>0.969</td><td>0.354</td><td>0.560</td><td>0.261</td><td>0.184</td></tr>
+      <tr><td>8</td><td>4</td><td>0.744</td><td>1.00x</td><td>0.272</td><td>0.480</td><td>0.178</td><td>0.281</td><td>0.262</td><td>0.183</td></tr>
+      <tr><td>8</td><td>8</td><td>0.537</td><td>1.39x</td><td>0.190</td><td>0.232</td><td>0.088</td><td>0.139</td><td>0.256</td><td>0.183</td></tr>
+      <tr><td>8</td><td>16</td><td>0.435</td><td>1.71x</td><td>0.140</td><td>0.111</td><td>0.044</td><td>0.070</td><td>0.256</td><td>0.186</td></tr>
+      <tr><td>16</td><td>2</td><td>2.283</td><td>0.66x</td><td>0.854</td><td>1.956</td><td>0.714</td><td>1.120</td><td>0.520</td><td>0.363</td></tr>
+      <tr><td>16</td><td>4</td><td>1.503</td><td>1.00x</td><td>0.559</td><td>0.970</td><td>0.357</td><td>0.560</td><td>0.531</td><td>0.362</td></tr>
+      <tr><td>16</td><td>8</td><td>1.105</td><td>1.36x</td><td>0.406</td><td>0.478</td><td>0.176</td><td>0.280</td><td>0.530</td><td>0.361</td></tr>
+      <tr><td>16</td><td>16</td><td>0.884</td><td>1.70x</td><td>0.314</td><td>0.231</td><td>0.087</td><td>0.139</td><td>0.510</td><td>0.361</td></tr>
+    </tbody>
+  </table>
+  <p class="note">
+    Time columns other than sweep are total seconds over two measured sweeps.
+    At beta=16, <code>green_from_stack</code>, <code>udv_lmul</code>,
+    and <code>udv_inv_one_plus</code> call counts are 160/80/40/20 for
+    stab=2/4/8/16, as expected.
+  </p>
+
+  <h2>16x16 U=4 Drift</h2>
+  <table>
+    <thead>
+      <tr><th>beta</th><th>stab=2</th><th>stab=4</th><th>stab=8</th><th>stab=16</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>4</td><td>8.53e-6</td><td>5.74e-6</td><td>8.88e-6</td><td class="warn">3.03e-2</td></tr>
+      <tr><td>8</td><td>2.13e-4</td><td>9.60e-5</td><td>3.37e-4</td><td class="bad">6.34e-1</td></tr>
+      <tr><td>16</td><td>6.09e-3</td><td>6.05e-3</td><td>7.01e-3</td><td class="bad">7.02</td></tr>
+    </tbody>
+  </table>
+  <p>
+    <code>stab=8</code> は beta=16 でも current default <code>stab=4</code> と同じ桁。
+    <code>stab=16</code> は beta=8 から明確に悪化し、beta=16 では採用不能。
+  </p>
+
+  <h2>U=12 Stress</h2>
+  <table>
+    <thead>
+      <tr><th>case</th><th>stab=2</th><th>stab=4</th><th>stab=8</th><th>stab=16</th><th>note</th></tr>
+    </thead>
+    <tbody>
+      <tr><td class="left">L4 beta=4 max drift</td><td>0.162</td><td>13.4</td><td>654</td><td>3096</td><td class="bad left">stab=16 output NaN</td></tr>
+      <tr><td class="left">L4 beta=8 max drift</td><td>1.88</td><td>74.3</td><td>92.8</td><td>4.46e5</td><td class="bad left">stab=16 output NaN</td></tr>
+      <tr><td class="left">L8 beta=4 max drift</td><td>0.156</td><td>4.11</td><td>209</td><td>709</td><td class="warn left">stab=16 observable drift</td></tr>
+    </tbody>
+  </table>
+  <p>
+    U=12 では <code>stab=8</code> も安全な一般 default としては扱えない。
+    ただし今回の短い統計では <code>stab=2/4/8</code> の観測量は概ね誤差内で、
+    <code>stab=16</code> だけが NaN または明確な観測量 drift を示した。
+  </p>
+  <p>
+    交互スイープ実装後の追加 drift 診断でも、U=12/stab=4 では
+    <code>max ~50-160</code>, <code>mean ~1e-3</code> 級の wrap drift が見えた。
+    forward の方がむしろ大きく（<code>163 vs 50</code>）、これは交互スイープの
+    退行ではなく既存の強結合 wrap drift である。したがって強結合条件では
+    <code>stab=2</code> 参照と drift 残差を decision gate に使う、という本 scan の
+    判定方針を維持する。
+  </p>
+
+  <h2>Decision Gate</h2>
+  <ul>
+    <li><code>stab=8</code>: 16x16 U=4 candidate として維持。alternating sweep は
+      <code>stab=4</code> と <code>stab=8</code> の両方で測る。</li>
+    <li><code>stab=16</code>: scan data point として残すが採用候補から外す。</li>
+    <li>U=12 stress の drift が大きいため、production default は変更しない。</li>
+  </ul>
+</body>
+</html>

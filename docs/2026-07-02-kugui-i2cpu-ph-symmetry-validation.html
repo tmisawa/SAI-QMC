@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>kugui i2cpu PH Symmetry Validation</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #182026;
+      --muted: #5c6872;
+      --line: #d7dde3;
+      --soft: #f5f7f9;
+      --accent: #0b6bcb;
+      --accent-2: #0d7f5f;
+    }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--ink);
+      background: #ffffff;
+      line-height: 1.55;
+    }
+    main {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 32px 24px 48px;
+    }
+    header {
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 20px;
+      margin-bottom: 28px;
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 32px;
+      line-height: 1.18;
+      letter-spacing: 0;
+    }
+    h2 {
+      margin: 34px 0 12px;
+      font-size: 20px;
+      letter-spacing: 0;
+    }
+    p {
+      margin: 10px 0;
+    }
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      background: var(--soft);
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      padding: 1px 4px;
+      font-size: 0.94em;
+    }
+    .meta {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 8px 18px;
+      color: var(--muted);
+      font-size: 14px;
+      margin-top: 16px;
+    }
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 12px;
+      margin: 22px 0;
+    }
+    .metric {
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 14px 16px;
+      background: var(--soft);
+    }
+    .metric strong {
+      display: block;
+      font-size: 26px;
+      line-height: 1.1;
+      color: var(--accent);
+      margin-bottom: 4px;
+    }
+    .metric span {
+      color: var(--muted);
+      font-size: 13px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0 20px;
+      font-size: 14px;
+    }
+    th, td {
+      border-bottom: 1px solid var(--line);
+      padding: 8px 10px;
+      text-align: right;
+      vertical-align: top;
+      white-space: nowrap;
+    }
+    th:first-child, td:first-child {
+      text-align: left;
+    }
+    th {
+      background: var(--soft);
+      color: #33414d;
+      font-weight: 650;
+    }
+    .ok {
+      color: var(--accent-2);
+      font-weight: 650;
+    }
+    .note {
+      border-left: 4px solid var(--accent);
+      background: #f1f7fe;
+      padding: 12px 14px;
+      margin: 16px 0;
+    }
+    .files {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .files a {
+      color: var(--accent);
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      padding: 5px 8px;
+      text-decoration: none;
+      background: #fff;
+      font-size: 14px;
+    }
+    @media (max-width: 720px) {
+      main {
+        padding: 22px 14px 36px;
+      }
+      h1 {
+        font-size: 26px;
+      }
+      table {
+        display: block;
+        overflow-x: auto;
+      }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>kugui i2cpu PH Symmetry Validation</h1>
+    <p>
+      Half-filled PH symmetry implementation <code>211d4d6</code> compared with
+      baseline <code>b77afcb</code> on kugui <code>i2cpu</code>.
+    </p>
+    <div class="meta">
+      <div>PBS job: <code>844018.kugui-pbs</code></div>
+      <div>Node: <code>cpu121</code>, queue <code>i2cpu</code></div>
+      <div>Remote: <code>runs/afqmc-kugui-i2cpu-ph-symmetry-211d4d6-20260702</code></div>
+      <div>Compiler: <code>icc</code>, <code>mpiicc</code>, <code>-qmkl=sequential</code></div>
+    </div>
+  </header>
+
+  <section class="summary" aria-label="Key results">
+    <div class="metric"><strong>1.98-1.99x</strong><span>serial sweep speedup, beta 4/8/16</span></div>
+    <div class="metric"><strong>2.00x</strong><span>MPI np16 beta=16 sweep speedup</span></div>
+    <div class="metric"><strong>2.20x</strong><span>MPI np16 beta=16 wall speedup</span></div>
+    <div class="metric"><strong>0</strong><span>new ntot jackknife error, exact half filling</span></div>
+  </section>
+
+  <h2>Validation Setup</h2>
+  <p>
+    Both trees were built from <code>git archive</code> snapshots. The job ran
+    <code>make test</code> and <code>make test_mpi</code> for both old and new
+    trees before measurement. The measured model was square 16x16,
+    <code>U=4</code>, <code>dtau=0.1</code>, <code>stab=4</code>,
+    <code>nwarm=0</code>, <code>nmeas=2</code>, <code>nbin=2</code>,
+    seed <code>246813579</code>.
+  </p>
+
+  <h2>Speedup</h2>
+  <table>
+    <thead>
+      <tr><th>mode</th><th>beta</th><th>old sweep avg</th><th>new sweep avg</th><th>sweep speedup</th><th>old real</th><th>new real</th><th>real speedup</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>serial</td><td>4</td><td>0.719 s</td><td>0.362 s</td><td>1.989x</td><td>2.11 s</td><td>1.01 s</td><td>2.089x</td></tr>
+      <tr><td>serial</td><td>8</td><td>1.475 s</td><td>0.740 s</td><td>1.993x</td><td>3.79 s</td><td>1.94 s</td><td>1.954x</td></tr>
+      <tr><td>serial</td><td>16</td><td>2.964 s</td><td>1.501 s</td><td>1.975x</td><td>7.49 s</td><td>3.84 s</td><td>1.951x</td></tr>
+      <tr><td>MPI np16</td><td>16</td><td>3.008 s</td><td>1.506 s</td><td>1.997x</td><td>10.62 s</td><td>4.83 s</td><td>2.199x</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Hot Regions, Serial Beta=16</h2>
+  <table>
+    <thead>
+      <tr><th>region</th><th>old total</th><th>new total</th><th>calls old -> new</th><th>ratio</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>green_from_scratch</code></td><td>1.431 s</td><td>0.724 s</td><td>2 -> 1</td><td>1.98x faster</td></tr>
+      <tr><td><code>green_stack_build</code></td><td>1.111 s</td><td>0.560 s</td><td>4 -> 2</td><td>1.99x faster</td></tr>
+      <tr><td><code>green_from_stack</code></td><td>1.934 s</td><td>0.973 s</td><td>160 -> 80</td><td>1.99x faster</td></tr>
+      <tr><td><code>green_wrap</code></td><td>1.025 s</td><td>0.522 s</td><td>640 -> 320</td><td>1.96x faster</td></tr>
+      <tr><td><code>green_update</code></td><td>0.722 s</td><td>0.363 s</td><td>121814 -> 60907</td><td>1.99x faster</td></tr>
+      <tr><td><code>la_gemm</code></td><td>3.990 s</td><td>2.026 s</td><td>11902 -> 5952</td><td>1.97x faster</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Hot Regions, MPI np16 Beta=16</h2>
+  <table>
+    <thead>
+      <tr><th>region</th><th>old total</th><th>new total</th><th>calls old -> new</th><th>ratio</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>green_from_scratch</code></td><td>23.085 s</td><td>11.778 s</td><td>32 -> 16</td><td>1.96x faster</td></tr>
+      <tr><td><code>green_stack_build</code></td><td>18.027 s</td><td>8.991 s</td><td>64 -> 32</td><td>2.00x faster</td></tr>
+      <tr><td><code>green_from_stack</code></td><td>31.237 s</td><td>15.595 s</td><td>2560 -> 1280</td><td>2.00x faster</td></tr>
+      <tr><td><code>green_wrap</code></td><td>16.895 s</td><td>8.430 s</td><td>10240 -> 5120</td><td>2.00x faster</td></tr>
+      <tr><td><code>green_update</code></td><td>11.640 s</td><td>5.835 s</td><td>1939604 -> 969802</td><td>2.00x faster</td></tr>
+      <tr><td><code>la_gemm</code></td><td>65.001 s</td><td>32.469 s</td><td>190008 -> 95020</td><td>2.00x faster</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Correctness</h2>
+  <p class="ok">All old/new runs kept <code>sign=1</code>, and both trees passed serial and MPI test suites before measurement.</p>
+  <div class="note">
+    The old/new output diffs are expected to be non-empty. PH symmetry makes
+    the half-filled <code>ntot</code> error column exactly zero, while energy
+    and doublon differences are at the printed last digit and far below the
+    reported jackknife errors.
+  </div>
+  <table>
+    <thead>
+      <tr><th>case</th><th>observed output difference</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>serial beta=4</td><td><code>dN: 8.2e-09 -> 0</code>; physical row otherwise identical</td></tr>
+      <tr><td>serial beta=8</td><td><code>E</code> differs by <code>1e-05</code>, <code>D</code> by <code>1e-08</code>, <code>dN: 3.5e-08 -> 0</code></td></tr>
+      <tr><td>serial beta=16</td><td><code>E</code> differs by <code>2e-05</code>, <code>D</code> by <code>1e-08</code>, <code>dN: 5.1e-07 -> 0</code></td></tr>
+      <tr><td>MPI np16 beta=16</td><td><code>E</code> differs by <code>2e-05</code>, <code>D</code> by <code>1e-08</code>, <code>dN: 4.6e-08 -> 0</code></td></tr>
+    </tbody>
+  </table>
+
+  <h2>Interpretation</h2>
+  <p>
+    The PH symmetry path is working as intended. In the measured half-filled,
+    bipartite 16x16 cases, spin-dependent sweep work is almost exactly halved.
+    The next main performance target is the remaining stabilization path inside
+    the single retained spin sector: <code>green_stack_build</code>,
+    <code>green_from_stack</code>, <code>udv_inv_one_plus</code>, and BLAS calls.
+  </p>
+
+  <h2>Raw Data</h2>
+  <p>
+    Raw results are stored in
+    <code>data/profiling_runs/kugui_i2cpu_ph_symmetry_211d4d6_20260702/</code>.
+  </p>
+  <div class="files">
+    <a href="../data/profiling_runs/kugui_i2cpu_ph_symmetry_211d4d6_20260702/README.md">README.md</a>
+    <a href="../data/profiling_runs/kugui_i2cpu_ph_symmetry_211d4d6_20260702/summary_speedup.tsv">summary_speedup.tsv</a>
+    <a href="../data/profiling_runs/kugui_i2cpu_ph_symmetry_211d4d6_20260702/summary_sweeps.tsv">summary_sweeps.tsv</a>
+    <a href="../data/profiling_runs/kugui_i2cpu_ph_symmetry_211d4d6_20260702/summary_regions.tsv">summary_regions.tsv</a>
+    <a href="../data/profiling_runs/kugui_i2cpu_ph_symmetry_211d4d6_20260702/kugui_ph_symmetry_validate.pbs">PBS script</a>
+    <a href="../data/profiling_runs/kugui_i2cpu_ph_symmetry_211d4d6_20260702/run_info.txt">run_info.txt</a>
+  </div>
+</main>
+</body>
+</html>

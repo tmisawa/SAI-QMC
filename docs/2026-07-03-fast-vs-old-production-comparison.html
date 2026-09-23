@@ -1,0 +1,41 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>AF_QMC Old vs Optimized Production Comparison</title>
+<style>
+body{font-family:Arial,Helvetica,sans-serif;line-height:1.45;margin:28px;color:#222}
+h1{font-size:24px} h2{font-size:18px;margin-top:26px}
+.note{background:#f6f8fa;border-left:4px solid #5b8def;padding:10px 14px;margin:12px 0}
+table{border-collapse:collapse;font-size:13px;margin:10px 0 22px}
+th,td{border:1px solid #ddd;padding:5px 8px;text-align:right} th:first-child,td:first-child{text-align:left}
+img{max-width:100%;height:auto;border:1px solid #ddd;margin:8px 0 18px}
+</style>
+</head>
+<body>
+<h1>AF_QMC Old vs Optimized Production Comparison</h1>
+<p>Comparison target: 2D 6x6, U=4, dtau=0.025, beta=2/4/8, PP/APP.</p>
+<div class="note">
+Old is the 20260630 production run. Optimized is current-head <code>alt_9f785f8_20260703</code>.
+Energy is compared per site. Doublon is already per site. z-scores use combined standard errors.
+The direct production walltime speedup is PP 68.85x and APP 70.01x for the beta=2,4,8 suite.
+Max |z_E|=1.02; max |z_D|=2.38.
+</div>
+<h2>Summary Table</h2>
+<table>
+<thead><tr><th>bc</th><th>beta</th><th>T</th><th>delta E/site</th><th>z_E</th><th>delta D</th><th>z_D</th><th>speedup</th></tr></thead>
+<tbody>
+<tr><td>APP</td><td>2</td><td>0.5</td><td>0.000143611</td><td>0.987</td><td>1.958e-05</td><td>0.986</td><td>70.01x</td></tr>
+<tr><td>APP</td><td>4</td><td>0.25</td><td>0.000251028</td><td>1.02</td><td>7.958e-05</td><td>1.55</td><td>70.01x</td></tr>
+<tr><td>APP</td><td>8</td><td>0.125</td><td>9.63889e-05</td><td>0.354</td><td>0.00014161</td><td>2.38</td><td>70.01x</td></tr>
+<tr><td>PP</td><td>2</td><td>0.5</td><td>5.11667e-05</td><td>0.358</td><td>1.048e-05</td><td>0.528</td><td>68.85x</td></tr>
+<tr><td>PP</td><td>4</td><td>0.25</td><td>0.000124833</td><td>0.441</td><td>-2.643e-05</td><td>-0.429</td><td>68.85x</td></tr>
+<tr><td>PP</td><td>8</td><td>0.125</td><td>0.000123972</td><td>0.379</td><td>5.94e-05</td><td>0.815</td><td>68.85x</td></tr>
+</tbody>
+</table>
+<h2>Figures</h2>
+<img src="figures/temperature_dependence_20260703/fast_vs_old_2d6x6_observables.png" alt="Old vs optimized observables">
+<img src="figures/temperature_dependence_20260703/fast_vs_old_2d6x6_deltas.png" alt="Old vs optimized differences">
+<img src="figures/temperature_dependence_20260703/fast_vs_old_2d6x6_walltime.png" alt="Old vs optimized walltime">
+</body>
+</html>

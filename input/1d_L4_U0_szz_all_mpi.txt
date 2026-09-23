@@ -1,0 +1,17 @@
+lattice=chain
+Lx=4
+Ly=1
+pbc=1
+t=-1
+U=0
+dtau=0.1
+beta_list=2.0
+nwarm=4
+nmeas=20
+nbin=2
+stab=4
+parallel=mpi
+nrep=3
+szz_q=all
+szz_file=szz.dat
+seed=12345

@@ -1,0 +1,4 @@
+# Optional plotting and high-precision reference tools; not needed to build DQMC.
+numpy
+matplotlib
+mpmath

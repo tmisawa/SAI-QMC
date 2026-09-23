@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <title>kugui i2cpu Alternating Sweep Validation</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 32px; color: #1f2328; line-height: 1.55; }
+    h1, h2 { margin-top: 1.4em; }
+    table { border-collapse: collapse; margin: 12px 0 24px; font-size: 14px; }
+    th, td { border: 1px solid #d0d7de; padding: 6px 9px; text-align: right; }
+    th:first-child, td:first-child { text-align: left; }
+    th { background: #f6f8fa; }
+    code { background: #f6f8fa; padding: 1px 4px; border-radius: 4px; }
+    .ok { color: #116329; font-weight: 600; }
+    .warn { color: #8a5a00; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <h1>kugui i2cpu Alternating Sweep Validation</h1>
+  <p>
+    Job <code>844092.kugui-pbs</code>, node <code>cpu121</code>, commit <code>b7164e3</code>,
+    walltime <code>00:15:38</code>, exit status <code>0</code>.
+    Raw data: <code>data/profiling_runs/kugui_i2cpu_alternating_sweep_b7164e3_20260702_234630/</code>.
+  </p>
+
+  <h2>Conclusion</h2>
+  <p class="ok">
+    Performance target confirmed. 16x16 U=4 beta=16 on kugui i2cpu gives
+    serial <code>1.240x</code> speedup at stab=4 and
+    <code>1.219x</code> at stab=8. MPI np16 smoke gives
+    <code>1.232x</code> / <code>1.228x</code>.
+  </p>
+  <p>
+    In every alternating profile, measurement-phase <code>green_stack_build</code>
+    calls dropped to zero. This is the intended steady-state behavior after
+    the even warmup (<code>nwarm=4</code>) has created the carried suffix stack.
+  </p>
+  <p class="warn">
+    Drift smoke did not fail, but the pre-stabilization wrapped-G drift is larger
+    in alternating mode, especially beta=16/stab=8 (<code>max_inf=1.47</code> vs
+    <code>0.083</code> for forward). This is not a fail-fast event and all rows keep
+    <code>sign=1</code>, <code>dN=0</code>, but it argues for keeping alternating opt-in and
+    monitoring drift in longer production validation before changing defaults.
+  </p>
+
+  <h2>Serial Profile</h2>
+  <table>
+    <tr><th>stab</th><th>beta</th><th>forward s/sweep</th><th>alternating s/sweep</th><th>speedup</th><th>stack calls fwd-&gt;alt</th><th>stack sec fwd-&gt;alt</th><th>real sec fwd-&gt;alt</th></tr>
+    <tr><td>4</td><td>4</td><td>0.362</td><td>0.294</td><td>1.234</td><td>20 -&gt; 0</td><td>1.289 -&gt; 0.000</td><td>9.01 -&gt; 7.40</td></tr>
+    <tr><td>4</td><td>8</td><td>0.729</td><td>0.594</td><td>1.227</td><td>20 -&gt; 0</td><td>2.694 -&gt; 0.000</td><td>17.99 -&gt; 14.89</td></tr>
+    <tr><td>4</td><td>16</td><td>1.479</td><td>1.193</td><td>1.240</td><td>20 -&gt; 0</td><td>5.562 -&gt; 0.000</td><td>36.36 -&gt; 29.79</td></tr>
+    <tr><td>8</td><td>4</td><td>0.258</td><td>0.218</td><td>1.186</td><td>20 -&gt; 0</td><td>0.843 -&gt; 0.000</td><td>6.48 -&gt; 5.56</td></tr>
+    <tr><td>8</td><td>8</td><td>0.529</td><td>0.438</td><td>1.207</td><td>20 -&gt; 0</td><td>1.891 -&gt; 0.000</td><td>13.17 -&gt; 11.09</td></tr>
+    <tr><td>8</td><td>16</td><td>1.084</td><td>0.889</td><td>1.219</td><td>20 -&gt; 0</td><td>4.029 -&gt; 0.000</td><td>26.87 -&gt; 22.41</td></tr>
+  </table>
+
+  <h2>MPI np16 Smoke</h2>
+  <table>
+    <tr><th>stab</th><th>beta</th><th>forward s/sweep</th><th>alternating s/sweep</th><th>speedup</th><th>stack calls fwd-&gt;alt</th><th>real sec fwd-&gt;alt</th></tr>
+    <tr><td>4</td><td>16</td><td>1.492</td><td>1.211</td><td>1.232</td><td>320 -&gt; 0</td><td>39.88 -&gt; 31.41</td></tr>
+    <tr><td>8</td><td>16</td><td>1.094</td><td>0.891</td><td>1.228</td><td>320 -&gt; 0</td><td>28.27 -&gt; 23.66</td></tr>
+  </table>
+
+  <h2>Drift Smoke</h2>
+  <p>
+    These runs used beta=16, <code>nwarm=4</code>, <code>nmeas=2</code>, serial only,
+    and include warmup drift samples. The diagnostic compares wrapped G just
+    before stabilization against a scratch rebuild; end-of-sweep measurements
+    are still exact rebuilt.
+  </p>
+  <table>
+    <tr><th>order</th><th>stab</th><th>samples</th><th>max_inf</th><th>mean_inf</th><th>max_tau</th><th>max_sweep</th><th>failed</th></tr>
+    <tr><td>alternating</td><td>4</td><td>240</td><td>0.187184</td><td>0.00225372</td><td>28</td><td>1</td><td>0</td></tr>
+    <tr><td>forward</td><td>4</td><td>240</td><td>0.0432336</td><td>0.000584699</td><td>100</td><td>2</td><td>0</td></tr>
+    <tr><td>alternating</td><td>8</td><td>120</td><td>1.47035</td><td>0.0424889</td><td>152</td><td>5</td><td>0</td></tr>
+    <tr><td>forward</td><td>8</td><td>120</td><td>0.083376</td><td>0.00214956</td><td>152</td><td>4</td><td>0</td></tr>
+  </table>
+
+  <h2>Output Sanity</h2>
+  <p>All shown beta=16 profile rows keep half-filled PH sanity: <code>ntot=256</code>, <code>dN=0</code>, <code>sign=1</code>.</p>
+  <table>
+    <tr><th>label</th><th>T</th><th>E_hub</th><th>dE_hub</th><th>ntot</th><th>dN</th><th>doublon</th><th>sign</th></tr>
+    <tr><td>mpi_np16_alternating_b16_s4_profile</td><td>0.0625</td><td>-226.84542</td><td>1.67</td><td>256</td><td>0</td><td>0.1215283</td><td>1</td></tr>
+    <tr><td>mpi_np16_alternating_b16_s8_profile</td><td>0.0625</td><td>-224.52077</td><td>0.651</td><td>256</td><td>0</td><td>0.12443008</td><td>1</td></tr>
+    <tr><td>mpi_np16_forward_b16_s4_profile</td><td>0.0625</td><td>-225.52761</td><td>0.925</td><td>256</td><td>0</td><td>0.12288935</td><td>1</td></tr>
+    <tr><td>mpi_np16_forward_b16_s8_profile</td><td>0.0625</td><td>-223.88697</td><td>0.882</td><td>256</td><td>0</td><td>0.12381424</td><td>1</td></tr>
+    <tr><td>serial_alternating_b16_s4_profile</td><td>0.0625</td><td>-222.74547</td><td>6.02</td><td>256</td><td>0</td><td>0.12350811</td><td>1</td></tr>
+    <tr><td>serial_alternating_b16_s8_profile</td><td>0.0625</td><td>-224.38641</td><td>4.08</td><td>256</td><td>0</td><td>0.12366058</td><td>1</td></tr>
+    <tr><td>serial_forward_b16_s4_profile</td><td>0.0625</td><td>-222.17496</td><td>4.2</td><td>256</td><td>0</td><td>0.12566109</td><td>1</td></tr>
+    <tr><td>serial_forward_b16_s8_profile</td><td>0.0625</td><td>-222.17495</td><td>4.2</td><td>256</td><td>0</td><td>0.12566109</td><td>1</td></tr>
+  </table>
+
+  <h2>Decision</h2>
+  <ul>
+    <li><span class="ok">Task 5 performance acceptance is satisfied:</span> stack build is removed from steady-state measurement and sweep speedup is about 1.22-1.24x.</li>
+    <li><span class="ok">MPI smoke confirms the same behavior</span> at np16 on the same i2cpu node.</li>
+    <li><span class="warn">Do not make alternating the default yet.</span> Keep it opt-in until longer production statistics and drift monitoring are recorded, especially for <code>stab=8</code>.</li>
+  </ul>
+</body>
+</html>

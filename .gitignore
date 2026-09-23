@@ -1,0 +1,39 @@
+# macOS
+.DS_Store
+
+# build artifacts
+*.o
+/dqmc
+/dqmc_omp
+/dqmc_mpi
+/dqmc_hybrid
+tests/test_*
+!tests/test_*.c
+!tests/test_*.h
+!tests/test_*.sh
+
+# run outputs
+*.dat
+!data/**/*.dat
+/out.dat
+hopping_used.txt
+/profile.csv
+/replicas.csv
+/szz.tsv
+/sperp.tsv
+/spin_consistency.tsv
+/profiles/
+
+# prebuilt DQMC binaries copied into run dirs (not tracked; convention keeps
+# only inputs/outputs: hopping/input/out.dat/replicas.csv/run_info/summary/time)
+data/production_runs/**/dqmc_mpi*
+data/production_runs/**/dqmc
+data/production_runs/**/dqmc_omp
+data/production_runs/**/dqmc_hybrid
+
+# python
+__pycache__/
+.venv/
+
+# local verification and scratch runs
+/.runs/

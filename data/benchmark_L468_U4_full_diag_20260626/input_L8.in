@@ -1,0 +1,15 @@
+lattice=chain
+Lx=8
+bc=periodic
+U=4
+dtau=0.05
+beta_list=0.5,0.6,0.8,1.0,1.2,1.6,2.0,2.4,3.2,4.0,4.8,6.4,8.0
+nwarm=500
+nmeas=5000
+nbin=100
+parallel=mpi
+nrep=8
+profile=1
+profile_file=data/benchmark_L468_U4_full_diag_20260626/profile_L8.csv
+replica_log=data/benchmark_L468_U4_full_diag_20260626/replicas_L8.csv
+seed=246813579

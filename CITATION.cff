@@ -1,0 +1,16 @@
+cff-version: 1.2.0
+message: "Please cite SAI-QMC and the exact release or commit used, together with the relevant algorithmic references in REFERENCES.md."
+type: software
+title: SAI-QMC
+version: '0.1'
+authors:
+  - family-names: Misawa
+    given-names: Takahiro
+repository-code: "https://github.com/tmisawa/SAI-QMC"
+abstract: "Finite-temperature determinant quantum Monte Carlo for the repulsive half-filled Hubbard model on bipartite lattices, with recorded AI-assisted development and numerical validation."
+keywords:
+  - determinant quantum Monte Carlo
+  - Hubbard model
+  - scientific software
+license: MIT
+# A release date and DOI will be recorded when available.

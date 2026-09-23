@@ -1,0 +1,15 @@
+lattice=square
+Lx=8
+Ly=8
+bc=periodic
+t=-1.0
+U=4.0
+dtau=0.1
+beta_list=4.0
+stab=4
+nwarm=2
+nmeas=4
+nbin=2
+seed=246813579
+profile=1
+profile_file=afqmc_bench_2d_L8_profile.dat

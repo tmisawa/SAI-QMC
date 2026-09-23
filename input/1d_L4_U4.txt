@@ -1,0 +1,11 @@
+lattice=chain
+Lx=4
+pbc=1
+t=-1.0
+U=4.0
+dtau=0.1
+beta_list=0.5,1.0,2.0,4.0,6.0,8.0
+nwarm=300
+nmeas=3000
+nbin=30
+seed=1

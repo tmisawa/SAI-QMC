@@ -1,0 +1,299 @@
+<!doctype html>
+<!--
+date: 2026-07-14
+datetime: 2026-07-14 23:12 JST
+model: GPT-5 Codex
+summary:
+  UDV scale overflow 対策の実装ロードマップ。
+  Phase 2 review の診断分析、Phase 2.1 実装レビュー、Phase 3 review、
+  Phase 4 Green integration と review、Phase 5 validation を反映し、
+  two-sided 単独での beta=33.325 完走を exit criteria から外し、
+  Phase 6 bounded UDV chunk chain の詳細設計と standalone gate を反映する。
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<title>AF_QMC UDV Green Rebuild Roadmap</title>
+<style>
+body{font-family:Arial,Helvetica,sans-serif;line-height:1.5;margin:28px;color:#222;max-width:1180px}
+h1{font-size:25px;margin-bottom:8px} h2{font-size:19px;margin-top:28px} h3{font-size:16px;margin-top:20px}
+.meta,.note{background:#f6f8fa;border-left:4px solid #5b8def;padding:10px 14px;margin:12px 0}
+.warn{background:#fff8e6;border-left:4px solid #d97706;padding:10px 14px;margin:12px 0}
+table{border-collapse:collapse;font-size:13px;margin:10px 0 22px;min-width:860px}
+th,td{border:1px solid #ddd;padding:6px 8px;text-align:left;vertical-align:top}
+th{background:#f7f7f7} .wide{overflow-x:auto}
+code{background:#f2f2f2;padding:1px 4px;border-radius:3px}
+.done{color:#166534;font-weight:bold}.active{color:#92400e;font-weight:bold}.todo{color:#1f2937;font-weight:bold}
+.blocked{color:#991b1b;font-weight:bold}
+</style>
+</head>
+<body>
+<h1>AF_QMC UDV Green Rebuild Roadmap</h1>
+<div class="meta">
+<div><b>datetime:</b> 2026-07-14 23:12 JST</div>
+<div><b>model:</b> GPT-5 Codex</div>
+<div><b>summary:</b> UDV scale overflow 対策を Phase 5 までの完了事項と、bounded UDV chunk chain および standalone solver gate からなる Phase 6 詳細設計に分けて整理する。</div>
+</div>
+
+<div class="note">
+Current decision: keep the existing combine path as the default and implement
+two-sided Db/Ds Green reconstruction as an opt-in intermediate step. Phase 2
+diagnostics show that beta=33.325 also reaches the single-factor D range limit,
+and Phase 2.1 beta=30 measurements show that equilibrium single-factor spread is
+already beyond dense representable width. A bounded multi-factor prefix/suffix
+countermeasure is the current Phase 6 first candidate before beta=33.325 can be
+an acceptance gate.
+</div>
+
+<h2>Current State</h2>
+<div class="wide">
+<table>
+<thead><tr><th>Area</th><th>Status</th><th>Details</th><th>Evidence / File</th></tr></thead>
+<tbody>
+<tr>
+<td>Failure reproduction</td>
+<td><span class="done">Done</span></td>
+<td>L=4, U=16, dtau=0.025, beta=33.325, seed <code>14012418791647386686</code> reproduces the low-temperature non-finite failure.</td>
+<td><code>docs/2026-07-13-l4-u16-low-temperature-nan-report.md</code></td>
+</tr>
+<tr>
+<td>Measurement fail-fast</td>
+<td><span class="done">Done in working tree</span></td>
+<td>Non-finite Green/sign/sample values now stop the run before they enter binning or jackknife paths.</td>
+<td><code>src/measure.*</code>, <code>src/replica.*</code>, <code>src/replica_run.c</code>, <code>src/main.c</code></td>
+</tr>
+<tr>
+<td>UDV stage diagnostics</td>
+<td><span class="done">Done in working tree</span></td>
+<td>The stricter diagnostic identifies the direct overflow as <code>udv_combine stage=C row=0 col=0 value=-inf</code>.</td>
+<td><code>src/linalg.*</code></td>
+</tr>
+<tr>
+<td>Numerical root cause</td>
+<td><span class="done">Understood</span></td>
+<td>The failing product is <code>l-&gt;D[i] * (l-&gt;T * r-&gt;U)[i,j] * r-&gt;D[j]</code>. The problem is scale separation in a long matrix product, not the determinant alone.</td>
+<td><code>docs/2026-07-14-udv-log-scale-implementation-plan.md</code></td>
+</tr>
+<tr>
+<td>Implementation status</td>
+<td><span class="done">Phase 5 local validation complete</span></td>
+<td><code>green_rebuild=combine|two_sided</code> is parsed. The default is <code>combine</code>. The run header reports the selected mode. <code>green_rebuild=two_sided</code> dispatches Green boundary rebuilds through <code>udv_inv_one_plus_two_sided_work()</code> instead of the combine path. Phase 4 review confirmed default combine bit-invariance and showed the beta=33.325 reproduction no longer fails at <code>udv_combine stage=C</code>; it advances to the predicted single-factor failure <code>udv_lmul_work stage=B_U_D</code>. Phase 5 added DQMC-level two-sided sweep regression coverage, passed <code>make test_mpi</code> / <code>make test_slow</code>, and confirmed beta=30-32 wall-inside combine/two_sided agreement at local validation length.</td>
+<td>This document</td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<h2>Planning And Review Status</h2>
+<div class="wide">
+<table>
+<thead><tr><th>Document</th><th>Status</th><th>What Is Settled</th><th>Open Point</th></tr></thead>
+<tbody>
+<tr>
+<td><code>2026-07-13-l4-u16-low-temperature-nan-report.md</code></td>
+<td><span class="done">Completed</span></td>
+<td>Low-temperature failure mode and reproduction condition were recorded.</td>
+<td>Needs re-run after two-sided implementation.</td>
+</tr>
+<tr>
+<td><code>2026-07-14-udv-log-scale-plan-review.md</code></td>
+<td><span class="done">Completed and checked</span></td>
+<td>Review rejected global-offset log-combine as the first implementation target and recommended two-sided Db/Ds first.</td>
+<td>None for Phase 1-2.</td>
+</tr>
+<tr>
+<td><code>2026-07-14-udv-log-scale-implementation-plan.md</code></td>
+<td><span class="done">Revised</span></td>
+<td>Default remains combine; <code>green_rebuild=two_sided</code> is the opt-in first target; log-scale UDV is deferred to Phase 6.</td>
+<td>Exact scratch buffer allocation for the two-sided solver will be finalized during Phase 3.</td>
+</tr>
+<tr>
+<td><code>2026-07-14-udv-green-rebuild-roadmap.html</code></td>
+<td><span class="active">Current roadmap</span></td>
+<td>Tracks implementation order and gates.</td>
+<td>Update as phases complete.</td>
+</tr>
+<tr>
+<td><code>2026-07-14-udv-scale-diagnostics-phase2-review.md</code></td>
+<td><span class="done">Completed and checked</span></td>
+<td>Phase 2 implementation was approved. The measured scale spread confirmed global-offset log-combine is insufficient and showed the single-factor D limit is active near beta=33.325.</td>
+<td>Roadmap gates are revised here: Phase 5 no longer requires beta=33.325 completion from two-sided alone; Phase 6 is required for that target.</td>
+</tr>
+<tr>
+<td><code>2026-07-14-udv-scale-diagnostics-phase2-1-plan.md</code></td>
+<td><span class="done">Reviewed and implemented</span></td>
+<td>Defines the small Phase 2.1 extension of <code>udv_scale_file</code> to single-factor sites while preserving the existing 25-column TSV schema.</td>
+<td>Implemented in working tree with exact direction labels and single-factor <code>nan</code> / <code>0</code> right-side sentinels.</td>
+</tr>
+<tr>
+<td><code>2026-07-14-udv-scale-diagnostics-phase2-1-plan-review.md</code></td>
+<td><span class="done">Completed and reflected</span></td>
+<td>C1-C3 were reflected before implementation: explicit single-factor sentinel output, corrected tau labels, and direction labels that do not prefix-match <code>forward</code> / <code>backward</code>.</td>
+<td>None for Phase 2.1.</td>
+</tr>
+<tr>
+<td><code>2026-07-14-udv-scale-diagnostics-phase2-1-review.md</code></td>
+<td><span class="done">Completed and checked</span></td>
+<td>Phase 2.1 implementation was approved. Additional beta=30 measurement showed wall-inside completion, suffix build growth to prefix scale after equilibration, and equilibrium <code>spread_logD ~= 1086-1191</code>.</td>
+<td>Phase 6 first candidate is bounded multi-factor prefix/suffix storage plus two-sided or multi-factor reconstruction. Phase 3 tests should include one-sided-large and two-sided-medium scale cases.</td>
+</tr>
+<tr>
+<td><code>2026-07-14-green-rebuild-phase4-review.md</code></td>
+<td><span class="done">Completed and checked</span></td>
+<td>Phase 4 implementation was approved. Reviewer-side runs confirmed default combine bit-invariance, <code>green_rebuild=two_sided</code> execution, beta=30 short-run completion, and Phase 5 gate (a): the beta=33.325 reproduction failure moved from <code>udv_combine stage=C</code> to <code>udv_lmul_work stage=B_U_D</code>.</td>
+<td>Remaining Phase 5 work is beta=30-32 statistical agreement validation, <code>make test_mpi</code> / <code>make test_slow</code>, and one or two DQMC-level two-sided sweep regression tests.</td>
+</tr>
+<tr>
+<td><code>2026-07-14-udv-phase5-validation.md</code></td>
+<td><span class="done">Completed</span></td>
+<td>DQMC-level two-sided sweep regression coverage was added. <code>make test</code>, <code>make test_mpi</code>, and <code>make test_slow</code> passed. beta=30,31,32 wall-inside runs with <code>nwarm=1000</code>, <code>nmeas=5000</code>, <code>nbin=50</code>, <code>nrep=1</code> completed in both modes and matched at printed precision with all 2-sigma checks OK.</td>
+<td>This is a local mode-equivalence gate, not a production-scale multi-replica physics data set. Phase 6 is still required for beta=33.325 completion.</td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<h2>Phase 2 Measurement</h2>
+<div class="wide">
+<table>
+<thead><tr><th>Observation</th><th>Value</th><th>Impact</th></tr></thead>
+<tbody>
+<tr>
+<td>Known overflow predictor</td>
+<td><code>cross_max_logD=710.68162208088245</code> at <code>tau=1320</code>, boundary 165. Natural log units.</td>
+<td>This exceeds <code>ln(DBL_MAX) ~= 709.78</code> and correctly predicts the immediate <code>udv_combine stage=C</code> overflow.</td>
+</tr>
+<tr>
+<td>Global-offset log-combine viability</td>
+<td><code>left_spread_logD=1355.80426133428</code>. Natural log units.</td>
+<td>The spread exceeds the roughly 745 natural-log-unit denormal range by about 610 natural-log units, so a global offset would turn overflow into rank loss.</td>
+</tr>
+<tr>
+<td>Single-factor D headroom</td>
+<td><code>left_max_logD=708.14631542658333</code> at <code>tau=1320</code>; full-beta extrapolation is above <code>ln(DBL_MAX)</code>.</td>
+<td>Two-sided reconstruction can remove the cross product, but beta=33.325 likely also needs a single-factor D countermeasure in lmul/rmul or factor storage.</td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<h2>Phase 2.1 Measurement</h2>
+<div class="wide">
+<table>
+<thead><tr><th>Observation</th><th>Value</th><th>Impact</th></tr></thead>
+<tbody>
+<tr>
+<td>Wall-inside diagnostic run</td>
+<td>beta=30, Ltr=1200, same seed, nwarm=6, nmeas=2 completed with finite observables.</td>
+<td>Supports the revised Phase 5 gate: beta=30-32 wall-inside runs are the right validation band for two-sided before Phase 6.</td>
+</tr>
+<tr>
+<td>Suffix build scale after equilibration</td>
+<td><code>stack_suffix_pre_rmul</code> rose from about 325 in the initial field to about 625 after one sweep, then tracked prefix/full product at roughly 586-616.</td>
+<td>Single-factor countermeasures must cover <code>green_stack_build_suffix()</code> / <code>udv_rmul</code>, not only forward prefix accumulation.</td>
+</tr>
+<tr>
+<td>Equilibrium single-factor spread</td>
+<td><code>spread_logD ~= 1086-1191</code> at beta=30, already above the roughly 745 natural-log-unit dense width.</td>
+<td>Plain log-D with one dense QR input still risks rank loss inside the wall. Phase 6 should prefer bounded multi-factor storage; log-D remains a fallback only with an explicit truncation policy.</td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<h2>Implementation Roadmap</h2>
+<div class="wide">
+<table>
+<thead><tr><th>Phase</th><th>Status</th><th>Goal</th><th>Exit Criteria</th></tr></thead>
+<tbody>
+<tr>
+<td>0. Baseline preservation</td>
+<td><span class="done">Done</span></td>
+<td>Keep fail-fast and existing UDV diagnostics. Existing default behavior remains the production path.</td>
+<td><code>make test</code>, <code>make test_mpi</code>, <code>make test_slow</code>, and <code>git diff --check</code> have passed on the diagnostic baseline.</td>
+</tr>
+<tr>
+<td>1. User-facing option</td>
+<td><span class="done">Done in working tree</span></td>
+<td>Add <code>green_rebuild=combine|two_sided</code>. Default must be <code>combine</code>. Header must report the selected mode.</td>
+<td>Parser tests cover default, valid values, and typo rejection. Before Phase 4, <code>two_sided</code> failed explicitly at runtime rather than silently falling back; Phase 4 removed that temporary guard and connected the real implementation.</td>
+</tr>
+<tr>
+<td>2. Scale spread diagnostics</td>
+<td><span class="done">Done in working tree</span></td>
+<td>Measure left/right <code>log(fabs(D))</code> min/max/spread near boundary rebuilds.</td>
+<td><code>udv_scale_file=path</code> writes TSV rows for combine-boundary prefix/suffix pairs with natural-log units, finite/zero/nonfinite counts, and <code>cross_max_logD</code>. Default output remains unchanged.</td>
+</tr>
+<tr>
+<td>2.1. Single-factor scale diagnostics</td>
+<td><span class="done">Done in working tree</span></td>
+<td>Extend the opt-in diagnostics to the sites that can fail after combine overflow is removed.</td>
+<td>Records full-prefix scale before end-of-sweep <code>green_from_left_udv()</code>, plus lmul/rmul input scales in <code>green_stack_build_suffix()</code> and <code>green_stack_build_prefix()</code>. Uses natural log units, preserves the existing TSV schema, emits single-factor rows with explicit <code>nan</code> / <code>0</code> right-side sentinels, and keeps production stdout unchanged. Verified by <code>make test</code>, <code>make dqmc_mpi</code>, <code>mpirun -np 1 ./tests/test_dqmc_mpi</code>, and <code>git diff --check</code>.</td>
+</tr>
+<tr>
+<td>3. Standalone two-sided solver</td>
+<td><span class="done">Done in working tree</span></td>
+<td>Implement <code>udv_inv_one_plus_two_sided_work()</code> against dense references.</td>
+<td><code>udv_inv_one_plus_two_sided_work()</code> builds <code>H = D_lb^-1 U_l^T T_r^-1 D_rb^-1 + D_ls (T_l U_r) D_rs</code>, returns <code>g = T_r^-1 D_rb^-1 H^-1 D_lb^-1 U_l^T</code>, and computes determinant sign without forming the combined UDV. Tests compare <code>g</code> and det sign against dense <code>(I + L R)^-1</code>, include existing combine agreement for a moderate case, and cover one-sided-large <code>e^600</code>, two-sided-medium <code>e^300 x e^300</code>, graded <code>{e^250,1,e^-250}</code>, combine-fail <code>{e^400,1,e^-400}</code>, and negative determinant cases. Phase 3 review: <code>docs/2026-07-14-udv-two-sided-phase3-review.md</code>.</td>
+</tr>
+<tr>
+<td>4. Green integration</td>
+<td><span class="done">Done in working tree</span></td>
+<td>Wire <code>green_rebuild=two_sided</code> into <code>green_from_boundary_factors()</code>.</td>
+<td><code>Green.rebuild_mode</code> selects the boundary solver. <code>combine</code> keeps the existing <code>udv_combine + udv_inv_one_plus_work</code> path. <code>two_sided</code> calls <code>udv_inv_one_plus_two_sided_work()</code> and no longer enters <code>udv_combine</code> for boundary reconstruction. The temporary <code>main.c</code> runtime guard was removed. Verified by focused Green/DQMC tests, full <code>make test</code>, MPI test binaries, and serial/MPI two-sided smoke runs with finite output.</td>
+</tr>
+<tr>
+<td>5. DQMC validation</td>
+<td><span class="done">Done in working tree</span></td>
+<td>Validate finite observables and physics consistency.</td>
+<td>Gate (a) is complete: reviewer-side validation showed the beta=33.325 reproduction passes the former <code>udv_combine stage=C</code> site and fails later at <code>udv_lmul_work stage=B_U_D</code>, matching the single-factor prediction. DQMC-level two-sided sweep regression coverage was added for forward stack and alternating/backward paths. <code>make test</code>, <code>make test_mpi</code>, and <code>make test_slow</code> pass. beta=30-32 wall-inside runs completed in both modes and matched at printed precision under the local validation setting documented in <code>2026-07-14-udv-phase5-validation.md</code>.</td>
+</tr>
+<tr>
+<td>6. Single-factor scale countermeasure</td>
+<td><span class="active">Original solver design returned; Track A investigated</span></td>
+<td>Design and implement a countermeasure for single-factor D range overflow.</td>
+<td>The original dense augmented solver design was returned by review: chunk spread 300-scale loses Green accuracy, while an accurate spread gate makes dense LU too expensive. Dense augmented is now test-oracle only; a production chain path would require structured O(m N^3) elimination. Track A centered scalar offset was investigated on the real trajectory: beta=33.325 has only about 31.9 natural-log units of centered margin, but a captured real factor at spread 1350.77 gave 6.8e-13 relative Green error against a 500-digit reference. A limited Track A prototype is the next candidate; it does not solve beta=100.</td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<h2>Decision Gates</h2>
+<ul>
+<li>Do not make <code>two_sided</code> the default yet. Phase 5 local wall-inside agreement is complete, but beta=33.325 still needs the Phase 6 single-factor countermeasure.</li>
+<li>Treat the beta=33.325 reproduction completion as a Phase 6 acceptance target; Phase 2.1 confirmed the single-factor D risk rather than removing it.</li>
+<li>Do not accept <code>green_rebuild=log</code> in the parser until the lmul/rmul log-D input scaling design is complete.</li>
+<li>Do not add columns to <code>replicas.csv</code> in Phase 1; use stdout header metadata first.</li>
+<li>Keep fail-fast diagnostics active in all modes, including future two-sided reconstruction.</li>
+<li>Keep <code>green_rebuild=two_sided</code> opt-in until Phase 6 determines whether the remaining single-factor failure can be removed without unacceptable truncation or rank loss.</li>
+</ul>
+
+<h2>Immediate Work Order</h2>
+<ol>
+<li><span class="done">Done:</span> add and test <code>green_rebuild</code> input parsing.</li>
+<li><span class="done">Done:</span> print <code>green_rebuild=...</code> in the run header.</li>
+<li><span class="done">Done:</span> guard unimplemented <code>two_sided</code> execution with a clear error.</li>
+<li><span class="done">Done:</span> add scale spread diagnostics as a separate step via <code>udv_scale_file</code>.</li>
+<li><span class="done">Done:</span> add Phase 2.1 single-factor scale recording to <code>udv_scale_file</code>.</li>
+<li><span class="done">Done:</span> implement the standalone two-sided solver with dense-reference tests.</li>
+<li><span class="done">Done:</span> integrate <code>green_rebuild=two_sided</code> into Green boundary rebuilds and remove the temporary runtime guard.</li>
+<li><span class="done">Done:</span> Phase 5 gate (a): beta=33.325 reproduction moved from <code>udv_combine stage=C</code> to <code>udv_lmul_work stage=B_U_D</code>.</li>
+<li><span class="done">Done:</span> add small DQMC-level two-sided sweep regression coverage, run <code>make test_mpi</code> / <code>make test_slow</code>, and run beta=30-32 wall-inside statistical comparisons against <code>combine</code>.</li>
+<li><span class="done">Done:</span> write the Phase 6 detailed design for bounded UDV chunks and a non-collapsing chain solver. See <code>2026-07-14-udv-phase6-single-factor-countermeasure-design.md</code>.</li>
+<li><span class="done">Done:</span> review the Phase 6 design. Dense augmented LU has no practical accuracy/performance operating point and is demoted to a test oracle.</li>
+<li><span class="done">Done:</span> investigate Track A centered scalar offset on the real trajectory. Actual-factor inversion is accurate, but the beta=33.325 centered exponent margin is only about 31.9.</li>
+<li><span class="done">Done:</span> write the limited Track A log-offset prototype plan with margin fail-fast and actual-factor accuracy gates.</li>
+<li><span class="done">Done:</span> Track A A0 representation: add <code>UDV.log_offset</code>, identity/copy propagation, transactional centered recentering, and unit tests.</li>
+<li><span class="done">Done:</span> Track A A1 centered lmul/rmul standalone implementation, moderate dense comparison, and repeated graded-update tests.</li>
+<li><span class="done">Done:</span> Track A A2 effective-log one-sided inverse with offset-zero legacy branching, offset-shift invariance, sign handling, and effective log +/-650 coverage.</li>
+<li><span class="done">Done:</span> Track A A3 effective-log two-sided inverse with one-side/both-side offsets, reparameterization invariance, sign handling, and effective log +/-400 coverage.</li>
+<li><span class="done">Done:</span> make ordinary <code>udv_combine</code> fail fast without modifying its output when either input carries a nonzero or non-finite centered offset.</li>
+<li><span class="done">Done:</span> review the A0--A3 standalone prototype. Algebra and legacy isolation pass, but A4 is conditionally held on update-margin proof, fixed real/high-precision fixtures, centered sign coverage, and explicit effective-log diagnostics. See <code>2026-07-15-udv-phase6a-a0-a3-standalone-review.md</code>.</li>
+<li><span class="done">Done:</span> close review F1 with input-aware log-domain QR-input bounds for centered lmul/rmul and transactional rejection tests at the exponent wall.</li>
+<li><span class="done">Done:</span> close review F3 with centered negative-D sign/crossing tests and F4 at the linalg layer with typed centered failure reasons and explicit effective-log range diagnostics.</li>
+<li><span class="done">Done:</span> close review F2 by recapturing the exact beta=33.325 n=16 factor and adding independent 500-digit one-/two-sided fixed fixtures with relative-error and determinant-sign gates.</li>
+<li><span class="active">Next:</span> proceed to A4 opt-in DQMC integration and propagate F4 reasons into centered diagnostics. Keep the beta=100 structured-chain design as a separate longer-term track.</li>
+</ol>
+
+</body>
+</html>

@@ -1,0 +1,740 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="date" content="2026-07-15">
+  <meta name="datetime" content="2026-07-15 17:46 JST">
+  <meta name="model" content="GPT-5 Codex">
+  <meta name="summary" content="低温DQMCで起きた数値破綻とcentered対策を説明し、beta=33.325の複数seed検証とbeta=50/100の適用限界を示す。">
+  <title>低温 DQMC の桁落ち問題 — どこで、なぜ壊れるのか</title>
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['\\(', '\\)']],
+        displayMath: [['\\[', '\\]']]
+      },
+      chtml: { displayAlign: 'center' },
+      options: { enableMenu: false }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@4.0.0/tex-chtml.js"></script>
+  <style>
+    :root {
+      --ink: #172033;
+      --muted: #596579;
+      --paper: #f4f1ea;
+      --surface: #fffdf8;
+      --surface-2: #eef4f1;
+      --navy: #12243f;
+      --navy-2: #1a3558;
+      --teal: #167d76;
+      --teal-soft: #dff1ed;
+      --amber: #b76516;
+      --amber-soft: #fff0d8;
+      --red: #ad3d32;
+      --red-soft: #fbe6e2;
+      --blue: #315f9b;
+      --line: #d8d4ca;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans JP", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
+      --serif: "Iowan Old Style", "Yu Mincho", "Hiragino Mincho ProN", Georgia, serif;
+    }
+
+    * { box-sizing: border-box; }
+    html { max-width: 100%; scroll-behavior: smooth; overflow-x: hidden; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 10% 0%, rgba(22,125,118,.10), transparent 28rem),
+        var(--paper);
+      font-family: var(--sans);
+      line-height: 1.78;
+      max-width: 100%;
+      overflow-x: hidden;
+      font-size: 16px;
+    }
+    a { color: var(--blue); text-underline-offset: 3px; }
+    a:hover { color: var(--teal); }
+    code, pre, .mono { font-family: var(--mono); }
+    code {
+      padding: .12em .35em;
+      border: 1px solid #d9e0df;
+      border-radius: .35rem;
+      background: #edf1f0;
+      font-size: .9em;
+    }
+    pre {
+      margin: 1rem 0 0;
+      padding: 1.1rem 1.25rem;
+      overflow-x: auto;
+      color: #eaf6f4;
+      background: #15263b;
+      border-radius: .8rem;
+      line-height: 1.6;
+      font-size: .86rem;
+    }
+    h1, h2, h3 { line-height: 1.28; letter-spacing: -.02em; }
+    h1 { margin: .3rem 0 1rem; font-family: var(--serif); font-size: clamp(2.1rem, 5vw, 4.3rem); }
+    h2 { margin: 0 0 1rem; font-size: clamp(1.5rem, 3vw, 2.15rem); }
+    h3 { margin: 1.6rem 0 .65rem; font-size: 1.15rem; }
+    p { margin: .75rem 0; }
+    p, li, .callout { overflow-wrap: anywhere; }
+
+    .hero {
+      color: white;
+      background:
+        linear-gradient(120deg, rgba(22,125,118,.40), transparent 55%),
+        linear-gradient(150deg, var(--navy-2), var(--navy));
+      border-bottom: 5px solid var(--teal);
+    }
+    .hero-inner, main, .footer-inner { width: min(1120px, calc(100% - 2rem)); margin: 0 auto; }
+    .hero-inner { padding: 4.2rem 0 3.6rem; }
+    .eyebrow {
+      display: inline-flex;
+      gap: .6rem;
+      align-items: center;
+      margin-bottom: 1rem;
+      color: #bce3dc;
+      font-size: .78rem;
+      font-weight: 750;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+    }
+    .eyebrow::before { content: ""; width: 2.5rem; height: 2px; background: #67c3b6; }
+    .hero .lead { max-width: 840px; color: #dfe9f2; font-size: clamp(1.03rem, 2vw, 1.23rem); overflow-wrap: anywhere; }
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .55rem 1.3rem;
+      margin-top: 1.55rem;
+      color: #aebfd0;
+      font-size: .82rem;
+    }
+
+    main { padding: 2.2rem 0 4rem; }
+    nav.toc {
+      position: sticky;
+      top: .6rem;
+      z-index: 4;
+      display: flex;
+      gap: .35rem;
+      margin: 0 0 2rem;
+      padding: .5rem;
+      overflow-x: auto;
+      background: rgba(255,253,248,.92);
+      border: 1px solid var(--line);
+      border-radius: .85rem;
+      box-shadow: 0 8px 28px rgba(20,31,48,.08);
+      backdrop-filter: blur(12px);
+    }
+    nav.toc a {
+      flex: 0 0 auto;
+      padding: .42rem .75rem;
+      color: #334054;
+      border-radius: .55rem;
+      font-size: .79rem;
+      font-weight: 700;
+      text-decoration: none;
+    }
+    nav.toc a:hover { color: white; background: var(--teal); }
+
+    section {
+      margin: 0 0 1.4rem;
+      padding: clamp(1.35rem, 3vw, 2.35rem);
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 1.05rem;
+      box-shadow: 0 10px 34px rgba(34,41,52,.055);
+      scroll-margin-top: 5rem;
+    }
+    .kicker { color: var(--teal); font-size: .76rem; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; }
+    .answer {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      gap: 1rem;
+      margin: 1.1rem 0;
+      padding: 1.15rem 1.25rem;
+      background: var(--amber-soft);
+      border-left: 5px solid var(--amber);
+      border-radius: .65rem;
+    }
+    .answer > *, .grid-2 > *, .grid-3 > *, .demo > *, .compare > * { min-width: 0; }
+    .answer .mark { font-size: 1.75rem; line-height: 1.2; }
+    .answer strong { color: #7d3d0b; }
+
+    .grid-2, .grid-3 { display: grid; gap: 1rem; }
+    .grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .card {
+      padding: 1.05rem 1.15rem;
+      background: #f7f8f4;
+      border: 1px solid #dedfd9;
+      border-radius: .75rem;
+    }
+    .card h3 { margin-top: 0; }
+    .card p:last-child { margin-bottom: 0; }
+    .stat { display: block; margin: .1rem 0 .3rem; color: var(--navy-2); font-family: var(--serif); font-size: 1.65rem; font-weight: 750; line-height: 1.2; }
+    .small { color: var(--muted); font-size: .87rem; }
+
+    .formula {
+      margin: 1rem 0;
+      padding: 1rem 1.2rem;
+      overflow-x: auto;
+      color: #102944;
+      background: #eef5f4;
+      border: 1px solid #c8ded9;
+      border-radius: .75rem;
+      font-size: clamp(1rem, 2vw, 1.16rem);
+      text-align: center;
+      white-space: normal;
+    }
+    .formula mjx-container[display="true"] { margin: .3rem 0 !important; }
+    .formula .math-note { margin-top: .45rem; color: var(--muted); font-family: var(--sans); font-size: .8em; }
+
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: .55rem;
+      margin: 1.25rem 0;
+      counter-reset: flow;
+    }
+    .flow > div {
+      position: relative;
+      min-height: 8.2rem;
+      padding: 2.6rem .8rem .8rem;
+      background: #f4f7f6;
+      border: 1px solid #d7dfdc;
+      border-radius: .7rem;
+      font-size: .86rem;
+    }
+    .flow > div::before {
+      counter-increment: flow;
+      content: counter(flow, decimal-leading-zero);
+      position: absolute;
+      top: .7rem;
+      left: .8rem;
+      color: var(--teal);
+      font-family: var(--mono);
+      font-weight: 800;
+    }
+    .flow > div:not(:last-child)::after {
+      content: "→";
+      position: absolute;
+      z-index: 2;
+      top: 43%;
+      right: -.77rem;
+      color: var(--amber);
+      font-size: 1.2rem;
+      font-weight: 800;
+    }
+
+    .range-figure {
+      margin: 1.2rem 0;
+      padding: 1rem;
+      background: #121f32;
+      border-radius: .85rem;
+      color: #e5eef7;
+    }
+    .range-track {
+      position: relative;
+      height: 4.8rem;
+      margin: 2rem 1.2rem 1rem;
+      border-top: 8px solid #6bc1b5;
+    }
+    .range-track .tick { position: absolute; top: -1.7rem; transform: translateX(-50%); color: #b9c7d6; font: .75rem var(--mono); }
+    .range-track .point { position: absolute; top: -.85rem; width: 3px; height: 2.1rem; transform: translateX(-50%); background: #ffb14e; }
+    .range-track .point::after { content: attr(data-label); position: absolute; top: 2.2rem; left: 50%; transform: translateX(-50%); color: #ffd59d; font: .76rem var(--mono); white-space: nowrap; }
+    .range-caption { color: #b9c7d6; font-size: .82rem; }
+
+    table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: .9rem; }
+    th, td { padding: .7rem .75rem; border-bottom: 1px solid #dcded9; text-align: left; vertical-align: top; }
+    th { color: #344057; background: #eff1ed; font-size: .78rem; letter-spacing: .04em; }
+    td.num, th.num { text-align: right; font-family: var(--mono); }
+    tbody tr:hover { background: #f4f8f6; }
+
+    .demo {
+      display: grid;
+      grid-template-columns: minmax(240px, .8fr) minmax(0, 1.2fr);
+      gap: 1rem;
+      margin-top: 1.2rem;
+      padding: 1rem;
+      background: #f6f8f5;
+      border: 1px solid #d9ded9;
+      border-radius: .85rem;
+    }
+    .demo label { display: block; font-weight: 750; }
+    .demo input[type="range"] { width: 100%; accent-color: var(--teal); }
+    .readout { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; }
+    .readout > div { padding: .7rem; background: white; border: 1px solid #dce1dd; border-radius: .55rem; }
+    .readout span { display: block; color: var(--muted); font-size: .73rem; }
+    .readout output { color: var(--navy); font: 700 .9rem var(--mono); word-break: break-all; }
+    .status-bad { color: var(--red) !important; }
+    .status-good { color: var(--teal) !important; }
+
+    .compare { display: grid; grid-template-columns: 1fr auto 1fr; gap: 1rem; align-items: stretch; margin: 1.2rem 0; }
+    .compare .versus { align-self: center; color: var(--muted); font: 800 .75rem var(--mono); }
+    .bad, .good { padding: 1.1rem; border-radius: .75rem; }
+    .bad { background: var(--red-soft); border: 1px solid #efc1ba; }
+    .good { background: var(--teal-soft); border: 1px solid #bddfd7; }
+    .bad h3 { color: #84352d; }
+    .good h3 { color: #11665f; }
+
+    .callout {
+      margin: 1rem 0;
+      padding: 1rem 1.15rem;
+      background: #edf2f9;
+      border-left: 4px solid var(--blue);
+      border-radius: .55rem;
+    }
+    .warning { background: var(--red-soft); border-left-color: var(--red); }
+    .checklist { list-style: none; padding: 0; }
+    .checklist li { position: relative; margin: .55rem 0; padding-left: 1.65rem; }
+    .checklist li::before { content: "✓"; position: absolute; left: 0; color: var(--teal); font-weight: 900; }
+    .not-done li::before { content: "!"; color: var(--amber); }
+
+    footer { padding: 1.8rem 0 3rem; color: #c5d0dc; background: var(--navy); }
+    .footer-inner { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+    footer a { color: #84d4c8; }
+
+    @media (max-width: 840px) {
+      .grid-3 { grid-template-columns: 1fr; }
+      .flow { grid-template-columns: 1fr; }
+      .flow > div { min-height: auto; }
+      .flow > div:not(:last-child)::after { content: "↓"; top: auto; right: 50%; bottom: -1.15rem; }
+      .demo, .compare { grid-template-columns: 1fr; }
+      .compare .versus { text-align: center; }
+    }
+    @media (max-width: 640px) {
+      body { font-size: 15px; }
+      .hero-inner { padding: 3rem 0 2.7rem; }
+      h1 { max-width: 100%; font-size: 2rem; overflow-wrap: anywhere; word-break: break-word; }
+      .grid-2, .readout { grid-template-columns: 1fr; }
+      section { max-width: 100%; border-radius: .8rem; overflow-x: hidden; }
+      table { table-layout: fixed; overflow-wrap: anywhere; }
+      th, td { padding: .55rem .5rem; }
+    }
+    @media print {
+      body { background: white; }
+      nav.toc { display: none; }
+      .hero { color: black; background: white; border-bottom: 2px solid black; }
+      .hero .lead, .meta { color: #333; }
+      section { break-inside: avoid; box-shadow: none; }
+    }
+  </style>
+</head>
+<body>
+  <header class="hero">
+    <div class="hero-inner">
+      <div class="eyebrow">AF_QMC numerical stability note</div>
+      <h1>低温 DQMC の「桁落ち問題」</h1>
+      <p class="lead">どの行列演算で壊れ、なぜ単純な直接計算では直らず、centered UDV と two-sided 再構築が何を守るのか。実際の \(\beta=33.325,\ U=16\) trajectory の数値を使って整理する。</p>
+      <div class="meta">
+        <span>日時: 2026-07-15 17:46 JST</span>
+        <span>モデル: GPT-5 Codex</span>
+        <span>対象: AF_QMC / Phase 6A</span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <nav class="toc" aria-label="ページ内目次">
+      <a href="#answer">結論</a>
+      <a href="#dqmc">DQMCの式</a>
+      <a href="#range">doubleの限界</a>
+      <a href="#failure">実際の破綻箇所</a>
+      <a href="#cancellation">桁落ちの数理</a>
+      <a href="#stable">安定化式</a>
+      <a href="#status">現在の到達点</a>
+    </nav>
+
+    <section id="answer">
+      <div class="kicker">Short answer</div>
+      <h2>先に結論: 最初の故障は「桁落ち」ではなく overflow</h2>
+      <div class="answer">
+        <div class="mark" aria-hidden="true">⚠</div>
+        <div><strong>実際に最初に非有限値を作った演算</strong>は、左右の UDV 因子を合成する <code>src/linalg.c:830</code> の積です。巨大な対角スケールを二つ同時に掛け、QR分解へ渡す前に <code>-inf</code> を作りました。</div>
+      </div>
+      <div class="formula" aria-label="問題となるUDV合成式">
+        \[
+        \begin{aligned}
+          C_{ij} &amp;= d_i^{L}(T_LU_R)_{ij}d_j^{R}, \\
+          \log\lvert C_{ij}\rvert
+            &amp;= \ell_i^{L}+\log\lvert(T_LU_R)_{ij}\rvert+\ell_j^{R}.
+        \end{aligned}
+        \]
+      </div>
+      <p>ただし「では積を普通の密行列として作り、\((I+P)^{-1}\) を直接計算すればよい」とすると、巨大な寄与の中に埋もれた小さい方向が丸めで消え、LU分解の減算で<strong>本来の桁落ち</strong>が起きます。したがって問題は二層です。</p>
+      <div class="grid-2">
+        <div class="card">
+          <h3>層 1: 表現範囲の破綻</h3>
+          <span class="stat">overflow / underflow</span>
+          <p>値が binary64 の指数範囲を越え、<code>inf</code> または <code>0</code> になる。今回最初に観測した直接原因。</p>
+        </div>
+        <div class="card">
+          <h3>層 2: 有効桁の消失</h3>
+          <span class="stat">cancellation / absorption</span>
+          <p>値は有限でも、小さい差や小さい特異方向が約16桁の仮数に残らない。直接行列化では避けられない。</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="dqmc">
+      <div class="kicker">01 · Mathematical origin</div>
+      <h2>低温では imaginary-time 積が指数的に悪条件化する</h2>
+      <p>離散 Hubbard–Stratonovich 場 \(s\) を固定すると、各スピンの重みと等時 Green 関数は time-slice 行列 \(B_\ell\) の積で決まります。</p>
+      <div class="formula" aria-label="DQMCの行列式重みとGreen関数">
+        \[
+        \begin{aligned}
+          P_\sigma(s) &amp;= B^\sigma_{L_\tau-1}\cdots B^\sigma_1B^\sigma_0, \\
+          W(s) &amp;= \prod_\sigma\det\!\left[I+P_\sigma(s)\right], \\
+          G_\sigma &amp;= \left[I+P_\sigma(s)\right]^{-1}.
+        \end{aligned}
+        \]
+      </div>
+      <p>各 \(B_\ell\) は有限でも、積の特異値はおおむね \(e^{\pm c\beta}\) のように分離します。今回の条件では \(\beta/\Delta\tau=33.325/0.025=1333\) slices です。HS係数 \(\lambda\simeq0.653733\) に対し \(\lambda L_\tau\simeq871.4\) であり、一つの密行列に全スケールを混ぜるには極端です。</p>
+
+      <h3>UDV分解の役割</h3>
+      <p>積をそのまま保持せず、QRを繰り返して次の形に保ちます。</p>
+      <div class="formula" aria-label="UDV分解">
+        \[ P=UDT, \qquad D=\operatorname{diag}(d_1,\ldots,d_n). \]
+        <div class="math-note"><i>U</i>: 直交行列　 <i>D</i>: スケール　 <i>T</i>: unit upper-triangular</div>
+      </div>
+      <p>\(D\) に指数的スケール差を隔離することで、\(U\) と \(T\) の数値を概ね扱いやすく保てます。問題は、この分離済み因子を<strong>再び一つへ合成する瞬間</strong>に現れました。</p>
+
+      <div class="flow" aria-label="数値破綻の伝播経路">
+        <div><strong>1333個の B</strong><br>低温の長い imaginary-time 積</div>
+        <div><strong>D の幅が増大</strong><br>大・小の特異方向を分離して保持</div>
+        <div><strong>左右因子を合成</strong><br>\(D_LXD_R\) を直接形成</div>
+        <div><strong>C[0,0] = −inf</strong><br>QRより前に exponent overflow</div>
+        <div><strong>G → 観測量</strong><br>未検出なら NaN が bin まで伝播</div>
+      </div>
+    </section>
+
+    <section id="range">
+      <div class="kicker">02 · Binary64 limits</div>
+      <h2>「値の範囲」と「有効桁」は別の限界</h2>
+      <div class="grid-3">
+        <div class="card">
+          <h3>精度</h3>
+          <span class="stat">\(\varepsilon=2^{-52}\)</span>
+          <p class="small">約 \(2.22\times10^{-16}\)。十進で約15.95桁。</p>
+        </div>
+        <div class="card">
+          <h3>最大有限値</h3>
+          <span class="stat">\(\ln x_{\max}\simeq709.78\)</span>
+          <p class="small">\(e^x\) は \(x>709.78\) で overflow。</p>
+        </div>
+        <div class="card">
+          <h3>最小非零値</h3>
+          <span class="stat">\(\ln x_{\min}\simeq-744.44\)</span>
+          <p class="small">\(x<-744.44\) では \(e^x=0\)。</p>
+        </div>
+      </div>
+
+      <h3>実 trajectory で採取した n=16 因子</h3>
+      <table>
+        <thead><tr><th>量</th><th class="num">値</th><th>意味</th></tr></thead>
+        <tbody>
+          <tr><td>min log|D|</td><td class="num">−644.9993847270</td><td>最小のスケール方向</td></tr>
+          <tr><td>max log|D|</td><td class="num">+705.7737890041</td><td>最大値まで残り約4.01</td></tr>
+          <tr><td>spread</td><td class="num">1350.7731737311</td><td>スケール比は約 \(10^{586.7}\)</td></tr>
+          <tr><td>center</td><td class="num">+30.3872021385</td><td>\((\max+\min)/2\)</td></tr>
+          <tr><td>centered radius</td><td class="num">675.3865868656</td><td>中心化後は両端が \(\pm675.39\)</td></tr>
+          <tr><td>remaining margin</td><td class="num">34.3961260278</td><td>\(\ln(\mathtt{DBL\_MAX})-\mathrm{radius}\)</td></tr>
+        </tbody>
+      </table>
+
+      <div class="range-figure" role="img" aria-label="double指数範囲と実因子のcentered radius">
+        <div class="range-track">
+          <span class="tick" style="left:0%">−709.78</span>
+          <span class="tick" style="left:50%">0</span>
+          <span class="tick" style="left:100%">+709.78</span>
+          <span class="point" style="left:2.42%" data-label="−675.39"></span>
+          <span class="point" style="left:97.58%" data-label="+675.39"></span>
+        </div>
+        <div class="range-caption">centered 後の stored D は有限範囲に入る。しかし残りは自然対数で34.4しかなく、万能な解決ではない。</div>
+      </div>
+
+      <div class="callout"><strong>重要:</strong> \(e^{705}\) と \(e^{-645}\) は個別には有限です。しかし両者を同じ密行列の加算に混ぜると、比が16桁を遥かに越えるため小さい寄与は消えます。また二つの大きい \(D\) を掛ければ、指数の<strong>和</strong>が709.78を越えて overflow します。</div>
+    </section>
+
+    <section id="failure">
+      <div class="kicker">03 · Exact failure site</div>
+      <h2>壊れた場所は UDV combine の QR入力形成</h2>
+      <p>左右の積を</p>
+      <div class="formula" aria-label="左右UDV因子の積">
+        \[
+        \begin{aligned}
+          L &amp;= U_LD_LT_L, &amp; R &amp;= U_RD_RT_R, \\
+          LR &amp;= U_L\!\left[D_L(T_LU_R)D_R\right]T_R.
+        \end{aligned}
+        \]
+      </div>
+      <p>と組み直すと、角括弧内の \(C\) をもう一度QR分解できます。中温では正しい方法ですが、低温では \(C_{ij}\) の三つの因子を掛けた時点で範囲外になります。</p>
+      <pre><span style="color:#7fd4c7">// src/linalg.c:824–833</span>
+la_matmul(n, l-&gt;T, r-&gt;U, TLUR);
+for (int j = 0; j &lt; n; j++) {
+    for (int i = 0; i &lt; n; i++) {
+        C[i + j*n] = l-&gt;D[i] * TLUR[i + j*n] * r-&gt;D[j];
+    }
+}
+check_matrix_finite("udv_combine", "C", n, C);</pre>
+      <div class="answer">
+        <div class="mark" aria-hidden="true">→</div>
+        <div>既知 seed ではここで <code>C[0,0] = -inf</code> が初めて検出されました。したがって LAPACK のQRや逆行列が先に失敗したのではありません。</div>
+      </div>
+
+      <h3>overflow 条件は log-domain なら事前に見える</h3>
+      <div class="formula" aria-label="オーバーフローとアンダーフローの条件">
+        \[
+        \begin{aligned}
+          \ell_i^L+\log\lvert X_{ij}\rvert+\ell_j^R &amp;> 709.78
+            &amp;\Longrightarrow\quad&amp; \mathrm{overflow}, \\
+          \ell_i^L+\log\lvert X_{ij}\rvert+\ell_j^R &amp;< -744.44
+            &amp;\Longrightarrow\quad&amp; \mathrm{underflow}, \\
+          X &amp;=T_LU_R.
+        \end{aligned}
+        \]
+      </div>
+      <p>この判定は積を作る前にできます。現在の centered 更新経路も、更新行列による増幅を log-domain 上界で評価してからQR入力を形成します（<a href="../src/linalg.c#L103">src/linalg.c:103</a> 付近）。</p>
+    </section>
+
+    <section id="cancellation">
+      <div class="kicker">04 · Catastrophic cancellation</div>
+      <h2>では、桁落ちはどこに潜んでいるのか</h2>
+      <p>浮動小数点減算 \(x-y\) で \(x\simeq y\) のとき、入力に含まれていた丸め誤差が結果に対して増幅されます。単純化した相対誤差増幅率は次です。</p>
+      <div class="formula" aria-label="減算の誤差増幅率">
+        \[
+        \kappa_{\mathrm{sub}}=\frac{\lvert x\rvert+\lvert y\rvert}{\lvert x-y\rvert},
+        \qquad
+        \frac{\lvert\Delta(x-y)\rvert}{\lvert x-y\rvert}
+        \lesssim \varepsilon\,\kappa_{\mathrm{sub}}.
+        \]
+        <div class="math-note">差が小さいほど \(\kappa_{\mathrm{sub}}\) が大きくなり、有効桁を失う。</div>
+      </div>
+
+      <h3>2×2 の最小例: 正則な行列が double では特異に見える</h3>
+      <div class="formula" aria-label="桁落ちを示す二行二列行列">
+        \[
+        A(s)=
+        \begin{pmatrix}
+          e^s &amp; e^s \\
+          e^s &amp; e^s+1
+        \end{pmatrix},
+        \qquad
+        \det A(s)=e^s(e^s+1)-e^{2s}=e^s.
+        \]
+      </div>
+      <p>数学的には常に正則です。しかし \(s\simeq37\) では \(e^s+1\) が \(e^s\) と同じ double に丸められ、計算上の行列式は0になります。LU分解の Schur complement でも同じ「巨大量 − 巨大量」が現れます。</p>
+
+      <div class="demo" aria-label="2x2桁落ちの対話デモ">
+        <div>
+          <label for="scaleSlider">指数 s = <output id="sOut">37.0</output></label>
+          <input id="scaleSlider" type="range" min="0" max="42" value="37" step="0.1">
+          <p class="small">行列右下に数学的には \(+1\) があります。スライダーを動かすと、どこで double から消えるか確認できます。</p>
+        </div>
+        <div class="readout">
+          <div><span>a = exp(s)</span><output id="aOut">—</output></div>
+          <div><span>double の (a+1)−a</span><output id="incrementOut">—</output></div>
+          <div><span>正しい det = a</span><output id="exactOut">—</output></div>
+          <div><span>直接計算した det</span><output id="naiveOut">—</output></div>
+          <div><span>naive / exact</span><output id="ratioOut">—</output></div>
+          <div><span>判定</span><output id="statusOut">—</output></div>
+        </div>
+      </div>
+
+      <table>
+        <thead><tr><th class="num">\(s\)</th><th class="num">\(a=e^s\)</th><th class="num">naive det / exact det</th><th>状態</th></tr></thead>
+        <tbody>
+          <tr><td class="num">20</td><td class="num">\(4.85\times10^8\)</td><td class="num">0.999999976</td><td>既に数桁劣化</td></tr>
+          <tr><td class="num">35</td><td class="num">\(1.59\times10^{15}\)</td><td class="num">0.887366</td><td>約11%の誤差</td></tr>
+          <tr><td class="num">36</td><td class="num">\(4.31\times10^{15}\)</td><td class="num">0.522310</td><td>約48%の誤差</td></tr>
+          <tr><td class="num">37</td><td class="num">\(1.17\times10^{16}\)</td><td class="num">0</td><td>+1が吸収され、特異に見える</td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout warning"><strong>DQMCとの対応:</strong> \(P=UDT\) を密行列として形成すると、大きい \(d_i\) の寄与が各要素を支配します。小さい特異方向や単位行列 \(I\) の寄与は \(e^{-36.7}\simeq10^{-16}\) より相対的に小さければ仮数から消えます。その後のLU消去では、必要な Schur complement が巨大成分の差として計算され、桁落ちします。</div>
+    </section>
+
+    <section id="stable">
+      <div class="kicker">05 · Stable algebra</div>
+      <h2>対策の要点: 大きい数を作らず、逆数側へ回す</h2>
+      <p>安定化の本質は「精度を上げる」ことではなく、数学的に等価な式へ変形し、すべての中間スケールを1以下に抑えることです。</p>
+
+      <h3>Step A — 全体スケールを log_offset に逃がす</h3>
+      <div class="formula" aria-label="centered UDV表現">
+        \[
+        \begin{aligned}
+          P &amp;= e^o U\operatorname{diag}(\widehat d_1,\ldots,\widehat d_n)T, \\
+          c &amp;= \frac{\max_i\log\lvert\widehat d_i\rvert
+                      +\min_i\log\lvert\widehat d_i\rvert}{2}, \\
+          \widehat d_i' &amp;= \operatorname{sgn}(\widehat d_i)
+            \exp\!\left(\log\lvert\widehat d_i\rvert-c\right),
+          &amp; o' &amp;=o+c.
+        \end{aligned}
+        \]
+      </div>
+      <p>この変換は \(e^{o'}\widehat d_i'=e^o\widehat d_i\) を厳密に保ちます。\(e^o\) 自体は形成せず、有効スケールは常に</p>
+      <div class="formula" aria-label="有効対数スケール">
+        \[ \ell_i=\log\lvert\widehat d_i\rvert+o. \]
+      </div>
+      <p>として log-domain で扱います。</p>
+
+      <h3>Step B — one-sided Green 再構築で big / small を分ける</h3>
+      <p>物理的な対角スケールを \(D=D_bD_s\) と分けます。計算で作るのは巨大な \(D_b\) ではなく、その逆数です。</p>
+      <div class="formula" aria-label="effective logによるbig small分解">
+        \[
+        \begin{array}{c|cc}
+          &amp; (D_b^{-1})_i &amp; (D_s)_i \\ \hline
+          \ell_i>0
+            &amp; \operatorname{sgn}(\widehat d_i)e^{-\ell_i} &amp; 1 \\
+          \ell_i\le 0
+            &amp; 1 &amp; \operatorname{sgn}(\widehat d_i)e^{\ell_i}
+        \end{array}
+        \qquad
+        \lvert D_b^{-1}\rvert\le1,\quad \lvert D_s\rvert\le1.
+        \]
+      </div>
+      <p>すると</p>
+      <div class="formula" aria-label="安定なone-sided Green再構築式">
+        \[
+        \begin{aligned}
+          M &amp;=D_b^{-1}U^{\mathsf T}T^{-1}+D_s, \\
+          I+UDT &amp;=UD_bMT, \\
+          G &amp;=T^{-1}M^{-1}D_b^{-1}U^{\mathsf T}.
+        \end{aligned}
+        \]
+      </div>
+      <p>となり、巨大な \(D\) も \(I+UDT\) も直接作りません。実装は <a href="../src/linalg.c#L955">src/linalg.c:955–966</a> の effective-log split と、同1000行付近の \(M\) 形成です。</p>
+
+      <h3>Step C — boundary では combine を捨て、two-sided のまま解く</h3>
+      <p>\(L=U_LD_LT_L\) と \(R=U_RD_RT_R\) を一つへ合成しません。\(D_L=D_{Lb}D_{Ls}\)、\(D_R=D_{Rs}D_{Rb}\) と分け、</p>
+      <div class="formula" aria-label="安定なtwo-sided Green再構築式">
+        \[
+        \begin{aligned}
+          X &amp;=T_LU_R, \\
+          H &amp;=D_{Lb}^{-1}U_L^{\mathsf T}T_R^{-1}D_{Rb}^{-1}
+             +D_{Ls}XD_{Rs}, \\
+          I+LR &amp;=U_LD_{Lb}HD_{Rb}T_R, \\
+          G &amp;=T_R^{-1}D_{Rb}^{-1}H^{-1}D_{Lb}^{-1}U_L^{\mathsf T}.
+        \end{aligned}
+        \]
+      </div>
+      <p>ここでも指数化するのは非正の量だけなので、各 scale factor の絶対値は1以下です。実装は <a href="../src/linalg.c#L1176">src/linalg.c:1176–1260</a>、centered モードが combine を迂回する分岐は <a href="../src/green.c#L299">src/green.c:299–306</a> です。</p>
+
+      <div class="compare">
+        <div class="bad">
+          <h3>不安定な経路</h3>
+          <p>\(D_LXD_R\) を形成</p>
+          <p>→ exponent を加算<br>→ overflow / underflow<br>→ 直接逆行列なら cancellation</p>
+        </div>
+        <div class="versus">VERSUS</div>
+        <div class="good">
+          <h3>centered two-sided 経路</h3>
+          <p>offset は log のまま保持</p>
+          <p>→ inverse-big と small のみ形成<br>→ 全scale factor ≤ 1<br>→ 有効桁を保った小行列 \(H\) を解く</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="status">
+      <div class="kicker">06 · Evidence and boundary</div>
+      <h2>確認できたことと、実測した適用限界</h2>
+      <div class="grid-2">
+        <div>
+          <h3>確認済み</h3>
+          <ul class="checklist">
+            <li>実 n=16 factor を mpmath 500桁の直接逆行列と比較。</li>
+            <li>centered one-sided Green の相対誤差 \(6.82\times10^{-13}\)。</li>
+            <li>独立 non-diagonal two-sided fixture でも高精度参照と符号を検証。</li>
+            <li>production seed 列の先頭4本が \(\beta=33.325\) で各 warmup 2000 + measurement 9000 sweeps を有限値のまま完走。</li>
+            <li>従来の <span class="mono">sweep_count=10397</span> 破綻点を通過。</li>
+            <li>\(\beta=25\) は combine / two-sided / centered、\(\beta=30\)–32 は既存 Phase 5 基準と全出力列が一致。</li>
+            <li>既知 seed の正式長では \(\beta=33.75\) が完走、\(\beta=34\) は <span class="mono">sweep_count=2684</span> で型付き停止。</li>
+          </ul>
+        </div>
+        <div>
+          <h3>適用限界・未保証</h3>
+          <ul class="checklist not-done">
+            <li>\(\beta=50\) は最初の measurement sweep、\(\beta=100\) は初期化中に <span class="mono">centered_update_margin</span> で停止。現方式では非対応。</li>
+            <li>4本以外のすべての seed / field fluctuationで範囲内に留まることは未保証。</li>
+            <li>centered は限定的 opt-in のまま。既定モードには昇格しない。</li>
+            <li>\(\beta=50\)、100には single factorへ潰さない structured chain solver が必要。</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="callout"><strong>数値的な位置づけ:</strong> centered offset は、スケール幅そのものを小さくするのではなく、binary64 の指数範囲を両側へ効率よく使う再パラメータ化です。実 trajectory では単純な半径8の壁より先に、次のB行列の増幅を含む update-margin gate が危険を検出しました。既知 seed の正式長境界は0.25刻みで \(33.75 &lt; \beta_{\mathrm{fail}}\le 34\) です。</div>
+
+      <h3>コードと資料</h3>
+      <table>
+        <thead><tr><th>参照</th><th>内容</th></tr></thead>
+        <tbody>
+          <tr><td><a href="../src/linalg.c">src/linalg.c</a></td><td>UDV更新、combine、one-/two-sided Green再構築</td></tr>
+          <tr><td><a href="../src/green.c">src/green.c</a></td><td>centered mode の経路選択と boundary rebuild</td></tr>
+          <tr><td><a href="2026-07-13-l4-u16-low-temperature-nan-report.md">低温NaN原因調査</a></td><td>再現条件、最初の非有限値、NaN伝播経路</td></tr>
+          <tr><td><a href="2026-07-14-udv-phase6a-centered-offset-investigation.md">centered offset 調査</a></td><td>実factorの幅、margin、500桁比較</td></tr>
+          <tr><td><a href="2026-07-15-udv-phase6a-a5-validation.md">A5適用限界検証</a></td><td>safe-region一致、4 seed正式長、beta=34–100のfail-fast境界</td></tr>
+          <tr><td><a href="../tests/test_udv_phase6a_fixture.c">高精度fixture test</a></td><td>固定 one-/two-sided reference に対する回帰試験</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+
+  <footer>
+    <div class="footer-inner">
+      <span>AF_QMC numerical note · 2026-07-15</span>
+      <span>要約: 最初の故障は combine overflow。桁落ちは直接行列化した場合の次の壁。</span>
+    </div>
+  </footer>
+
+  <script>
+    (() => {
+      const slider = document.getElementById('scaleSlider');
+      const sOut = document.getElementById('sOut');
+      const aOut = document.getElementById('aOut');
+      const incrementOut = document.getElementById('incrementOut');
+      const exactOut = document.getElementById('exactOut');
+      const naiveOut = document.getElementById('naiveOut');
+      const ratioOut = document.getElementById('ratioOut');
+      const statusOut = document.getElementById('statusOut');
+
+      const format = value => {
+        if (!Number.isFinite(value)) return String(value);
+        if (value === 0) return '0';
+        return value.toExponential(7);
+      };
+
+      const update = () => {
+        const s = Number(slider.value);
+        const a = Math.exp(s);
+        const increment = (a + 1) - a;
+        const naive = a * (a + 1) - a * a;
+        const ratio = naive / a;
+        const lost = increment === 0 || naive === 0;
+
+        sOut.value = s.toFixed(1);
+        sOut.textContent = s.toFixed(1);
+        aOut.value = format(a);
+        aOut.textContent = format(a);
+        incrementOut.value = format(increment);
+        incrementOut.textContent = format(increment);
+        exactOut.value = format(a);
+        exactOut.textContent = format(a);
+        naiveOut.value = format(naive);
+        naiveOut.textContent = format(naive);
+        ratioOut.value = format(ratio);
+        ratioOut.textContent = format(ratio);
+        statusOut.value = lost ? '小さい差が消失' : '差はまだ表現可能';
+        statusOut.textContent = statusOut.value;
+        statusOut.className = lost ? 'status-bad' : 'status-good';
+      };
+
+      slider.addEventListener('input', update);
+      update();
+    })();
+  </script>
+</body>
+</html>

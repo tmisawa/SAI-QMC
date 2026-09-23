@@ -1,0 +1,580 @@
+<!doctype html>
+<!--
+date: 2026-07-02
+datetime: 2026-07-02 16:56 JST
+model: GPT-5 Codex
+summary:
+  UDV stack stabilization commit ff9b741 の kugui i2cpu 検証結果をHTML化。
+  old commit 25ebdd2との16x16 beta=4/8/16比較、テスト結果、PBS環境、
+  beta線形化の確認をまとめる。
+-->
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>kugui i2cpu UDV Stack Validation</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #1e2528;
+      --muted: #667176;
+      --line: #d9e1e5;
+      --paper: #ffffff;
+      --soft: #f5f7f8;
+      --old: #9b4a3b;
+      --new: #25726a;
+      --accent: #315f9b;
+      --ok: #2f7a45;
+      --warn: #8a6a21;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 16px;
+      line-height: 1.6;
+    }
+
+    main {
+      width: min(1120px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 32px 0 56px;
+    }
+
+    header {
+      border-bottom: 2px solid var(--line);
+      padding-bottom: 20px;
+      margin-bottom: 28px;
+    }
+
+    h1 {
+      margin: 0 0 10px;
+      font-size: clamp(1.75rem, 3vw, 2.6rem);
+      line-height: 1.16;
+      font-weight: 760;
+    }
+
+    h2 {
+      margin: 34px 0 12px;
+      font-size: 1.35rem;
+      line-height: 1.25;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 8px;
+    }
+
+    h3 {
+      margin: 20px 0 8px;
+      font-size: 1rem;
+    }
+
+    p {
+      margin: 0 0 12px;
+    }
+
+    a {
+      color: var(--accent);
+      text-decoration-thickness: 1px;
+      text-underline-offset: 3px;
+    }
+
+    code {
+      background: #edf1f3;
+      border-radius: 4px;
+      padding: 0.08rem 0.28rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.92em;
+    }
+
+    .meta {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 8px 16px;
+      color: var(--muted);
+      font-size: 0.94rem;
+    }
+
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin: 22px 0 8px;
+    }
+
+    .metric {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px 16px;
+      background: var(--soft);
+      min-height: 98px;
+    }
+
+    .metric .label {
+      color: var(--muted);
+      font-size: 0.85rem;
+      margin-bottom: 6px;
+    }
+
+    .metric .value {
+      font-size: 1.55rem;
+      font-weight: 740;
+      line-height: 1.15;
+    }
+
+    .metric .sub {
+      color: var(--muted);
+      font-size: 0.86rem;
+      margin-top: 5px;
+    }
+
+    .ok {
+      color: var(--ok);
+      font-weight: 700;
+    }
+
+    .note {
+      border-left: 4px solid var(--warn);
+      padding: 10px 14px;
+      background: #fbf7eb;
+      color: #594618;
+      margin: 16px 0;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0 18px;
+      font-size: 0.95rem;
+    }
+
+    th,
+    td {
+      border-bottom: 1px solid var(--line);
+      padding: 9px 10px;
+      text-align: right;
+      vertical-align: middle;
+      white-space: nowrap;
+    }
+
+    th:first-child,
+    td:first-child,
+    .text-left {
+      text-align: left;
+    }
+
+    thead th {
+      color: #3e4a4f;
+      background: #eef3f5;
+      font-weight: 700;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      margin: 12px 0 18px;
+    }
+
+    .table-wrap table {
+      margin: 0;
+      border-collapse: separate;
+      border-spacing: 0;
+    }
+
+    .table-wrap tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .bars {
+      display: grid;
+      gap: 14px;
+      margin: 18px 0 22px;
+    }
+
+    .bar-row {
+      display: grid;
+      grid-template-columns: 72px 1fr 84px;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .bar-track {
+      display: grid;
+      gap: 5px;
+    }
+
+    .bar {
+      height: 20px;
+      border-radius: 4px;
+      min-width: 2px;
+    }
+
+    .bar.old {
+      background: var(--old);
+    }
+
+    .bar.new {
+      background: var(--new);
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      color: var(--muted);
+      font-size: 0.92rem;
+      margin: 6px 0 0;
+    }
+
+    .legend span::before {
+      content: "";
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border-radius: 3px;
+      margin-right: 6px;
+      vertical-align: -1px;
+    }
+
+    .legend .old::before {
+      background: var(--old);
+    }
+
+    .legend .new::before {
+      background: var(--new);
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px 16px;
+      background: var(--soft);
+    }
+
+    .panel ul {
+      margin: 8px 0 0;
+      padding-left: 1.1rem;
+    }
+
+    .panel li {
+      margin: 4px 0;
+    }
+
+    .source-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 8px 14px;
+      margin-top: 10px;
+    }
+
+    .source-list a {
+      display: block;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 8px 10px;
+      background: #fafcfd;
+    }
+
+    footer {
+      margin-top: 34px;
+      padding-top: 16px;
+      color: var(--muted);
+      border-top: 1px solid var(--line);
+      font-size: 0.9rem;
+    }
+
+    @media (max-width: 780px) {
+      main {
+        width: min(100% - 20px, 1120px);
+        padding-top: 20px;
+      }
+
+      .summary,
+      .grid-2 {
+        grid-template-columns: 1fr;
+      }
+
+      .bar-row {
+        grid-template-columns: 56px 1fr 70px;
+        gap: 8px;
+      }
+    }
+
+    @media print {
+      body {
+        font-size: 12px;
+      }
+
+      main {
+        width: 100%;
+        padding: 0;
+      }
+
+      a {
+        color: inherit;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>kugui i2cpu UDV Stack Validation</h1>
+      <p>
+        UDV stack stabilization commit <code>ff9b741</code> を kugui <code>i2cpu</code>
+        で実機検証し、old commit <code>25ebdd2</code> と同一ノード・同一入力で比較した結果。
+      </p>
+      <div class="meta">
+        <div>作成: 2026-07-02 16:56 JST</div>
+        <div>Model: GPT-5 Codex</div>
+        <div>PBS job: <code>843753.kugui-pbs</code></div>
+        <div>Remote: <code>cpu121</code>, queue <code>i2cpu</code></div>
+      </div>
+    </header>
+
+    <section class="summary" aria-label="key metrics">
+      <div class="metric">
+        <div class="label">PBS result</div>
+        <div class="value ok">exit 0</div>
+        <div class="sub">walltime 00:04:10</div>
+      </div>
+      <div class="metric">
+        <div class="label">Tests on ff9b741</div>
+        <div class="value ok">PASS</div>
+        <div class="sub">make test / make test_mpi</div>
+      </div>
+      <div class="metric">
+        <div class="label">Max speedup</div>
+        <div class="value">18.61x</div>
+        <div class="sub">16x16, beta=16, Ltr=160</div>
+      </div>
+      <div class="metric">
+        <div class="label">Scaling</div>
+        <div class="value">linear</div>
+        <div class="sub">new: 2.02x, then 2.00x</div>
+      </div>
+    </section>
+
+    <div class="note">
+      この run は性能検証用の短時間測定であり、production 統計ではない。条件は
+      <code>nwarm=0</code>, <code>nmeas=2</code>, <code>nbin=2</code>。
+      物理量は old/new の同一軌道 smoke として確認した。
+    </div>
+
+    <h2>1. Sweep Timing</h2>
+    <p>
+      主指標は profiler の <code>dqmc_sweep</code> 平均秒。旧実装は beta を倍にすると
+      sweep 時間が約 3.6-3.8 倍に伸び、新実装はほぼ 2 倍で伸びる。
+    </p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>beta</th>
+            <th>Ltr</th>
+            <th>old avg sec/sweep</th>
+            <th>new avg sec/sweep</th>
+            <th>speedup</th>
+            <th>old beta step</th>
+            <th>new beta step</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>4</td>
+            <td>40</td>
+            <td>4.6984</td>
+            <td>0.8492</td>
+            <td><strong>5.53x</strong></td>
+            <td>-</td>
+            <td>-</td>
+          </tr>
+          <tr>
+            <td>8</td>
+            <td>80</td>
+            <td>16.9654</td>
+            <td>1.7181</td>
+            <td><strong>9.87x</strong></td>
+            <td>3.61x</td>
+            <td>2.02x</td>
+          </tr>
+          <tr>
+            <td>16</td>
+            <td>160</td>
+            <td>63.8117</td>
+            <td>3.4296</td>
+            <td><strong>18.61x</strong></td>
+            <td>3.76x</td>
+            <td>2.00x</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>sec/sweep bar view</h3>
+    <div class="legend">
+      <span class="old">old 25ebdd2</span>
+      <span class="new">new ff9b741</span>
+    </div>
+    <div class="bars" aria-label="sweep timing bars">
+      <div class="bar-row">
+        <strong>beta 4</strong>
+        <div class="bar-track">
+          <div class="bar old" style="width: 7.36%" title="old 4.698 sec"></div>
+          <div class="bar new" style="width: 1.33%" title="new 0.849 sec"></div>
+        </div>
+        <span>5.53x</span>
+      </div>
+      <div class="bar-row">
+        <strong>beta 8</strong>
+        <div class="bar-track">
+          <div class="bar old" style="width: 26.59%" title="old 16.965 sec"></div>
+          <div class="bar new" style="width: 2.69%" title="new 1.718 sec"></div>
+        </div>
+        <span>9.87x</span>
+      </div>
+      <div class="bar-row">
+        <strong>beta 16</strong>
+        <div class="bar-track">
+          <div class="bar old" style="width: 100%" title="old 63.812 sec"></div>
+          <div class="bar new" style="width: 5.38%" title="new 3.430 sec"></div>
+        </div>
+        <span>18.61x</span>
+      </div>
+    </div>
+
+    <h2>2. Run Configuration</h2>
+    <div class="grid-2">
+      <div class="panel">
+        <h3>HPC / Build</h3>
+        <ul>
+          <li>Remote run dir: <code>runs/afqmc-kugui-i2cpu-udv-stack-ff9b741-20260702</code></li>
+          <li>PBS: <code>select=1:ncpus=128:mpiprocs=16:ompthreads=1</code>, requested walltime <code>00:30:00</code></li>
+          <li>Modules: <code>intel/2022.2.1</code>, <code>intel-mpi/2021.7.1</code></li>
+          <li>Compiler: <code>icc</code>, <code>mpiicc</code>, link <code>-qmkl=sequential</code></li>
+          <li>Runtime: <code>OMP_NUM_THREADS=1</code>, <code>MKL_NUM_THREADS=1</code>, <code>FI_PROVIDER=psm3</code></li>
+        </ul>
+      </div>
+      <div class="panel">
+        <h3>DQMC Inputs</h3>
+        <ul>
+          <li>lattice: square 16x16</li>
+          <li><code>U=4.0</code>, <code>dtau=0.1</code>, <code>stab=4</code></li>
+          <li><code>beta=4,8,16</code> (<code>Ltr=40,80,160</code>)</li>
+          <li><code>nwarm=0</code>, <code>nmeas=2</code>, <code>nbin=2</code></li>
+          <li><code>seed=246813579</code>, <code>profile=1</code></li>
+        </ul>
+      </div>
+    </div>
+
+    <h2>3. Profiler Breakdown</h2>
+    <p>
+      beta=16 の measurement phase では、旧実装は <code>green_from_scratch</code> が
+      <code>124.60s</code>、sweep 全体の約 <code>96%</code> を占める。
+      新実装では同じ役割が stack build / stack reconstruction に分散し、
+      <code>dqmc_sweep</code> は <code>127.62s</code> から <code>6.86s</code> に下がった。
+    </p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th class="text-left">case</th>
+            <th>dqmc_sweep total</th>
+            <th>green_from_scratch</th>
+            <th>green_stack_build</th>
+            <th>green_from_stack</th>
+            <th>green_update</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="text-left">old beta=16</td>
+            <td>127.623s</td>
+            <td>124.604s</td>
+            <td>-</td>
+            <td>-</td>
+            <td>1.684s</td>
+          </tr>
+          <tr>
+            <td class="text-left">new beta=16</td>
+            <td>6.859s</td>
+            <td>-</td>
+            <td>1.140s</td>
+            <td>1.941s</td>
+            <td>1.603s</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2>4. Correctness Smoke</h2>
+    <p>
+      old/new の出力行は印字精度または最終桁差のみで一致した。全ケースで <code>sign=1</code>。
+    </p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>beta</th>
+            <th class="text-left">agreement</th>
+            <th>sign old</th>
+            <th>sign new</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>4</td>
+            <td class="text-left">E / doublon match; dN differs only at printed ~1e-9 scale</td>
+            <td>1</td>
+            <td>1</td>
+          </tr>
+          <tr>
+            <td>8</td>
+            <td class="text-left">E and doublon differ by one final printed digit</td>
+            <td>1</td>
+            <td>1</td>
+          </tr>
+          <tr>
+            <td>16</td>
+            <td class="text-left">E and doublon differ by one final printed digit</td>
+            <td>1</td>
+            <td>1</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2>5. Source Artifacts</h2>
+    <p>ローカルに同期した検証結果は次のディレクトリに保存済み。</p>
+    <p>
+      <code>data/profiling_runs/kugui_i2cpu_udv_stack_ff9b741_20260702/</code>
+    </p>
+    <div class="source-list">
+      <a href="../data/profiling_runs/kugui_i2cpu_udv_stack_ff9b741_20260702/README.md">README.md</a>
+      <a href="../data/profiling_runs/kugui_i2cpu_udv_stack_ff9b741_20260702/summary_sweeps.tsv">summary_sweeps.tsv</a>
+      <a href="../data/profiling_runs/kugui_i2cpu_udv_stack_ff9b741_20260702/summary_speedup.tsv">summary_speedup.tsv</a>
+      <a href="../data/profiling_runs/kugui_i2cpu_udv_stack_ff9b741_20260702/summary_regions.tsv">summary_regions.tsv</a>
+      <a href="../data/profiling_runs/kugui_i2cpu_udv_stack_ff9b741_20260702/kugui_udv_stack_i2cpu_validate.pbs">PBS script</a>
+      <a href="../data/profiling_runs/kugui_i2cpu_udv_stack_ff9b741_20260702/run_info.txt">run_info.txt</a>
+    </div>
+
+    <footer>
+      Generated from kugui i2cpu validation results on 2026-07-02. This document is a static report and does not require a web server.
+    </footer>
+  </main>
+</body>
+</html>

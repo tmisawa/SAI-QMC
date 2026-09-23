@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AF_QMC コードリファレンス — 有限温度補助場量子モンテカルロ (DQMC/BSS)</title>
+<script>
+MathJax = {
+  tex: {
+    inlineMath: [['$', '$'], ['\\(', '\\)']],
+    displayMath: [['$$', '$$'], ['\\[', '\\]']],
+    tags: 'ams'
+  }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
+<style>
+  :root {
+    --fg: #1a1a2e;
+    --bg: #fdfdfd;
+    --accent: #16537e;
+    --accent-light: #e8f1f8;
+    --code-bg: #f4f4f6;
+    --border: #d8dce3;
+    --warn-bg: #fff8e6;
+    --warn-border: #e6c860;
+  }
+  body {
+    font-family: "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic",
+                 "Noto Sans CJK JP", sans-serif;
+    color: var(--fg);
+    background: var(--bg);
+    line-height: 1.75;
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem 6rem;
+  }
+  h1 { font-size: 1.7rem; border-bottom: 3px solid var(--accent); padding-bottom: .4rem; }
+  h2 {
+    font-size: 1.35rem; color: var(--accent);
+    border-left: 6px solid var(--accent); padding-left: .6rem;
+    margin-top: 2.8rem;
+  }
+  h3 { font-size: 1.1rem; margin-top: 2rem; border-bottom: 1px dashed var(--border); padding-bottom: .2rem; }
+  code, pre {
+    font-family: "SF Mono", Menlo, Consolas, "Noto Sans Mono CJK JP", monospace;
+    font-size: .88em;
+  }
+  code { background: var(--code-bg); padding: .1em .35em; border-radius: 4px; }
+  pre {
+    background: var(--code-bg); border: 1px solid var(--border);
+    border-radius: 8px; padding: .9rem 1.1rem; overflow-x: auto; line-height: 1.5;
+  }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 1rem 0; font-size: .93rem; }
+  th, td { border: 1px solid var(--border); padding: .45rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--accent-light); }
+  tr:nth-child(even) td { background: #fafbfc; }
+  .meta {
+    background: var(--accent-light); border: 1px solid var(--border);
+    border-radius: 8px; padding: .8rem 1.2rem; font-size: .9rem; margin: 1.2rem 0;
+  }
+  .note {
+    background: var(--warn-bg); border: 1px solid var(--warn-border);
+    border-radius: 8px; padding: .7rem 1.1rem; margin: 1rem 0; font-size: .93rem;
+  }
+  .flow {
+    background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px;
+    padding: 1rem 1.2rem; font-family: Menlo, Consolas, monospace;
+    font-size: .85rem; line-height: 1.6; overflow-x: auto; white-space: pre;
+  }
+  .fn { color: var(--accent); font-weight: 600; }
+  nav#toc {
+    background: #f7f9fb; border: 1px solid var(--border); border-radius: 8px;
+    padding: .8rem 1.4rem; font-size: .92rem;
+  }
+  nav#toc ol { margin: .3rem 0; padding-left: 1.4rem; }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<h1>AF_QMC コードリファレンス<br>
+<small>有限温度補助場量子モンテカルロ (DQMC / BSS) の C 実装</small></h1>
+
+<div class="meta">
+<b>日時:</b> 2026-07-02 16:30 JST ／
+<b>作成:</b> Claude Fable 5 ／
+<b>対象コード:</b> UDV 部分積スタック実装後の working tree（基点 commit 25ebdd2）<br>
+<b>まとめ:</b> 半充填ハバード模型の有限温度補助場QMC（Blankenbecler–Scalapino–Sugar 法、
+行列式QMC）実装の全体像。定式化（Trotter 分解・HS 変換・グリーン関数・UDV 安定化・
+部分積スタック）、計算の流れとファイル/関数対応、内部パラメータの典型値、
+入出力仕様、検証・性能をまとめる。実装リファレンスは大塚雄一 博士論文 付録A
+（<code>references/</code> が正本）。
+</div>
+
+<nav id="toc">
+<b>目次</b>
+<ol>
+  <li><a href="#sec1">概要と物理設定</a></li>
+  <li><a href="#sec2">定式化: Trotter 分解と HS 変換</a></li>
+  <li><a href="#sec3">グリーン関数と局所更新</a></li>
+  <li><a href="#sec4">数値安定化: UDV 分解と部分積スタック</a></li>
+  <li><a href="#sec5">符号の扱い</a></li>
+  <li><a href="#sec6">計算の流れとファイル/関数対応</a></li>
+  <li><a href="#sec7">測定量</a></li>
+  <li><a href="#sec8">内部パラメータの典型値</a></li>
+  <li><a href="#sec9">入出力仕様</a></li>
+  <li><a href="#sec10">並列化</a></li>
+  <li><a href="#sec11">検証ラダーとテスト</a></li>
+  <li><a href="#sec12">計算量と性能</a></li>
+</ol>
+</nav>
+
+<h2 id="sec1">1. 概要と物理設定</h2>
+
+<p>対象はハバード模型</p>
+$$
+H \;=\; -t\sum_{\langle i,j\rangle,\sigma}
+\left(c^\dagger_{i\sigma}c_{j\sigma} + \mathrm{h.c.}\right)
+\;+\; U\sum_i n_{i\uparrow}n_{i\downarrow}
+\;-\; \mu\sum_{i\sigma} n_{i\sigma},
+\qquad
+\mu = \frac{U}{2}\ \text{(半充填)}
+$$
+<p>のグランドカノニカル有限温度計算である。相互作用は<b>非対称形</b>
+$U n_\uparrow n_\downarrow$ を用い、二部格子（1次元鎖・正方格子）の半充填は
+$\mu = U/2$ で実現する。この設定では負符号問題が無く（sign $\equiv +1$）、
+主目的はエネルギーの温度依存性 $E(T)$ を外部の厳密対角化 (ED)・TPQ と
+比較検証することにある。</p>
+
+<ul>
+<li><b>手法:</b> Blankenbecler–Scalapino–Sugar (BSS) の行列式QMC（DQMC）。
+補助場（離散 Hubbard–Stratonovich 場）を Metropolis 単サイト反転でサンプリングする。</li>
+<li><b>行列規約:</b> すべて column-major（Fortran 順、$A_{ij}=$ <code>A[i+j*n]</code>）。
+LAPACK/BLAS を Fortran シンボル（<code>dgemm_</code> 等）で直接呼ぶ。</li>
+<li><b>実装リファレンス:</b> 大塚雄一 博士論文 付録A（式 A.1–A.135 検証済み。
+原論文 (A.103) 2行目に符号タイポがあるが実装は (A.107) に従うため影響なし）。</li>
+</ul>
+
+<h2 id="sec2">2. 定式化: Trotter 分解と HS 変換</h2>
+
+<h3>2.1 Trotter–Suzuki 分解</h3>
+
+<p>逆温度 $\beta$ を $L_\tau$ 枚の虚時間スライスに分割する
+（<code>main.c</code>: <code>Ltr = lround(beta/dtau)</code>）:</p>
+$$
+e^{-\beta H} \;=\; \prod_{l=0}^{L_\tau-1} e^{-\Delta\tau H}
+\;\simeq\; \prod_{l=0}^{L_\tau-1} e^{-\Delta\tau K}\, e^{-\Delta\tau V}
+\;+\; O(\Delta\tau^2),
+\qquad \Delta\tau = \frac{\beta}{L_\tau}.
+$$
+<p>ここで $K$ は一体項（ホッピング $-t$ と化学ポテンシャル $-\mu$ を対角に含む。
+<code>model.c:model_init</code> で $K_{ii} \mathrel{-}= \mu$）、$V$ は相互作用項。
+$e^{\pm\Delta\tau K}$ は対称行列の固有分解
+（<code>linalg.c:la_expm_sym</code>、LAPACK <code>dsyev</code>）で厳密に指数化し、
+<code>Model.expK</code> / <code>Model.expKinv</code> に保持する。
+一次分解なので系統誤差は $O(\Delta\tau^2)$ であり、
+$E(\Delta\tau) = E(0) + c\,\Delta\tau^2$ の外挿で除去する（§8, §11）。</p>
+
+<h3>2.2 離散 Hubbard–Stratonovich（HS）変換</h3>
+
+<p>各サイト $i$・各スライス $l$ に離散補助場（イジング変数）
+$s_{i,l} = \pm 1$ を導入する（Hirsch のスピンチャネル分解）:</p>
+$$
+e^{-\Delta\tau U\, n_{i\uparrow} n_{i\downarrow}}
+\;=\; \frac{1}{2}\, e^{-\frac{\Delta\tau U}{2}(n_{i\uparrow}+n_{i\downarrow})}
+\sum_{s_{i,l}=\pm 1} e^{\lambda s_{i,l}\,(n_{i\uparrow}-n_{i\downarrow})},
+\qquad
+\cosh\lambda = e^{\Delta\tau U/2}.
+$$
+<p>結合定数はコードでは
+<code>field.c:field_init</code> の
+$\lambda = \operatorname{arccosh}\!\left(e^{\Delta\tau U/2}\right)$。
+これにより各スピン $\sigma$（$\sigma_\uparrow = +1,\ \sigma_\downarrow = -1$）の
+一体化されたスライス伝搬行列（$n\times n$、$n$ はサイト数）は</p>
+$$
+B_\sigma(l) \;=\; e^{-\Delta\tau K}\,
+\operatorname{diag}\!\Big( e^{\lambda\sigma s_{i,l} + c} \Big),
+\qquad c = -\frac{\Delta\tau U}{2}
+$$
+<p>となる（<code>green.c:green_build_B</code>。指数は $s=\pm1$ の2値なので
+<code>Green.expv[2]</code> に事前計算してキャッシュ）。分配関数は補助場の和と
+スピンごとの行列式の積に落ちる:</p>
+$$
+Z \;=\; \sum_{\{s\}} \prod_{\sigma=\uparrow,\downarrow}
+\det M_\sigma(\{s\}),
+\qquad
+M_\sigma \;=\; \mathbb{1} + B_\sigma(L_\tau\!-\!1)\, B_\sigma(L_\tau\!-\!2)\cdots B_\sigma(0).
+$$
+
+<h2 id="sec3">3. グリーン関数と局所更新</h2>
+
+<h3>3.1 等時間グリーン関数</h3>
+
+<p>物理規約は $g_{ij} = \langle c_i c_j^\dagger \rangle$（<b>非</b>時間順序、
+密度は $\langle c_i^\dagger c_j \rangle = \delta_{ij} - g_{ji}$）。
+虚時間スライス $\tau$ における等時間グリーン関数は</p>
+$$
+G_\sigma(\tau) \;=\;
+\Big[\, \mathbb{1} + B_\sigma(\tau,0)\, B_\sigma(\beta,\tau) \,\Big]^{-1},
+\qquad
+B_\sigma(\tau_2,\tau_1) \equiv B_\sigma(\tau_2\!-\!1)\cdots B_\sigma(\tau_1).
+$$
+<p>直接構成は <code>green.c:green_from_scratch(G, l0)</code>
+（$l_0$ から一周する循環積を UDV 安定化しながら左から掛ける。§4）。</p>
+
+<h3>3.2 単サイト反転の Metropolis 比</h3>
+
+<p>スライス $l$・サイト $i$ の補助場を $s \to -s$ 反転する提案に対し、
+行列式比は閉じた形で書ける（<code>field.c:field_N</code>,
+<code>green.c:green_ratio_N</code>）:</p>
+$$
+N_\sigma \;=\; e^{-2\lambda\sigma s_{i,l}} - 1,
+\qquad
+R_\sigma \;=\; 1 + \big(1 - [G_\sigma]_{ii}\big)\, N_\sigma,
+\qquad
+R \;=\; R_\uparrow R_\downarrow .
+$$
+<p>採択判定は $p = \min(1, |R|)$（コードは <code>rng_double(r) &lt; fabs(R)</code>、
+乱数は xoshiro256 系: <code>rng.c</code>）。$N_\sigma$ も $s=\pm1$ の2値なので
+<code>Field.N_cache[2][2]</code> にキャッシュされる。</p>
+
+<h3>3.3 ランク1更新（Sherman–Morrison）</h3>
+
+<p>採択時、グリーン関数は $O(n^2)$ のランク1更新で追従する
+（<code>green.c:green_update</code>）:</p>
+$$
+g'_{jk} \;=\; g_{jk} \;-\; \frac{N_\sigma}{R_\sigma}
+\big(\delta_{ji} - g_{ji}\big)\, g_{ik}.
+$$
+<p>作業ベクトル $u_j = \delta_{ji} - g_{ji}$, $v_k = g_{ik}$ は
+<code>Green</code> 構造体に事前確保済み（ホットパスに malloc なし）。</p>
+
+<h3>3.4 スライス間の移動（wrap）</h3>
+
+<p>スライス $l$ の全サイト更新後、次のスライスへは相似変換で移る
+（<code>green.c:green_wrap</code>、dgemm 2回）:</p>
+$$
+G_\sigma(l+1) \;=\; B_\sigma(l)\, G_\sigma(l)\, B_\sigma(l)^{-1},
+\qquad
+B_\sigma(l)^{-1} = \operatorname{diag}\!\big(e^{-\lambda\sigma s_{i,l} - c}\big)\, e^{+\Delta\tau K}.
+$$
+<p>wrap は丸め誤差を蓄積するため、一定間隔（<code>stab_interval</code>）ごとに
+厳密再構成（§4）でリセットする。</p>
+
+<h2 id="sec4">4. 数値安定化: UDV 分解と部分積スタック</h2>
+
+<h3>4.1 なぜ安定化が要るか</h3>
+
+<p>$B$ 行列の積 $B(\beta,0)$ の特異値は $e^{\pm\beta W}$（$W$ はバンド幅程度）で
+指数的に開く。低温では倍精度の表現域（$\sim 10^{\pm 308}$）と精度（$10^{-16}$）を
+超えるため、素朴な積和では $G$ が壊れる。対策は積を
+<b>UDV 分解</b>で保持すること:</p>
+$$
+B(\tau_2,\tau_1) \;=\; U\, D\, T,
+$$
+<p>$U$: 直交行列、$D$: 対角（スケールを一手に引き受ける、非ソート）、
+$T$: 単位上三角。実装は QR 分解（<code>dgeqrf</code>/<code>dorgqr</code>）ベース
+（<code>linalg.c</code>）:</p>
+
+<table>
+<tr><th>プリミティブ</th><th>演算</th><th>実装（<code>linalg.c</code>）</th></tr>
+<tr><td><code>udv_lmul(s, B)</code></td>
+<td>$UDT \to B\,(UDT)$: $X = (BU)D$ を QR $\Rightarrow$ 新 $U{=}Q,\ D{=}\mathrm{diag}(R),\ T{=}D^{-1}R\,T$</td>
+<td>gemm + QR + 三角積。列が $D$ でスケールされるため QR が安定</td></tr>
+<tr><td><code>udv_rmul(s, P, w)</code></td>
+<td>$UDT \to (UDT)\,P$: $X = D\,(TP)$ を QR $\Rightarrow$ $U{\leftarrow}UQ,\ D{=}\mathrm{diag}(R),\ T{=}D^{-1}R$</td>
+<td>右スタック構築用（§4.3）。β=20, U=12 級まで from_scratch と一致することを実測検証済み</td></tr>
+<tr><td><code>udv_combine(l, r, out, w)</code></td>
+<td>$(U_L D_L T_L)(U_R D_R T_R)$: $C = D_L (T_L U_R) D_R$ を QR $\Rightarrow$
+$U = U_L Q,\ D = \mathrm{diag}(R),\ T = (D^{-1}R)\, T_R$</td>
+<td>左積×右スタックの結合。out は l/r と別インスタンスであること</td></tr>
+</table>
+
+<h3>4.2 $(\mathbb{1} + UDT)^{-1}$ の安定な逆転と行列式符号</h3>
+
+<p><code>linalg.c:udv_inv_one_plus</code> は $D$ を大小に分離して逆転する
+（Loh らの標準手法）:</p>
+$$
+D = D_b\, D_s,\qquad
+[D_b]_i = \max(|D_i|,1)\cdot\mathrm{sgn},\quad
+[D_s]_i = \min(|D_i|,1)\text{側},
+$$
+$$
+\big(\mathbb{1} + UDT\big)^{-1}
+= T^{-1}\, M^{-1}\, D_b^{-1}\, U^{\mathsf T},
+\qquad
+M = D_b^{-1} U^{\mathsf T} T^{-1} + D_s .
+$$
+<p>$M$ は良条件なので逆転が安定。行列式符号も同じ分解から頑健に取れる:</p>
+$$
+\operatorname{sgn}\det(\mathbb{1}+UDT)
+= \operatorname{sgn}\det U \cdot \operatorname{sgn}\det D_b \cdot \operatorname{sgn}\det M
+$$
+<p>（$T$ は単位上三角で $\det T = 1$）。<code>la_logdet</code>（LU の対角と置換の符号）で
+$\det U$, $\det M$ の符号を評価し、<code>Green.det_sign</code>（$\pm1$、0 は失敗
+sentinel）に格納する。失敗時は stale 値を使わず fail-fast する（§5）。</p>
+
+<h3>4.3 UDV 部分積スタック（2026-07-02 導入）</h3>
+
+<p>素朴な実装では安定化のたびに全 $L_\tau$ 枚を掛け直すため、
+1 sweep のコストが $O(n^3 L_\tau^2/\mathrm{stab})$ となり
+$\beta^2$ 則で爆発する（kugui 実運用で実測）。現行実装は
+<b>右側部分積のスタック</b>でこれを $O(n^3 L_\tau)$（$\beta$ 線形）に落とす。</p>
+
+<p>ブロック境界を
+$b_j = \min(j\cdot\mathrm{stab},\, L_\tau)$、$M = \lceil L_\tau/\mathrm{stab}\rceil$
+で定義し（端数 tail block を正しく含む）:</p>
+
+<ol>
+<li><b>sweep 冒頭</b>（<code>green.c:green_stack_build</code>）:
+現在の場から右スタックを右から左へ構築する。
+$$ S[M] = \mathbb{1},\qquad S[j] = S[j+1]\cdot B(b_{j+1}, b_j)
+\quad\Rightarrow\quad S[j] = B(\beta,\, b_j). $$
+ブロック内の $\le$ stab 枚は稠密積（<code>green_build_Bblock</code>、gemm のみ）に
+まとめてから <code>udv_rmul</code> 1回で取り込む。コストは従来の from_scratch
+1回分（gemm $L_\tau$ 回 + QR $M$ 回）。</li>
+<li><b>periodic 安定化点</b> $\tau = b_{j+1}$（<code>dqmc.c:dqmc_sweep</code>、
+条件 <code>(l+1)%stab==0 &amp;&amp; (l+1)&lt;L</code>）:
+更新済みの場から直前ブロックの稠密積を作り左 UDV に
+<code>udv_lmul</code> で延長（left $= B(\tau,0)$、更新済みスライス $0..\tau{-}1$）。
+$$ G(\tau) = \Big[\mathbb{1} + \underbrace{B(\tau,0)}_{\text{left（更新済み）}}
+\cdot \underbrace{B(\beta,\tau)}_{S[j+1]\text{（未更新）}}\Big]^{-1} $$
+を <code>udv_combine</code> + <code>udv_inv_one_plus</code> で厳密再構成
+（<code>green.c:green_from_stack</code>）。スタックは sweep 中に更新されない
+スライス $\tau..L_\tau{-}1$ から構築済みなので常に厳密。</li>
+<li><b>sweep 末尾</b>: 残り suffix $B(L_\tau, \tau_{\mathrm{left}})$
+（tail block／$L_\tau &lt; \mathrm{stab}$ なら全スライス）を左 UDV に延長し、
+$G(0) = [\mathbb{1} + B(\beta,0)]^{-1}$ を
+<code>green.c:green_from_left_udv</code> で再構成。
+旧「末尾無条件 from_scratch(0)」と同一の保証（測定直前の $G$ と符号は常に厳密）。</li>
+</ol>
+
+<p>メモリはスタック $(M{+}1)$ 段 × factor-only $(2n^2{+}n)$ 実数 × 2 スピン。
+作業領域は共有 <code>LinalgWork</code>（<code>Green</code> が1個保持）に分離されており
+スタック段数に依存しない。16×16, $L_\tau{=}160$, stab=4 で約 86 MB/replica。</p>
+
+<h2 id="sec5">5. 符号の扱い</h2>
+
+<p>半充填・二部格子・スピンチャネル HS では厳密に $R \ge 0$ で sign $\equiv +1$ だが、
+wrap でドリフトした $G$ から計算した $R$ が偽に負になり得る。対策（2026-07-01 導入）:</p>
+<ul>
+<li>実行中の符号 <code>Dqmc.sign</code> は $R &lt; 0$ の採択で反転して追従しつつ、</li>
+<li><b>各安定化点</b>（periodic + sweep 末尾）で
+$\mathrm{sign} \leftarrow \mathrm{sgn}\det M_\uparrow \cdot \mathrm{sgn}\det M_\downarrow$
+（= <code>Gu.det_sign * Gd.det_sign</code>）に<b>厳密リセット</b>し、
+ドリフト由来の偽反転が蓄積しないようにする。</li>
+<li>再構成や符号評価が失敗したら <code>det_sign = 0</code> → <code>Dqmc.status = 1</code>
+の fail-fast 連鎖で、その replica を明示エラーとして落とす
+（<code>replica_run.c</code>）。stale な符号は決して使わない。</li>
+</ul>
+
+<h2 id="sec6">6. 計算の流れとファイル/関数対応</h2>
+
+<h3>6.1 全体フロー</h3>
+
+<div class="flow">main() <span class="fn">[main.c]</span>
+ ├─ 入力パース: params_read() <span class="fn">[io.c]</span>            key=value 形式（§9）
+ ├─ 格子生成: lattice_chain / lattice_square / lattice_from_file <span class="fn">[lattice.c]</span>
+ ├─ (MPI 時) MPI_Init, rank/size 取得 <span class="fn">[main.c, replica_mpi.c]</span>
+ └─ β ループ: for beta in beta_list
+     ├─ Ltr = lround(beta / dtau)          … トロッタースライス数
+     ├─ replica ループ（serial / OpenMP / MPI / hybrid で分配）
+     │   └─ dqmc_run_replica() <span class="fn">[replica_run.c]</span>   replica = 独立マルコフ連鎖
+     │       ├─ model_init()  <span class="fn">[model.c]</span>   K = t − μI, expK = e^{∓ΔτK} (dsyev)
+     │       ├─ rng_seed()    <span class="fn">[rng.c]</span>     replica_seed() で一意 seed <span class="fn">[replica.c]</span>
+     │       ├─ field_init()  <span class="fn">[field.c]</span>   λ = arccosh(e^{ΔτU/2}), s_{i,l} 乱数 ±1
+     │       ├─ dqmc_init()   <span class="fn">[dqmc.c]</span>    G↑G↓ を green_from_scratch(0) で構成
+     │       │                              スタック/左UDV/combined を確保
+     │       ├─ warmup: nwarm 回 dqmc_sweep()
+     │       └─ measurement: nbin × (nmeas/nbin) 回
+     │           ├─ dqmc_sweep() <span class="fn">[dqmc.c]</span>
+     │           ├─ measure_sample() <span class="fn">[measure.c]</span>  E_kin, E_int, n, doublon
+     │           └─ replica_bin_add() <span class="fn">[replica.c]</span> sign 重み付きビン集計
+     ├─ (MPI 時) ビン集約: MPI_Gatherv <span class="fn">[main.c, replica_mpi.c]</span>
+     ├─ jackknife() <span class="fn">[measure.c]</span>  全ビンから平均と誤差
+     └─ 出力: T E_hub dE E_gc dE E_ph dE ntot dN doublon dD sign
+
+dqmc_sweep() <span class="fn">[dqmc.c]</span> の内部（1 sweep = 全スライス×全サイト）
+ ├─ green_stack_build() ×2スピン <span class="fn">[green.c]</span>   右スタック S[j]=B(β,b_j) 構築
+ ├─ 左 UDV ← 単位元
+ └─ for l = 0 .. Ltr−1:
+     ├─ for i = 0 .. n−1:  単サイト Metropolis
+     │   ├─ green_flipN / green_ratio_N <span class="fn">[green.c]</span>  R = R↑R↓
+     │   └─ 採択なら green_update ×2 + 場反転 (+ R&lt;0 なら sign 反転)
+     ├─ green_wrap() ×2 <span class="fn">[green.c]</span>              G(l) → G(l+1)
+     └─ (l+1)%stab==0 かつ l+1&lt;Ltr なら periodic 安定化:
+         左UDV延長(udv_lmul) → green_from_stack() → sign 厳密リセット
+ └─ 末尾: 残り suffix を左UDVへ延長 → green_from_left_udv() → sign リセット</div>
+
+<h3>6.2 ファイル/関数対応表</h3>
+
+<table>
+<tr><th>ファイル</th><th>役割</th><th>主要関数</th></tr>
+<tr><td><code>src/main.c</code></td><td>エントリポイント。β ループ、replica 分配（serial/omp/mpi/hybrid）、ビン集約、jackknife、出力、プロファイラ制御</td>
+<td><code>main</code>, <code>jackknife_and_print</code>, OpenMP <code>#pragma omp parallel for</code> の replica ループ</td></tr>
+<tr><td><code>src/io.c</code></td><td>key=value 入力のパースと検証</td><td><code>params_read</code>（§9 のキー表）</td></tr>
+<tr><td><code>src/lattice.c</code></td><td>格子と hopping 行列 $t_{ij}$ の生成</td><td><code>lattice_chain</code>, <code>lattice_square</code>, <code>lattice_from_file</code>, <code>lattice_dump</code></td></tr>
+<tr><td><code>src/model.c</code></td><td>一体部分: $K = t - \mu\mathbb{1}$, $e^{\mp\Delta\tau K}$</td><td><code>model_init</code>（<code>la_expm_sym</code> 使用）</td></tr>
+<tr><td><code>src/field.c</code></td><td>HS 場 $s_{i,l}$、$\lambda$、$N_\sigma$ の2値キャッシュ</td><td><code>field_init</code>, <code>field_N</code></td></tr>
+<tr><td><code>src/green.c</code></td><td>グリーン関数一式: B 行列、from_scratch、スタック構築、stacked 再構成、ランク1更新、wrap</td>
+<td><code>green_build_B</code>, <code>green_build_Bblock</code>, <code>green_stack_build</code>, <code>green_from_scratch</code>, <code>green_from_stack</code>, <code>green_from_left_udv</code>, <code>green_update</code>, <code>green_wrap</code></td></tr>
+<tr><td><code>src/linalg.c</code></td><td>BLAS/LAPACK ラッパと UDV プリミティブ、共有作業領域</td>
+<td><code>la_gemm</code>, <code>la_inverse(_work)</code>, <code>la_logdet(_work)</code>, <code>la_expm_sym</code>, <code>udv_lmul(_work)</code>, <code>udv_rmul</code>, <code>udv_combine</code>, <code>udv_inv_one_plus(_work)</code>, <code>linalg_work_init</code></td></tr>
+<tr><td><code>src/dqmc.c</code></td><td>1 マルコフ連鎖の状態（G↑G↓・スタック・左UDV・sign・status）と sweep 本体</td>
+<td><code>dqmc_init</code>, <code>dqmc_sweep</code>, <code>dqmc_free</code></td></tr>
+<tr><td><code>src/measure.c</code></td><td>等時間測定と jackknife</td><td><code>measure_sample</code>, <code>jackknife</code></td></tr>
+<tr><td><code>src/replica.c</code></td><td>replica の seed 生成（splitmix64、一意性チェック）と sign 重み付きビン</td>
+<td><code>replica_seed</code>, <code>replica_bin_add</code>, <code>replica_bin_values</code></td></tr>
+<tr><td><code>src/replica_run.c</code></td><td>1 replica の実行（init → warmup → measurement、fail-fast 検査）</td><td><code>dqmc_run_replica</code></td></tr>
+<tr><td><code>src/replica_mpi.c</code></td><td>MPI でのビン/ステータス集約ヘルパ</td><td><code>replica_mpi_*</code></td></tr>
+<tr><td><code>src/rng.c</code></td><td>乱数（xoshiro256 系、splitmix 初期化）</td><td><code>rng_seed</code>, <code>rng_double</code></td></tr>
+<tr><td><code>src/profiler.c</code></td><td>region 別タイマ（<code>profile=1</code> で CSV 出力）</td><td><code>profiler_*</code>, <code>PROF_BEGIN/END</code></td></tr>
+</table>
+
+<h2 id="sec7">7. 測定量</h2>
+
+<p><code>measure.c:measure_sample</code> は各測定 sweep 後の厳密再構成済み
+$G_\uparrow, G_\downarrow$ から等時間量を評価する:</p>
+$$
+E_{\mathrm{kin}} = \sum_{ij\sigma} t_{ij}\,
+\big(\delta_{ij} - [G_\sigma]_{ji}\big),
+\qquad
+E_{\mathrm{int}} = U \sum_i \langle n_{i\uparrow} n_{i\downarrow}\rangle
+= U \sum_i \big(1-[G_\uparrow]_{ii}\big)\big(1-[G_\downarrow]_{ii}\big),
+$$
+$$
+n_{\mathrm{tot}} = \sum_{i\sigma} \big(1 - [G_\sigma]_{ii}\big),
+\qquad
+\text{doublon} = \frac{1}{n}\sum_i \langle n_{i\uparrow} n_{i\downarrow}\rangle .
+$$
+<p>エネルギーは3つの規約で出力される（ED/TPQ 比較時の定数シフト整合のため。
+<code>replica.c:replica_bin_add</code>）:</p>
+$$
+E_{\mathrm{hub}} = \langle H_0 \rangle = E_{\mathrm{kin}} + E_{\mathrm{int}},\qquad
+E_{\mathrm{gc}} = \langle H_0 - \mu N \rangle,\qquad
+E_{\mathrm{ph}} = \Big\langle H_0 - \tfrac{U}{2} N + \tfrac{U}{4} n_{\mathrm{site}} \Big\rangle .
+$$
+<p>集計は sign 重み付き（$\langle A \rangle = \sum \mathrm{sign}\cdot A / \sum \mathrm{sign}$、
+半充填では sign=1 なので単純平均に一致）で、ビン単位に貯めて
+<code>measure.c:jackknife</code> で平均と誤差を出す。誤差はビン間 jackknife:</p>
+$$
+\bar{x}_{(i)} = \frac{1}{N-1}\sum_{j\ne i} x_j,\qquad
+\sigma^2 = \frac{N-1}{N}\sum_i \big(\bar{x}_{(i)} - \bar{x}\big)^2 .
+$$
+
+<h2 id="sec8">8. 内部パラメータの典型値</h2>
+
+<table>
+<tr><th>パラメータ</th><th>意味</th><th>典型値・選び方</th></tr>
+<tr><td><code>dtau</code> ($\Delta\tau$)</td>
+<td>トロッタースライス幅。系統誤差 $O(\Delta\tau^2)$</td>
+<td><b>0.1 が標準</b>（テスト・弱結合）。Trotter 外挿には 0.2 / 0.1 / 0.05 の
+2〜3点で $\Delta\tau^2$ 線形外挿。低温 production（2D 系列）では
+<b>0.025〜0.05</b> も使用。$U$ が大きいほど小さめに</td></tr>
+<tr><td>$L_\tau$ (<code>Ltr</code>)</td>
+<td>スライス数 $= \operatorname{round}(\beta/\Delta\tau)$（自動決定）</td>
+<td>β=4, Δτ=0.1 → 40。β=20, Δτ=0.025 → <b>800</b>（production 実績）。
+スタック導入後はコストが $L_\tau$ 線形</td></tr>
+<tr><td><code>stab</code> (<code>stab_interval</code>)</td>
+<td>UDV 厳密再構成の間隔（wrap 何回ごとに安定化するか）</td>
+<td>デフォルト 8。<b>production は 4</b>。強結合（U=8〜12）や低温でドリフトが
+出たら小さくする（U=12 の stab=8 で汚染事例あり → stab=2 で解消）。
+スタック導入後は stab=2 常用も低コスト</td></tr>
+<tr><td><code>nwarm</code></td><td>熱平衡化 sweep 数（測定しない）</td>
+<td>テスト 300、production・強結合の診断では <b>2000</b> 程度</td></tr>
+<tr><td><code>nmeas</code></td><td>測定 sweep 数（毎 sweep 測定）</td>
+<td>テスト 3000、<b>production 10000</b>（kugui 実績）。<code>nbin</code> で割り切れること</td></tr>
+<tr><td><code>nbin</code></td><td>jackknife 用ビン数</td>
+<td><b>30〜40</b>。1ビン = nmeas/nbin sweep（自己相関より十分長く）</td></tr>
+<tr><td><code>nrep</code></td><td>独立 replica（マルコフ連鎖）数。統計は nrep × nbin ビン</td>
+<td>serial 1、kugui production で <b>120</b>。seed は splitmix64 で一意生成・重複検査</td></tr>
+<tr><td><code>seed</code></td><td>基底乱数 seed</td><td>任意の非負整数（例 246813579）。replica/β ごとに派生 seed</td></tr>
+<tr><td><code>parallel</code></td><td>replica の分配方式</td><td><code>serial</code> / <code>omp</code> / <code>mpi</code> / <code>hybrid</code>（§10）</td></tr>
+<tr><td>$\lambda$</td><td>HS 結合（導出量）</td>
+<td>$\operatorname{arccosh}(e^{\Delta\tau U/2})$。例: U=4, Δτ=0.1 → λ≈0.6329;
+U=12, Δτ=0.1 → λ≈1.0575</td></tr>
+<tr><td>$\mu$</td><td>化学ポテンシャル</td><td>半充填固定: $\mu = U/2$（<code>model_init</code> の half=1）</td></tr>
+</table>
+
+<div class="note"><b>パラメータ選択の実務メモ:</b>
+(1) まず U=0 で解析解と一致確認 → (2) 目的の U で dtau 2〜3点を回し
+$\Delta\tau^2$ 外挿 → (3) sign が全行 1、dE が要求精度以下、invalid bin ゼロを確認
+（検証ラダー §11）。低温で <code>numerical breakdown</code> が出たら stab を半分に。</div>
+
+<h2 id="sec9">9. 入出力仕様</h2>
+
+<h3>9.1 入力ファイル（key=value 形式、<code>io.c</code>）</h3>
+
+<table>
+<tr><th>キー</th><th>意味</th><th>例</th></tr>
+<tr><td><code>lattice</code></td><td><code>chain</code> / <code>square</code> / <code>file</code></td><td><code>lattice=square</code></td></tr>
+<tr><td><code>Lx</code>, <code>Ly</code></td><td>格子サイズ（chain は Lx のみ）</td><td><code>Lx=16</code>, <code>Ly=16</code></td></tr>
+<tr><td><code>pbc</code> / <code>bc</code></td><td>境界条件（<code>1</code>/<code>periodic</code>/<code>pbc</code> か <code>0</code>/<code>open</code>/<code>obc</code>）</td><td><code>pbc=1</code></td></tr>
+<tr><td><code>latfile</code></td><td><code>lattice=file</code> 時の hopping 行列ファイル</td><td>—</td></tr>
+<tr><td><code>t</code>, <code>U</code>, <code>dtau</code></td><td>ホッピング、相互作用、スライス幅</td><td><code>t=-1.0 U=4.0 dtau=0.1</code></td></tr>
+<tr><td><code>beta_list</code></td><td>カンマ区切りの β リスト（1点ずつ計算）</td><td><code>beta_list=0.5,1.0,2.0,4.0</code></td></tr>
+<tr><td><code>nwarm</code>, <code>nmeas</code>, <code>nbin</code></td><td>§8 参照</td><td><code>nwarm=300 nmeas=3000 nbin=30</code></td></tr>
+<tr><td><code>stab</code>（<code>stabilize_interval</code>）</td><td>安定化間隔</td><td><code>stab=4</code></td></tr>
+<tr><td><code>seed</code>, <code>nrep</code>, <code>parallel</code>, <code>replica_log</code></td><td>乱数・replica 並列</td><td><code>nrep=120 parallel=mpi</code></td></tr>
+<tr><td><code>profile</code>, <code>profile_file</code></td><td>region 別タイマ CSV 出力（既定 <code>profile.csv</code>）</td><td><code>profile=1</code></td></tr>
+</table>
+
+<h3>9.2 出力（stdout、β 1行）</h3>
+
+<pre><code>T  E_hub dE_hub  E_gc dE_gc  E_ph dE_ph  ntot dN  doublon dD  sign</code></pre>
+
+<p>$T = 1/\beta$。各量はビン jackknife の平均と誤差。半充填の健全性チェックは
+<code>ntot</code> $= n_{\mathrm{site}}$（機械精度）と <code>sign</code> $=1$（全行）。</p>
+
+<h3>9.3 ビルドと実行</h3>
+
+<pre><code>make dqmc          # serial（macOS=Accelerate / Linux=OpenBLAS+LAPACK 自動切替）
+make dqmc_omp      # OpenMP replica 並列
+make dqmc_mpi      # MPI replica 並列
+make dqmc_hybrid   # MPI + OpenMP
+make test / test_slow / test_omp / test_mpi / test_hybrid
+
+./dqmc input/1d_L4_U4.txt &gt; out.dat</code></pre>
+
+<h2 id="sec10">10. 並列化</h2>
+
+<p>並列化の軸は <b>replica（独立マルコフ連鎖）</b>で、embarrassingly parallel:</p>
+<ul>
+<li><b>OpenMP</b>: <code>main.c</code> の replica ループを
+<code>#pragma omp parallel for</code> で分配（<code>parallel=omp</code>）。
+各 replica が独立の <code>Dqmc</code>/<code>Green</code>/<code>LinalgWork</code> を持つため
+共有可変状態なし。</li>
+<li><b>MPI</b>: replica を rank に分配し、ビン・ステータス・プロファイル統計を
+<code>MPI_Gatherv</code>/<code>MPI_Reduce</code> で root に集約
+（<code>replica_mpi.c</code>、<code>parallel=mpi</code>）。1 replica でも失敗（fail-fast）が
+あれば invalid bin として明示エラー。</li>
+<li><b>hybrid</b>: MPI rank 内で OpenMP replica。</li>
+</ul>
+
+<div class="note"><b>kugui 実務メモ:</b> <code>intel/2022.2.1</code> +
+<code>intel-mpi/2021.7.1</code> + <code>mpiicc</code> + <code>FI_PROVIDER=psm3</code> を使う
+（<code>openmpi_intel/4.1.5</code> + classic icc は MPI_Gatherv 受信欠落の既知問題で使用禁止。
+詳細は <code>AGENTS.md</code> HPC メモと <code>LOG.md</code>）。
+UDV スタック導入後は時間の大半が $n\times n$ の dgemm/QR なので、
+16×16 級では「純 MPI replica × threaded BLAS (MKL 2–4 スレッド)」の
+ハイブリッドが追加の高速化候補（コード変更不要）。</div>
+
+<h2 id="sec11">11. 検証ラダーとテスト</h2>
+
+<ol>
+<li><b>U=0 解析解</b>: 自由フェルミオンの厳密 $E(T)$ と一致。</li>
+<li><b>Δτ→0 外挿</b>: $E(\Delta\tau) = E(0) + c\Delta\tau^2$ の線形性を確認。</li>
+<li><b>安定化残差</b>: wrap 後の $G$ と厳密再構成の差、stab を変えた不変性。</li>
+<li><b>ED/TPQ 照合</b>: 1D L=4, U/t=4, grand-canonical ED（HΦ 等）と
+$E_{\mathrm{hub}}$ を統計誤差内で一致（アンサンブル・規約は §7 の3形式で整合）。</li>
+<li><b>符号</b>: 半充填で全行 sign=1、invalid bin ゼロ
+（<code>tests/test_sign_regression_slow.c</code>）。</li>
+</ol>
+
+<p>単体テストは <code>tests/test_*.c</code>（各々独立 main、<code>make test</code> 一括）。
+UDV スタック関連は <code>test_udv_stack.c</code>（rmul/combine の代数・直交性・
+det_sign の brute-force 照合）と <code>test_green_stack.c</code>
+（スタック積の直接照合、from_scratch との $G$/det_sign 一致、境界ケース
+$L\%\mathrm{stab}\ne0$ / $L&lt;\mathrm{stab}$ / $L{=}\mathrm{stab}$ / stab=1）。
+実装検証の詳細は
+<code>docs/reviews/2026-07-02-dqmc-udv-stack-implementation-review.md</code> を参照
+（β=20, U=12, $D$ レンジ $10^{-45}..10^{+58}$ で from_scratch と
+$\max|\Delta G| \le 4\times10^{-12}$、det_sign 全一致）。</p>
+
+<h2 id="sec12">12. 計算量と性能</h2>
+
+<p>1 sweep（全スライス×全サイト）あたり、$n$=サイト数:</p>
+
+<table>
+<tr><th>処理</th><th>回数/sweep</th><th>コスト</th></tr>
+<tr><td>局所更新 <code>green_update</code></td><td>$\sim n L_\tau \times 2\text{spin} \times$ 採択率</td><td>$O(n^3 L_\tau)$</td></tr>
+<tr><td>wrap（gemm×2）</td><td>$L_\tau \times 2$</td><td>$O(n^3 L_\tau)$</td></tr>
+<tr><td>スタック構築 + 安定化（QR 系）</td><td>QR $\approx 6M$ 回（$M = \lceil L_\tau/\mathrm{stab}\rceil$）</td><td>$O(n^3 L_\tau)$</td></tr>
+<tr><td><i>（旧実装: 安定化の全再計算）</i></td><td><i>QR $2(M{+}1)L_\tau$ 回</i></td><td><i>$O(n^3 L_\tau^2/\mathrm{stab})$ ← β²則の原因</i></td></tr>
+</table>
+
+<p>実測（16×16, U=4, dtau=0.1, stab=4）。Mac は Apple Silicon/Accelerate serial、
+kugui は i2cpu・icc + MKL sequential・1コア（PBS 843753、commit ff9b741 vs 25ebdd2）:</p>
+
+<table>
+<tr><th>1 sweep</th><th colspan="3">Mac</th><th colspan="3">kugui i2cpu</th></tr>
+<tr><th></th><th>旧</th><th>新</th><th>speedup</th><th>旧</th><th>新</th><th>speedup</th></tr>
+<tr><td>β=4 ($L_\tau$=40)</td><td>≈1.9 s</td><td>≈0.41 s</td><td>4.7×</td>
+<td>4.70 s</td><td>0.85 s</td><td>5.5×</td></tr>
+<tr><td>β=8 ($L_\tau$=80)</td><td>≈5.8 s</td><td>≈0.80 s</td><td>7.5×</td>
+<td>16.97 s</td><td>1.72 s</td><td>9.9×</td></tr>
+<tr><td>β=16 ($L_\tau$=160)</td><td>—</td><td>—</td><td>—</td>
+<td>63.81 s</td><td>3.43 s</td><td><b>18.6×</b></td></tr>
+</table>
+
+<p>β を倍にしたときの時間比は、旧 3.4〜3.8×（≈β²則）に対し
+新は <b>2.0×（β線形）</b>で、両環境とも計画の主目標を達成
+（kugui 生データ: <code>data/profiling_runs/kugui_i2cpu_udv_stack_ff9b741_20260702/</code>）。</p>
+
+<p>スタック導入後の内訳（16×16, β=4）: <code>green_update</code> 52% ／
+安定化系（stack_build + lmul + from_stack）約 39% ／ wrap 6%。
+次の高速化候補は (1) delayed update（ランク $k$ 一括 dgemm 化、期待 2–4×）、
+(2) 半充填の粒子正孔対称性 $G_\downarrow = \mathbb{1} - P\,G_\uparrow^{\mathsf T} P$
+（$P$: 副格子パリティ）による down スピン省略（2×）、
+(3) MPI replica × threaded BLAS。詳細は
+<code>docs/2026-07-02-performance-analysis.md</code> と
+<code>docs/superpowers/plans/2026-07-02-dqmc-udv-stack-performance.md</code>。</p>
+
+<hr>
+<p style="font-size:.85rem; color:#666;">
+参考文献: R. Blankenbecler, D. J. Scalapino, R. L. Sugar, Phys. Rev. D 24, 2278 (1981)
+／ J. E. Hirsch, Phys. Rev. B 31, 4403 (1985)
+／ E. Y. Loh Jr. &amp; J. E. Gubernatis, in <i>Electronic Phase Transitions</i> (1992)
+（UDV 安定化）／ 大塚雄一 博士論文 付録A（実装の正本、<code>references/</code>）
+／ QUEST・ALF（スタック安定化の標準実装例）。<br>
+数式表示には MathJax (CDN) を使用。オフライン閲覧時は数式が TeX ソースのまま
+表示されます。
+</p>
+
+</body>
+</html>

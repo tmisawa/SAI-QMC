@@ -1,0 +1,301 @@
+<!--
+date: 2026-07-04
+datetime: 2026-07-04 (JST)
+model: Claude Opus 4.8 (1M context)
+summary: |
+  AF_QMC (DQMC/BSS) の一連の高速化作業のまとめ。ボトルネック構造(green_from_scratch =
+  O(n^3 L^2/stab))から出発し、(1) UDV部分積スタック安定化、(2) 遅延ランクk Green更新、
+  (3) 半充填PH対称性 + スタック繰り越し交互スイープ、(4) レプリカMPI/ハイブリッド並列、
+  (5) ホットパス微最適化 を数式(TeX/MathJax)・コード・実測データ付きで記録する。
+  kugui/Genkai 実機の実測: UDVスタックで16x16 beta=16が18.6x・beta依存がbeta^2->beta線形化、
+  遅延更新でgreen_updateが2.2x、交互スイープで1.24x、旧production比で総合 68-70x。
+-->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AF_QMC DQMC 高速化まとめ (数式・コード・実測)</title>
+<script>
+  MathJax = {
+    tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] },
+    svg: { fontCache: 'global' }
+  };
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" async></script>
+<style>
+  :root {
+    color-scheme: light dark;
+    --ink: #1e2528; --muted: #667176; --line: #d9e1e5; --paper: #ffffff;
+    --soft: #f5f7f8; --code-bg: #edf1f3; --old: #9b4a3b; --new: #25726a;
+    --accent: #315f9b; --ok: #2f7a45; --warn: #8a6a21; --hl: #fbf7eb;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ink: #e4e9ec; --muted: #97a2a8; --line: #303a3f; --paper: #14181a;
+      --soft: #1c2225; --code-bg: #222a2e; --old: #d98a78; --new: #6cc3b6;
+      --accent: #7aa8e0; --ok: #6cc07f; --warn: #d9b862; --hl: #26240f;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Noto Sans JP", sans-serif;
+    font-size: 16px; line-height: 1.65;
+  }
+  main { width: min(1080px, calc(100% - 32px)); margin: 0 auto; padding: 32px 0 72px; }
+  header { border-bottom: 2px solid var(--line); padding-bottom: 20px; margin-bottom: 28px; }
+  h1 { margin: 0 0 10px; font-size: clamp(1.7rem, 3vw, 2.5rem); line-height: 1.16; font-weight: 760; }
+  h2 { margin: 40px 0 12px; font-size: 1.4rem; border-bottom: 1px solid var(--line); padding-bottom: 8px; }
+  h3 { margin: 26px 0 8px; font-size: 1.08rem; }
+  p { margin: 0 0 12px; }
+  a { color: var(--accent); text-underline-offset: 3px; }
+  code { background: var(--code-bg); border-radius: 4px; padding: 0.08rem 0.3rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.9em; }
+  pre { background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px;
+    padding: 12px 14px; overflow-x: auto; font-size: 0.85rem; line-height: 1.5; margin: 12px 0; }
+  pre code { background: none; padding: 0; }
+  .meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 6px 18px; color: var(--muted); font-size: 0.92rem; }
+  .lead { font-size: 1.05rem; color: var(--ink); }
+  .eq { background: var(--soft); border: 1px solid var(--line); border-left: 4px solid var(--accent);
+    border-radius: 6px; padding: 6px 16px; margin: 14px 0; overflow-x: auto; }
+  .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; margin: 14px 0 20px; }
+  table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.92rem; }
+  th, td { border-bottom: 1px solid var(--line); padding: 8px 11px; text-align: right; white-space: nowrap; }
+  th:first-child, td:first-child, .tl { text-align: left; }
+  thead th { background: var(--soft); font-weight: 700; }
+  tr:last-child td { border-bottom: 0; }
+  .win { color: var(--new); font-weight: 720; }
+  .old { color: var(--old); }
+  .note { border-left: 4px solid var(--warn); background: var(--hl); padding: 10px 14px; margin: 16px 0; border-radius: 4px; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin: 20px 0; }
+  .card { border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; background: var(--soft); }
+  .card .k { color: var(--muted); font-size: 0.82rem; margin-bottom: 5px; }
+  .card .v { font-size: 1.5rem; font-weight: 740; line-height: 1.1; }
+  .card .s { color: var(--muted); font-size: 0.82rem; margin-top: 5px; }
+  ul, ol { margin: 6px 0 14px; padding-left: 22px; }
+  li { margin: 3px 0; }
+  .tag { display: inline-block; background: var(--code-bg); border-radius: 4px; padding: 1px 7px; font-size: 0.8rem; color: var(--muted); }
+</style>
+
+<main>
+<header>
+  <h1>AF_QMC — DQMC 高速化まとめ</h1>
+  <p class="lead">半充填ハバード模型の有限温度 補助場QMC (BSS/行列式QMC) を、16×16・低温 (\(\beta\) 大) まで実用にするための一連のアルゴリズム・実装最適化。数式・コード・実機実測をまとめる。</p>
+  <div class="meta">
+    <div>日付: 2026-07-04 (JST)</div>
+    <div>モデル: Claude Opus 4.8 (1M context)</div>
+    <div>対象: <code>AF_QMC/src</code> (dqmc/green/linalg/replica_mpi)</div>
+    <div>実機: kugui (Intel MKL) / Genkai</div>
+  </div>
+</header>
+
+<h2>0. 結論サマリ</h2>
+<div class="cards">
+  <div class="card"><div class="k">UDVスタック安定化</div><div class="v win">18.6×</div><div class="s">16×16, \(\beta{=}16\) (kugui). \(\beta^2\to\beta\) 線形化</div></div>
+  <div class="card"><div class="k">遅延 Green 更新</div><div class="v win">2.2×</div><div class="s">green_update ホット領域 (kugui)</div></div>
+  <div class="card"><div class="k">交互スイープ</div><div class="v win">1.24×</div><div class="s">スタック再構築を定常で 0 に (kugui)</div></div>
+  <div class="card"><div class="k">総合 (旧production比)</div><div class="v win">68–70×</div><div class="s">2D 6×6, \(\beta{=}2/4/8\) 実 walltime</div></div>
+</div>
+<p>物理量は全段階で ED/TPQ・旧実装と一致 (旧 vs 最適化で \(\max|z_E|{=}1.02\), \(\mathrm{sign}{=}1\) を維持)。速さは「物理を変えず、安定化アルゴリズムの再計算コストを削った」結果である。</p>
+
+<h2>1. 背景と支配的ボトルネック</h2>
+<p>DQMC の分配関数は補助場 \(s\) についての和で、各スピン \(\sigma\) の行列式積になる:</p>
+<div class="eq">\[ Z = \sum_{\{s\}} \prod_{\sigma} \det\!\left( \mathbb{1} + B^{\sigma}_{L} B^{\sigma}_{L-1} \cdots B^{\sigma}_{1} \right), \qquad B^{\sigma}_{l} = e^{-\Delta\tau\,K}\, e^{V^{\sigma}_{l}(s)} \]</div>
+<p>等時間 Green 関数 (実装規約 \(g_{ij} = \langle c_i\, c_j^{\dagger}\rangle\)) は</p>
+<div class="eq">\[ G^{\sigma}(l) = \left( \mathbb{1} + B^{\sigma}_{l}\cdots B^{\sigma}_{1}\, B^{\sigma}_{L}\cdots B^{\sigma}_{l+1} \right)^{-1} \]</div>
+<p>低温 (\(\beta=\Delta\tau\,L\) 大) では \(B\) の積が病的条件数になるため、<code>stab</code> 枚ごとに UDV (実装は \(U\,\mathrm{diag}(D)\,T\) 分解) で安定化しながら積を作り直す。旧実装の <code>green_from_scratch</code> は <strong>安定化のたびに \(L\) 枚すべての \(B\) を掛け直していた</strong>:</p>
+<div class="eq">\[ \text{1 sweep のコスト} \;\approx\; O\!\left( \frac{n^3 L^2}{\text{stab}} \right) \;\Longrightarrow\; \beta\text{ 依存が } \beta^2\ \text{則} \]</div>
+
+<p>Mac/Accelerate serial の <code>profile=1</code> 実測 (16×16, \(\beta{=}4\), \(L{=}40\), stab=8) で、1 sweep の <strong>80–87% が <code>green_from_scratch</code></strong> (実体は <code>udv_lmul</code> の QR 連鎖) と特定した。kugui の低温側実行時間爆発は物理ではなく安定化の再計算コストだった。以下はこれを削る順序である。</p>
+
+<div class="table-wrap"><table>
+<thead><tr><th>region (8×8, \(\beta{=}4\), serial)</th><th>total / 40 sweep</th><th>割合</th></tr></thead>
+<tbody>
+<tr><td class="tl">green_from_scratch (=udv_lmul)</td><td>1.523 s</td><td>87%</td></tr>
+<tr><td class="tl">green_update (rank-1)</td><td>0.156 s</td><td>9%</td></tr>
+<tr><td class="tl">green_wrap</td><td>0.069 s</td><td>4%</td></tr>
+<tr><td class="tl">measure_sample</td><td>0.0005 s</td><td>≈0%</td></tr>
+</tbody></table></div>
+
+<h2>2. 最適化 (1): UDV 部分積スタック安定化 <span class="tag">最大の効果</span></h2>
+<h3>アイデアと数式</h3>
+<p>QUEST / ALF 等の標準手法。スイープ前に右側部分積の UDV を <code>stab</code> 境界 \(b_j = j\cdot\text{stab}\) ごとに<strong>スタックに保存</strong>しておく。実装は suffix スタック:</p>
+<div class="eq">\[ S[j] = \mathrm{UDV}\big( B(L, b_j) \big) = B_L \cdots B_{b_j+1}, \qquad j = M, M-1, \dots, 1,\quad S[M]=\mathbb{1} \]</div>
+<p>スイープが虚時間を進むにつれ、左側の部分積 \(\text{prefix}=B(b_j,0)\) を <code>stab</code> 枚ぶんだけ足し、保存済みの suffix と結合して Green を得る:</p>
+<div class="eq">\[ G(b_j) = \big( \mathbb{1} + \text{prefix}\cdot S[j] \big)^{-1}, \qquad \text{prefix} \xleftarrow{\ \text{stab 枚 左乗算}\ } \text{UDV} \]</div>
+<p>これで安定化あたりの QR は「\(L\) 枚全部」から「stab 枚ぶん + 1 結合」に落ちる:</p>
+<div class="eq">\[ \#\mathrm{QR}:\ \frac{2L^2}{\text{stab}} \longrightarrow \frac{2L}{\text{stab}} \quad(L\text{ 分の }1),\qquad \text{sweep}:\ O\!\Big(\tfrac{n^3 L^2}{\text{stab}}\Big) \longrightarrow O(n^3 L) \quad(\beta^2 \to \beta\text{ 線形}) \]</div>
+
+<h3>コード</h3>
+<p>suffix スタックの構築 (<a href="../src/green.c">src/green.c</a>) — 高い \(j\) から低い \(j\) へ、stab 枚ブロック \(B(b_j, b_{j+1})\) を右乗算しながら UDV を積む:</p>
+<pre><code>void green_stack_build_suffix(Green *G, GreenStack *st) {
+    udv_identity(&amp;st-&gt;S[st-&gt;M]);
+    udv_identity(&amp;st-&gt;S[0]);
+    for (int j = st-&gt;M - 1; j &gt;= 1; j--) {
+        const int begin = st-&gt;b[j];
+        const int len   = st-&gt;b[j + 1] - st-&gt;b[j];
+        green_build_Bblock(G, begin, len, G-&gt;B, G-&gt;Binv, G-&gt;tmp);
+        udv_copy(&amp;st-&gt;S[j], &amp;st-&gt;S[j + 1]);
+        udv_rmul(&amp;st-&gt;S[j], G-&gt;B, &amp;G-&gt;work);   /* S[j] = S[j+1] * B_block, QR安定化 */
+    }
+}</code></pre>
+<p>スイープ中の Green 再構成は保存済み suffix と左 prefix を結合するだけ:</p>
+<pre><code>int green_from_boundary_factors(Green *G, const UDV *prefix, const UDV *suffix,
+                                UDV *combined, int cur_l) {
+    udv_combine(prefix, suffix, combined, &amp;G-&gt;work);        /* U D T を1回だけ結合 */
+    int rc = udv_inv_one_plus_work(combined, G-&gt;g, &amp;sgn, &amp;G-&gt;work); /* g=(1+UDT)^{-1} */
+    ...
+}</code></pre>
+<p>安定化された \(g = (\mathbb{1} + U\,\mathrm{diag}(D)\,T)^{-1}\) の計算は、\(D\) を大小分割してスケールを分離する標準の well-conditioned 経路 (<code>udv_inv_one_plus_work</code>)。\(\det\) の符号も三角因子から robust に取り、低温でも stale sign を残さない。</p>
+
+<h3>実測 (kugui i2cpu, 16×16, \(U{=}4\), \(\Delta\tau{=}0.1\), stab=4)</h3>
+<p>old <code>25ebdd2</code> vs new <code>ff9b741</code>、同一ノード <code>cpu121</code>・同一入力。<code>intel/2022.2.1 + intel-mpi/2021.7.1 + icc -qmkl=sequential</code>。</p>
+<div class="table-wrap"><table>
+<thead><tr><th>\(\beta\)</th><th>\(L_{\mathrm{tr}}\)</th><th class="old">old s/sweep</th><th class="win">new s/sweep</th><th>speedup</th><th>old \(\beta\) 倍率</th><th>new \(\beta\) 倍率</th></tr></thead>
+<tbody>
+<tr><td>4</td><td>40</td><td class="old">4.6984</td><td class="win">0.8492</td><td class="win">5.53×</td><td>—</td><td>—</td></tr>
+<tr><td>8</td><td>80</td><td class="old">16.9654</td><td class="win">1.7181</td><td class="win">9.87×</td><td class="old">3.61×</td><td>2.02×</td></tr>
+<tr><td>16</td><td>160</td><td class="old">63.8117</td><td class="win">3.4296</td><td class="win">18.61×</td><td class="old">3.76×</td><td>2.00×</td></tr>
+</tbody></table></div>
+<p>旧実装は \(\beta\) を倍にすると sweep 時間が約 3.6–3.8 倍 (\(\beta^2\)) に伸びるのに対し、新実装はほぼ 2 倍 (\(\beta\) 線形)。効果は低温ほど大きく、\(\beta{=}16\) で <strong>18.6×</strong>。プロファイル上は \(\beta{=}16\) の <code>dqmc_sweep</code> が <span class="old">127.62 s</span> → <span class="win">6.86 s</span>、支配項だった <code>green_from_scratch</code> (124.6 s, 96%) が消え、<code>green_stack_build</code> 1.14 s + <code>green_from_stack</code> 1.94 s に分散した。</p>
+<div class="note">副次効果: 安定化が安価になったため <code>stab=2</code> 常用が現実的になり、以前 L4-U12 で起きた <code>stab=8</code> 汚染のような数値問題の恒久対策にもなった。</div>
+
+<h2>3. 最適化 (2): 遅延 (rank-\(k\)) Green 更新</h2>
+<h3>数式</h3>
+<p>局所フリップ受理ごとの Green 更新は本来 rank-1 (Sherman–Morrison):</p>
+<div class="eq">\[ G' = G - \frac{N}{d}\, u\, v^{\mathsf{T}}, \qquad u_j = \delta_{ij} - G_{ji},\quad v_k = G_{ik},\quad d = 1 + (1 - G_{ii})\,N \]</div>
+<p>これは \(O(n^2)\) の rank-1 (<code>dger</code> 相当) で、\(n{=}256\) ではメモリ帯域律速になり UDV スタック後の相対的支配項になる。そこで \(k\) 回ぶんの更新ベクトルを \(C, V \in \mathbb{R}^{n\times k}\) に溜め、安定化/wrap の直前に <strong>1 回の BLAS3 dgemm</strong> でまとめて反映する:</p>
+<div class="eq">\[ G \leftarrow G - C\,V^{\mathsf{T}} \qquad (\texttt{la\_gemm\_nt\_rect},\ \text{1回の rank-}k) \]</div>
+<p>受理判定に必要な対角要素だけは pending 補正を反映して逐次評価する:</p>
+<div class="eq">\[ \tilde{G}_{ii} = G_{ii} - \sum_{p=1}^{k_{\text{pend}}} C_{ip}\,V_{ip} \;\Longrightarrow\; R = 1 + (1 - \tilde{G}_{ii})\,N \]</div>
+
+<h3>コード (<a href="../src/green.c">src/green.c</a>)</h3>
+<pre><code>void green_delay_accept(Green *G, int i, double N) {
+    const double denom = green_delay_ratio_N(G, i, N);   /* pending込み対角 */
+    const double fac   = N / denom;
+    for (int j = 0; j &lt; n; j++) {                        /* pending補正した列 */
+        double gij = g[j + i*n];
+        for (int p = 0; p &lt; G-&gt;delay_count; p++) gij -= G-&gt;delay_c[j+p*n]*G-&gt;delay_v[i+p*n];
+        u[j] = ((i==j)?1.0:0.0) - gij;
+    }
+    ...                                                  /* 同様に v[k] を作り */
+    const int p = G-&gt;delay_count++;                      /* C,V に積むだけ (即時反映しない) */
+    for (int j=0;j&lt;n;j++) G-&gt;delay_c[j+p*n] = fac*u[j];
+    for (int k=0;k&lt;n;k++) G-&gt;delay_v[k+p*n] = v[k];
+}
+void green_delay_flush(Green *G) {                       /* 溜めた分を一括 rank-k */
+    la_gemm_nt_rect(n, G-&gt;delay_count, -1.0, G-&gt;delay_c, G-&gt;delay_v, 1.0, G-&gt;g);
+    G-&gt;delay_count = 0;
+}</code></pre>
+<p><code>green_wrap</code> / <code>green_from_scratch</code> / <code>green_from_stack</code> は冒頭・末尾で必ず flush/clear し、pending と厳密再構成が混ざらないよう不変条件を保証している。</p>
+
+<h3>実測 (kugui i2cpu, 16×16, \(U{=}4\))</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>mode</th><th>\(\beta\)</th><th class="old">old</th><th class="win">new</th><th>speedup</th></tr></thead>
+<tbody>
+<tr><td class="tl">serial</td><td>4</td><td class="old">0.835 s</td><td class="win">0.729 s</td><td>1.145×</td></tr>
+<tr><td class="tl">serial</td><td>8</td><td class="old">1.696 s</td><td class="win">1.487 s</td><td>1.141×</td></tr>
+<tr><td class="tl">serial</td><td>16</td><td class="old">3.435 s</td><td class="win">2.998 s</td><td>1.146×</td></tr>
+<tr><td class="tl">MPI np16</td><td>16</td><td class="old">3.453 s</td><td class="win">3.006 s</td><td>1.149×</td></tr>
+</tbody></table></div>
+<p>狙った <code>green_update</code> ホット領域は serial \(\beta{=}16\) で <span class="old">1.615 s</span> → <span class="win">0.728 s</span> (<strong>2.2×</strong>)、MPI np16 \(\beta{=}16\) で 26.0 s → 11.66 s。full sweep 改善は 1.14–1.15× に留まる (UDV スタック後は他領域も効くため)。出力は全ケースで old と bit 一致・\(\mathrm{sign}{=}1\)。</p>
+
+<h2>4. 最適化 (3): 半充填 PH 対称性 + スタック繰り越し交互スイープ</h2>
+<h3>数式</h3>
+<p>二部格子・\(\mu{=}U/2\)・\(\lambda\sigma s\) 型 HS 変換では、down スピン Green は up から粒子正孔 (PH) 対称性で<strong>厳密に</strong>得られる (\(P_i = (-1)^i\) は副格子パリティ):</p>
+<div class="eq">\[ G^{\downarrow}_{ij} = \delta_{ij} - P_i P_j\, G^{\uparrow}_{ji} \]</div>
+<p>up だけ更新すれば安定化・更新・wrap がすべて半分になり、符号も恒等的に 1。さらに「スタック繰り越し交互スイープ」では、前向き/後ろ向きスイープを交互に行い、warmup で作った suffix スタックを次スイープに繰り越すことで、<strong>定常状態で <code>green_stack_build</code> の再構築を 0 回</strong>にする。後ろ向きには <code>green_wrap_backward</code> (\(G \leftarrow B^{-1} G\, B\)) を使う。</p>
+<pre><code>void green_build_ph_down(const Green *up, const int *bipart, double *g_down) {
+    for (int j=0;j&lt;n;j++) for (int i=0;i&lt;n;i++) {
+        double p = (double)(bipart[i]*bipart[j]);
+        g_down[i+j*n] = ((i==j)?1.0:0.0) - p * up-&gt;g[j+i*n];   /* δ - P_i P_j G↑_ji */
+    }
+}</code></pre>
+
+<h3>実測 (kugui i2cpu, 16×16, \(U{=}4\), \(\beta{=}16\))</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>stab</th><th>\(\beta\)</th><th class="old">forward s/sweep</th><th class="win">alternating s/sweep</th><th>speedup</th><th>stack calls fwd→alt</th></tr></thead>
+<tbody>
+<tr><td>4</td><td>4</td><td class="old">0.362</td><td class="win">0.294</td><td>1.234×</td><td>20 → 0</td></tr>
+<tr><td>4</td><td>8</td><td class="old">0.729</td><td class="win">0.594</td><td>1.227×</td><td>20 → 0</td></tr>
+<tr><td>4</td><td>16</td><td class="old">1.479</td><td class="win">1.193</td><td>1.240×</td><td>20 → 0</td></tr>
+<tr><td>8</td><td>16</td><td class="old">1.084</td><td class="win">0.889</td><td>1.219×</td><td>20 → 0</td></tr>
+</tbody></table></div>
+<p>交互スイープは serial 1.24× / MPI np16 1.232×。measurement フェーズの stack build 呼び出しが 0 に落ちるのが効果の実体。PH 対称性による down 省略はさらに理論上 2× で、全ケース \(n_{\text{tot}}{=}256\), \(dN{=}0\), \(\mathrm{sign}{=}1\) の半充填サニティを維持。</p>
+<div class="note">交互モードは安定化前の wrapped-\(G\) ドリフトが前向きより大きい (\(\beta{=}16\)/stab=8 で \(\max_\infty\) 1.47 vs 0.083; fail-fast には至らず)。このため本番デフォルトには据えず opt-in とし、長時間 production ではドリフト監視を継続する方針。</div>
+
+<h2>5. 最適化 (4): レプリカ MPI・ハイブリッド並列</h2>
+<p>16×16 は統計誤差確保に多数レプリカが必要で、これは embarrassingly parallel。独立レプリカを MPI rank に分配し、root で <code>MPI_Gatherv</code> 集約する (<a href="../src/replica_mpi.c">src/replica_mpi.c</a>)。ビルドは <code>make dqmc_mpi</code> / <code>dqmc_hybrid</code>。</p>
+
+<h3>実測: 純 MPI vs ハイブリッド / スレッド化 BLAS (Genkai, L8 \(U{=}4\) \(\beta{=}8\), nrep120)</h3>
+<p>結論は<strong>「純 MPI レプリカ × sequential MKL が最速」</strong>。ノード内スレッド化 BLAS はレプリカ並列に負ける。</p>
+<div class="table-wrap"><table>
+<thead><tr><th>構成</th><th>np</th><th>threads</th><th>real sec</th><th>相対性能</th></tr></thead>
+<tbody>
+<tr><td class="tl">MPI (基準)</td><td>120</td><td>1</td><td class="win">193.6</td><td class="win">1.000</td></tr>
+<tr><td class="tl">hybrid np60×t2</td><td>60</td><td>2</td><td>207.0</td><td>0.935</td></tr>
+<tr><td class="tl">hybrid np30×t4</td><td>30</td><td>4</td><td>222.1</td><td>0.872</td></tr>
+<tr><td class="tl">hybrid np10×t12</td><td>10</td><td>12</td><td>213.0</td><td>0.909</td></tr>
+<tr><td class="tl">MPI np60 × MKL2</td><td>60</td><td>2</td><td class="old">360.1</td><td class="old">0.533</td></tr>
+<tr><td class="tl">MPI np30 × MKL4</td><td>30</td><td>4</td><td class="old">627.4</td><td class="old">0.306</td></tr>
+<tr><td class="tl">MPI np10 × MKL12</td><td>10</td><td>12</td><td class="old">1844.4</td><td class="old">0.104</td></tr>
+</tbody></table></div>
+<p>MKL スレッド化はレプリカを削ってスレッドに回すため \(n{=}64\) では非効率 (mkl12 で 0.10×)。物理量は全構成で一致 (\(E{=}-4.5621717\) 等, \(\mathrm{sign}{=}1\))。従って本番は純 MPI レプリカ × <code>-qmkl=sequential</code> を採用。</p>
+
+<h3>OpenMP レプリカ スループット (L6 \(U{=}4\) \(\beta{=}4\), 8 threads)</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>nrep</th><th>real sec</th><th>throughput speedup vs nrep1</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>2.64</td><td>1.00</td></tr>
+<tr><td>2</td><td>2.75</td><td>1.92</td></tr>
+<tr><td>4</td><td>3.16</td><td>3.34</td></tr>
+<tr><td>8</td><td>4.44</td><td>4.76</td></tr>
+<tr><td>16</td><td>9.11</td><td>4.64</td></tr>
+</tbody></table></div>
+<p>8 スレッドまでほぼ線形、それ以降は物理コア数で頭打ち。レプリカ並列が本番の主軸として妥当であることを裏づける。</p>
+
+<h2>6. 最適化 (5): ホットパス微最適化</h2>
+<ul>
+<li><strong>malloc/free 除去</strong>: <code>green_update</code> は 1 sweep に \(\sim\!1.4\)万回、作業領域 (\(u/v/\text{tmp}\)) を毎回確保していた。これらを <code>Green</code> / 共有 <code>LinalgWork</code> に事前確保し、ホットパスから動的確保を排除。</li>
+<li><strong>\(\exp()\) キャッシュ</strong>: <code>green_build_B</code> の HS 場は \(s=\pm1\) の 2 値のみ。\(e^{\pm\lambda}\) を事前計算して引く。</li>
+<li><strong>rank-\(k\) flush の BLAS3 化</strong>: 遅延更新の反映を <code>la_gemm_nt_rect</code> (dgemm) に集約し、キャッシュ効率とベクトル化を確保。</li>
+<li><strong>UDV は factor-only を維持</strong>: スタック保存のため中間因子を破棄せず、再利用可能に。</li>
+</ul>
+
+<h2>7. 総合実測: 旧 production vs 最適化版</h2>
+<p>2D 6×6, \(U{=}4\), \(\Delta\tau{=}0.025\), \(\beta{=}2/4/8\), PP/APP 境界条件。old は 20260630 production、optimized は current-head <code>alt_9f785f8_20260703</code>。</p>
+<div class="table-wrap"><table>
+<thead><tr><th>bc</th><th>\(\beta\)</th><th>\(T\)</th><th>\(\delta E/\text{site}\)</th><th>\(z_E\)</th><th>\(\delta D\)</th><th>\(z_D\)</th><th>speedup</th></tr></thead>
+<tbody>
+<tr><td>APP</td><td>2</td><td>0.5</td><td>1.4e-4</td><td>0.99</td><td>2.0e-5</td><td>0.99</td><td class="win">70.01×</td></tr>
+<tr><td>APP</td><td>4</td><td>0.25</td><td>2.5e-4</td><td>1.02</td><td>8.0e-5</td><td>1.55</td><td class="win">70.01×</td></tr>
+<tr><td>APP</td><td>8</td><td>0.125</td><td>9.6e-5</td><td>0.35</td><td>1.4e-4</td><td>2.39</td><td class="win">70.01×</td></tr>
+<tr><td>PP</td><td>2</td><td>0.5</td><td>5.1e-5</td><td>0.36</td><td>1.0e-5</td><td>0.53</td><td class="win">68.85×</td></tr>
+<tr><td>PP</td><td>4</td><td>0.25</td><td>1.2e-4</td><td>0.44</td><td>−2.6e-5</td><td>−0.43</td><td class="win">68.85×</td></tr>
+<tr><td>PP</td><td>8</td><td>0.125</td><td>1.2e-4</td><td>0.38</td><td>5.9e-5</td><td>0.82</td><td class="win">68.85×</td></tr>
+</tbody></table></div>
+<p><strong>実 walltime で PP 68.85× / APP 70.01×</strong>。物理量は誤差範囲で一致 (\(\max|z_E|{=}1.02\), \(\max|z_D|{=}2.38\))。この総合値は UDV スタック (\(\beta^2 \to \beta\)) が主因で、そこに遅延更新・交互スイープ・微最適化・並列レイアウト調整が積み上がったもの。</p>
+
+<h2>8. 効果の積み上げ (概念図)</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>段階</th><th>16×16 \(\beta{=}8\) (\(L{=}160\)) 1 sweep, Mac serial 外挿</th><th>\(\beta\) 依存則</th></tr></thead>
+<tbody>
+<tr><td class="tl">現行 (旧, stab=4)</td><td class="old">~27–30 s</td><td class="old">\(\beta^2\)</td></tr>
+<tr><td class="tl">+ UDV スタック</td><td class="win">~1.5–2 s</td><td class="win">\(\beta\) 線形</td></tr>
+<tr><td class="tl">+ 遅延更新ほか</td><td class="win">~1.0 s</td><td>\(\beta\) 線形</td></tr>
+<tr><td class="tl">+ PH 対称性 (down 省略)</td><td class="win">~0.5 s</td><td>\(\beta\) 線形</td></tr>
+</tbody></table></div>
+<p>これにレプリカ MPI (100本規模) を重ね、16×16・低温の \(E(T)\) 計算が実用領域に入った。</p>
+
+<h2>参照</h2>
+<ul>
+<li>性能分析の原典: <a href="2026-07-02-performance-analysis.md">2026-07-02-performance-analysis.md</a></li>
+<li>UDV スタック検証: <a href="2026-07-02-kugui-i2cpu-udv-stack-validation.html">2026-07-02-kugui-i2cpu-udv-stack-validation.html</a></li>
+<li>交互スイープ検証: <a href="2026-07-02-kugui-i2cpu-alternating-sweep-validation.html">2026-07-02-kugui-i2cpu-alternating-sweep-validation.html</a></li>
+<li>旧 vs 最適化 総合比較: <a href="2026-07-03-fast-vs-old-production-comparison.html">2026-07-03-fast-vs-old-production-comparison.html</a></li>
+<li>実測生データ: <code>data/profiling_runs/kugui_i2cpu_udv_stack_ff9b741_20260702/</code>, <code>data/profiling_runs/genkai_*_20260629/</code></li>
+<li>コード: <a href="../src/green.c">src/green.c</a> (スタック/遅延/PH/wrap), <a href="../src/linalg.c">src/linalg.c</a> (UDV), <a href="../src/replica_mpi.c">src/replica_mpi.c</a> (MPI)</li>
+</ul>
+
+<p style="color:var(--muted);font-size:0.85rem;margin-top:32px">数式は MathJax (TeX) で描画。オフライン環境で数式を表示するには CDN (<code>cdn.jsdelivr.net/npm/mathjax@3</code>) への接続が必要です。</p>
+
+</main>

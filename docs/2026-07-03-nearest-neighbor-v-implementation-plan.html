@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>最近接 V1 を AF_QMC に導入するための数式と実装計画</title>
+<script>
+MathJax = {
+  tex: {
+    inlineMath: [['$', '$'], ['\\(', '\\)']],
+    displayMath: [['$$', '$$'], ['\\[', '\\]']],
+    tags: 'ams'
+  }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
+<style>
+  :root {
+    --fg: #17212b;
+    --muted: #596a7a;
+    --bg: #ffffff;
+    --panel: #f7f9fc;
+    --accent: #16466d;
+    --accent-light: #e9f2fb;
+    --border: #d7dee8;
+    --warn-bg: #fff8e6;
+    --warn-border: #e2bd45;
+    --code-bg: #f3f5f8;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0 auto;
+    max-width: 1080px;
+    padding: 28px 24px 64px;
+    color: var(--fg);
+    background: var(--bg);
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans",
+                 "Yu Gothic", Meiryo, sans-serif;
+    line-height: 1.72;
+  }
+  h1 {
+    margin: 0 0 10px;
+    color: var(--accent);
+    font-size: 1.75rem;
+    line-height: 1.32;
+    border-bottom: 3px solid var(--accent);
+    padding-bottom: 8px;
+  }
+  h2 {
+    margin-top: 34px;
+    padding-left: 10px;
+    border-left: 6px solid var(--accent);
+    color: var(--accent);
+    font-size: 1.28rem;
+  }
+  h3 {
+    margin-top: 26px;
+    color: #20384d;
+    font-size: 1.06rem;
+    border-bottom: 1px dashed var(--border);
+    padding-bottom: 3px;
+  }
+  p.meta {
+    color: var(--muted);
+    margin: 0 0 18px;
+  }
+  .summary, .note, .todo {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin: 14px 0;
+  }
+  .summary {
+    background: var(--panel);
+    border-left: 5px solid var(--accent);
+  }
+  .note {
+    background: var(--warn-bg);
+    border-color: var(--warn-border);
+  }
+  .todo {
+    background: #fbfcfe;
+  }
+  nav {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 18px;
+    margin: 18px 0 26px;
+  }
+  nav ol { margin: 6px 0 0; padding-left: 22px; }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 14px 0 22px;
+    font-size: .94rem;
+  }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 8px 10px;
+    text-align: left;
+    vertical-align: top;
+  }
+  th { background: var(--accent-light); color: #20384d; }
+  tr:nth-child(even) td { background: #fbfcfe; }
+  code, pre {
+    font-family: "SF Mono", Menlo, Consolas, "Noto Sans Mono CJK JP", monospace;
+    font-size: .9em;
+  }
+  code {
+    background: var(--code-bg);
+    border-radius: 4px;
+    padding: .08em .32em;
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    overflow-x: auto;
+    line-height: 1.5;
+  }
+  pre code { background: transparent; padding: 0; }
+  a { color: #0b5cad; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .small { color: var(--muted); font-size: .92rem; }
+  .phase li { margin-bottom: 6px; }
+</style>
+</head>
+<body>
+<h1>最近接 $V_1$ を AF_QMC に導入するための数式と実装計画</h1>
+<p class="meta">
+作成日: 2026-07-03 JST。
+対象: 現行の有限温度 BSS/DQMC C 実装に、square/chain 半充填の最近接密度相互作用
+$V_1$ を追加するための設計メモ。
+</p>
+
+<section class="summary">
+<strong>結論。</strong>
+最初に実装すべき対象は square 格子半充填の最近接 $V_1$ である。
+Yao, Wang &amp; Wang (2022) の bond-centered 離散 HS 分解を採用すると、
+square 格子では $|U| \ge 4|V_1|$ の範囲で sign-free なサンプリングが可能になる。
+ただし反発的 $U&gt;0$ では補助場ポテンシャルが複素になるため、現行の実数
+<code>Green</code>/<code>UDV</code> path をそのまま拡張するだけでは足りない。
+まず complex one-spin PH path を別系統で実装し、$V_1=0$ で既存結果に戻ること、
+小さい系で ED と一致することを採用条件にする。
+</section>
+
+<nav>
+<strong>目次</strong>
+<ol>
+  <li><a href="#scope">対象範囲</a></li>
+  <li><a href="#hamiltonian">Hamiltonian と規約</a></li>
+  <li><a href="#decomposition">bond HS 分解と $|U| \ge 4|V_1|$</a></li>
+  <li><a href="#sign">sign-free 条件の意味</a></li>
+  <li><a href="#dqmc">有限温度 DQMC への落とし込み</a></li>
+  <li><a href="#update">局所更新と rank-2 Green 更新</a></li>
+  <li><a href="#measure">測定量</a></li>
+  <li><a href="#implementation">実装計画</a></li>
+  <li><a href="#v2">次近接 $V_2$ の扱い</a></li>
+  <li><a href="#validation">検証計画</a></li>
+  <li><a href="#refs">参照</a></li>
+</ol>
+</nav>
+
+<h2 id="scope">1. 対象範囲</h2>
+
+<p>
+本メモは、現行コードのオンサイト Hubbard $U$ 実装に、最近接の密度相互作用
+$V_1$ を追加するための最小実装を定義する。最初の実装対象は以下に限定する。
+</p>
+
+<table>
+<thead><tr><th>項目</th><th>初期実装の方針</th></tr></thead>
+<tbody>
+<tr><td>格子</td><td>組み込み <code>square</code> を優先。<code>chain</code> は同じ枠組みで対応可能。<code>file</code> lattice は bond list の意味が曖昧なので後回し。</td></tr>
+<tr><td>充填</td><td>半充填のみ。particle-hole (PH) 対称性を sign-free 条件に使う。</td></tr>
+<tr><td>相互作用</td><td>オンサイト $U$ と最近接 $V_1$。次近接 $V_2$ は将来拡張。</td></tr>
+<tr><td>パラメータ範囲</td><td>まず $U&gt;0$、$|V_1| \le U/4$。一般の $U&lt;0$ は式上は扱えるが、現行 production の主対象外。</td></tr>
+<tr><td>HS 型</td><td>Yao-Wang-Wang 型の bond-centered 4値離散 HS。</td></tr>
+<tr><td>線形代数</td><td>反発 $U&gt;0$ では complex path が必要。既存 real path は壊さず、新しい extended path として追加する。</td></tr>
+</tbody>
+</table>
+
+<h2 id="hamiltonian">2. Hamiltonian と規約</h2>
+
+<p>
+現行コードは実行時には
+$U n_{i\uparrow}n_{i\downarrow}$ と半充填の $\mu=U/2$ を使っている。
+$V_1$ を入れる場合、相互作用は particle-hole 対称形で定義する方がよい。
+</p>
+
+$$
+H = K
+  + U\sum_i
+    \left(n_{i\uparrow}-\frac{1}{2}\right)
+    \left(n_{i\downarrow}-\frac{1}{2}\right)
+  + V_1\sum_{\langle i,j\rangle}
+    (n_i-1)(n_j-1),
+$$
+
+$$
+n_i = n_{i\uparrow}+n_{i\downarrow},\qquad
+Q_i = n_i - 1.
+$$
+
+<p>
+この規約ではオンサイト項は
+</p>
+
+$$
+\left(n_{i\uparrow}-\frac{1}{2}\right)
+\left(n_{i\downarrow}-\frac{1}{2}\right)
+= \frac{1}{2}Q_i^2 - \frac{1}{4}.
+$$
+
+<p>
+したがって定数を除けば、
+</p>
+
+$$
+H_I \equiv
+\frac{U}{2}\sum_i Q_i^2
++ V_1\sum_{\langle i,j\rangle} Q_iQ_j.
+$$
+
+<div class="note">
+現行出力の <code>E_ph</code> は、オンサイト Hubbard の particle-hole 対称形へ変換した
+エネルギーである。$V_1$ 導入後は、$E_{\mathrm{ph}}$ に
+$V_1\sum_{\langle i,j\rangle}\langle Q_iQ_j\rangle$ を加える必要がある。
+</div>
+
+<h2 id="decomposition">3. bond HS 分解と $|U| \ge 4|V_1|$</h2>
+
+<p>
+Yao-Wang-Wang の最近接 bond 分解では、square 格子の有向最近接 bond
+$(i,j)$ ごとに
+</p>
+
+$$
+A_{ij} = Q_i + a Q_j
+$$
+
+<p>
+を定義し、相互作用を
+</p>
+
+$$
+H_I =
+\frac{g}{2}\sum_{\langle i,j\rangle_{\mathrm{oriented}}}
+\left(Q_i+aQ_j\right)^2
+$$
+
+<p>
+と書く。square 格子では各サイトが有向 bond の始点として $z/2$ 回、終点として
+$z/2$ 回現れる。$z=4$ は最近接数である。
+展開すると
+</p>
+
+$$
+\frac{g}{2}\sum_{\langle i,j\rangle}
+(Q_i+aQ_j)^2
+=
+\frac{gz}{4}(1+a^2)\sum_i Q_i^2
++ ga\sum_{\langle i,j\rangle} Q_iQ_j.
+$$
+
+<p>
+$H_I = (U/2)\sum_iQ_i^2 + V_1\sum_{\langle i,j\rangle}Q_iQ_j$
+と比較して、
+</p>
+
+$$
+U = \frac{gz}{2}(1+a^2),\qquad
+V_1 = ga.
+$$
+
+<p>
+この2式から
+</p>
+
+$$
+\frac{U}{V_1}
+= \frac{z}{2}\left(a+\frac{1}{a}\right)
+$$
+
+<p>
+を得る。実数 $a$ が存在するには
+</p>
+
+$$
+\left|\frac{U}{V_1}\right| \ge z.
+$$
+
+<p>
+square 格子では $z=4$ なので、
+</p>
+
+$$
+|U| \ge 4|V_1|.
+$$
+
+<p>
+実装では、$r=2U/(zV_1)$ と置いて
+</p>
+
+$$
+a = \frac{r \pm \sqrt{r^2-4}}{2},\qquad
+g = \frac{V_1}{a}
+$$
+
+<p>
+を使う。数値的には $|a|\le 1$ の枝を選ぶと、bond の片側に過度に大きな係数を
+持たせにくい。
+</p>
+
+<h3>4値離散 HS</h3>
+
+<p>
+各 bond・各時間 slice に4値の補助場 $s\in\{\pm1,\pm2\}$ を置く。
+</p>
+
+$$
+e^{-\Delta\tau\,g A^2/2}
+=
+\sum_{s=\pm1,\pm2}
+\gamma_s e^{\lambda_s A}
++ O(\Delta\tau^4),
+$$
+
+$$
+\gamma_{\pm1}=\frac14+\frac{\sqrt6}{12},\qquad
+\gamma_{\pm2}=\frac14-\frac{\sqrt6}{12},
+$$
+
+$$
+\lambda_{\pm1}
+= \pm\sqrt{-\Delta\tau g(3-\sqrt6)},\qquad
+\lambda_{\pm2}
+= \pm\sqrt{-\Delta\tau g(3+\sqrt6)}.
+$$
+
+<p>
+$g&gt;0$ では $\lambda_s$ は純虚数になり、$g&lt;0$ では実数になる。
+現在の production 主対象である $U&gt;0$ かつ $|V_1|\le U/4$ では通常 $g&gt;0$ で、
+complex HS として扱う。
+</p>
+
+<h2 id="sign">4. sign-free 条件の意味</h2>
+
+<p>
+DQMC の補助場配置 $s$ に対する重みは概念的に
+</p>
+
+$$
+W[s] = A_s \det M_\uparrow[s]\det M_\downarrow[s]
+$$
+
+<p>
+である。sign-free にするには、各補助場配置ごとに
+</p>
+
+$$
+\det M_\downarrow[s] = \det M_\uparrow[s]^*
+$$
+
+<p>
+または $\det M_\downarrow=\det M_\uparrow$ の形にできればよい。
+このとき
+</p>
+
+$$
+W[s] \propto |\det M_\uparrow[s]|^2 \ge 0.
+$$
+
+<p>
+$g&gt;0$ では HS coupling が純虚数になるが、半充填かつ二部格子では
+down spin に対する部分 particle-hole 変換
+</p>
+
+$$
+c_{i\downarrow}\rightarrow \eta_i \tilde{c}_{i\downarrow}^{\dagger},
+\qquad \eta_i=\pm1
+$$
+
+<p>
+により、down spin の一体行列を up spin の複素共役に移せる。
+これが $|U|\ge4|V_1|$ の範囲で sign-free になる理由である。
+</p>
+
+<div class="note">
+重要なのは、$|U|=4|V_1|$ が「物理的に符号が突然出る点」ではなく、
+この bond HS 分解の実数パラメータ $a$ が存在する境界だという点である。
+ただし square の反発 $V_1&gt;0$ では、$q=(\pi,\pi)$ の charge/CDW mode が
+概略 $U-4V_1$ で効くため、CDW を駆動する物理的な境界と sign-free 保証の境界が
+近い場所に現れる。
+</div>
+
+<h2 id="dqmc">5. 有限温度 DQMC への落とし込み</h2>
+
+<p>
+現在の有限温度コードでは、1 slice の伝播を概念的に
+</p>
+
+$$
+B_l = e^{-\Delta\tau K} e^{V_l}
+$$
+
+<p>
+として扱っている。$V_1$ 版でも $V_l$ は対角一体ポテンシャルなので、
+B 行列構築と wrap/stabilized rebuild の構造は再利用できる。
+違いは、$V_l$ の各サイト成分が「そのサイトに接続した複数 bond field の和」に
+なることである。
+</p>
+
+<p>
+ある時間 slice $l$ において、bond $b=(i,j)$ の補助場が $\lambda_{b,l}$ を持つとき、
+up spin の対角ポテンシャル寄与は
+</p>
+
+$$
+v_i \mathrel{+}= \lambda_{b,l},\qquad
+v_j \mathrel{+}= a\lambda_{b,l}.
+$$
+
+<p>
+sign-free PH transformed path では、down spin は独立にサンプルせず、up spin の
+複素共役・PH 写像から構成する。したがって、初期実装は
+「complex up Green のみを保持し、測定時に down Green を再構成する」方式がよい。
+</p>
+
+<pre><code>for each time slice l:
+    v_site[:] = 0
+    for each oriented V1 bond b=(i,j):
+        lambda = lambda_table[field[l,b]]
+        v_site[i] += lambda
+        v_site[j] += a * lambda
+    B_l = expK * diag(exp(v_site))</code></pre>
+
+<h2 id="update">6. 局所更新と rank-2 Green 更新</h2>
+
+<p>
+現在の onsite HS 更新は、1サイトだけ対角ポテンシャルが変わるため rank-1 更新である。
+bond field を1つ更新すると、基本的には2サイト $(i,j)$ の対角ポテンシャルが変わる。
+したがって最初は rank-2 更新として実装する。
+</p>
+
+<p>
+bond $b=(i,j)$ の field を $s\rightarrow s'$ に変えると
+</p>
+
+$$
+\delta\lambda = \lambda_{s'}-\lambda_s,
+$$
+
+$$
+\delta v_i = \delta\lambda,\qquad
+\delta v_j = a\,\delta\lambda,
+$$
+
+$$
+N_i = e^{\delta v_i}-1,\qquad
+N_j = e^{\delta v_j}-1.
+$$
+
+<p>
+更新対象サイト集合を $P=\{p_1,p_2\}=\{i,j\}$ とし、
+$\Delta$ をこの2サイトだけ非ゼロの対角行列とする。
+現行コードの Green 規約 $G=\langle c c^\dagger\rangle$ では、spin 1成分の
+determinant ratio は
+</p>
+
+$$
+R_\uparrow =
+\det\left[
+I_2 + \left(I-G_\uparrow\right)_{P,P}
+\,\mathrm{diag}(N_i,N_j)
+\right].
+$$
+
+<p>
+反発 $U&gt;0$ の sign-free PH path では Metropolis ratio を
+</p>
+
+$$
+R_{\mathrm{MC}}
+=
+\frac{\gamma_{s'}}{\gamma_s}
+\left|R_\uparrow\right|^2
+$$
+
+<p>
+として使う。提案確率は、現在の4値 field から他の3値へ一様に選べば対称である。
+</p>
+
+<p>
+採択後の Green 更新は rank-2 Sherman-Morrison-Woodbury 型で
+</p>
+
+$$
+G' =
+G
+-
+(I-G)\Delta
+\left[I+(I-G)\Delta\right]^{-1}
+G.
+$$
+
+<p>
+実装上は $P$ 上の $2\times2$ 小行列を組み、既存の delayed update はいったん使わず、
+正しさ優先で即時更新するのがよい。rank-2 版が安定してから、現在の
+<code>GREEN_DELAY_CAPACITY</code> に合わせた rank-k delayed update を検討する。
+</p>
+
+<h2 id="measure">7. 測定量</h2>
+
+<h3>エネルギー</h3>
+
+<p>
+オンサイト項は既存の doublon 測定から計算できる。ただし particle-hole 対称形の
+エネルギーとして使う場合は
+</p>
+
+$$
+E_U^{\mathrm{ph}} =
+U\sum_i
+\left[
+\langle n_{i\uparrow}n_{i\downarrow}\rangle
+-\frac{1}{2}\langle n_i\rangle
++\frac{1}{4}
+\right].
+$$
+
+<p>
+最近接項は
+</p>
+
+$$
+E_{V_1} =
+V_1\sum_{\langle i,j\rangle}\langle Q_iQ_j\rangle.
+$$
+
+<p>
+等時刻 Green から、同一 HS 配置内では Wick 展開により
+</p>
+
+$$
+\langle n_{i\sigma}\rangle = 1-G^\sigma_{ii},
+$$
+
+$$
+\langle n_{i\sigma}n_{j\sigma}\rangle
+=
+\langle n_{i\sigma}\rangle\langle n_{j\sigma}\rangle
+- C^\sigma_{ij} C^\sigma_{ji},
+\qquad
+C^\sigma_{ij}=\langle c^\dagger_{i\sigma}c_{j\sigma}\rangle
+=\delta_{ij}-G^\sigma_{ji}.
+$$
+
+<p>
+$i\ne j$ の最近接 bond では
+</p>
+
+$$
+\langle n_i n_j\rangle =
+\sum_\sigma \langle n_{i\sigma}n_{j\sigma}\rangle
++
+\sum_{\sigma\ne\tau}
+\langle n_{i\sigma}\rangle\langle n_{j\tau}\rangle,
+$$
+
+$$
+\langle Q_iQ_j\rangle
+=
+\langle n_i n_j\rangle
+-\langle n_i\rangle
+-\langle n_j\rangle
++1.
+$$
+
+<h3>追加したい出力列</h3>
+
+<table>
+<thead><tr><th>列</th><th>意味</th><th>優先度</th></tr></thead>
+<tbody>
+<tr><td><code>E_total</code> または既存 <code>E_hub</code> の拡張</td><td>$K+U+V_1$ の総エネルギー。既存解析との互換性を考えるなら列名再設計が必要。</td><td>高</td></tr>
+<tr><td><code>E_v1</code></td><td>$V_1\sum_{\langle i,j\rangle}\langle Q_iQ_j\rangle$。</td><td>高</td></tr>
+<tr><td><code>nn_charge_corr</code></td><td>bond 平均 $\langle Q_iQ_j\rangle$。</td><td>高</td></tr>
+<tr><td><code>cdw_pi_pi</code></td><td>$S_{\mathrm{CDW}}(\pi,\pi)$。CDW 境界を見るなら有用。</td><td>中</td></tr>
+<tr><td><code>sign</code></td><td>sign-free mode では 1 のはず。外側を許す mode を作るなら平均 sign。</td><td>高</td></tr>
+</tbody>
+</table>
+
+<h2 id="implementation">8. 実装計画</h2>
+
+<h3>Phase 0: 入力と実装モードを固定する</h3>
+
+<ul class="phase">
+<li><code>V1=...</code> を <code>Params</code> に追加する。</li>
+<li><code>interaction_hs=onsite_spin</code> を既定値にし、既存入力は完全に維持する。</li>
+<li><code>interaction_hs=nn_bond_yao</code> を新設する。</li>
+<li><code>nn_bond_yao</code> では半充填・二部格子・<code>square</code>・$|U|\ge4|V_1|$ を満たさない入力をまず拒否する。</li>
+</ul>
+
+<h3>Phase 1: bond list と HS パラメータ</h3>
+
+<ul class="phase">
+<li><code>InteractionGraph</code> あるいは <code>BondList</code> を追加し、square の +x/+y 方向 bond を有向 bond として列挙する。</li>
+<li><code>ExtendedModel</code> に <code>V1</code>, <code>z</code>, <code>a</code>, <code>g</code>, <code>lambda[4]</code>, <code>gamma[4]</code> を持たせる。</li>
+<li>数値分岐は $|V_1|$ が十分小さい場合に注意する。初期実装では <code>V1=0</code> は既存 onsite path に戻す。</li>
+</ul>
+
+<h3>Phase 2: complex Green path を分離して追加する</h3>
+
+<ul class="phase">
+<li><code>ComplexGreen</code>, <code>ComplexUDV</code>, <code>complex_linalg</code> を新規追加する。既存 <code>Green</code> を直接 complex 化しない。</li>
+<li>C99 <code>double complex</code> か、明示的な <code>{double re, im}</code> 型を選ぶ。LAPACK/BLAS を使うなら <code>zgemm/zgetrf</code> 系が必要。</li>
+<li>最初は UDV stack 最適化を再実装する前に、小サイズで from-scratch rebuild が正しいことを確認する。</li>
+</ul>
+
+<h3>Phase 3: B 行列と安定化</h3>
+
+<ul class="phase">
+<li>slice ごとに <code>v_site[n]</code> を構築し、<code>B = expK * diag(exp(v_site))</code> を作る。</li>
+<li><code>Binv = diag(exp(-v_site)) * expKinv</code> を作る。</li>
+<li>finite-temperature trace 版では <code>G=(I+B_{L-1}\cdots B_0)^{-1}</code> を complex UDV で計算する。</li>
+</ul>
+
+<h3>Phase 4: rank-2 local update</h3>
+
+<ul class="phase">
+<li>bond field を4値のうち別の値へ提案する。</li>
+<li>$2\times2$ determinant ratio を計算し、$R_{\mathrm{MC}}=(\gamma'/\gamma)|R_\uparrow|^2$ で採否を決める。</li>
+<li>採択時は rank-2 更新式で complex up Green を更新する。</li>
+<li>まず delayed update は無効化する。正しさ確認後に rank-k delayed update を足す。</li>
+</ul>
+
+<h3>Phase 5: 測定と出力</h3>
+
+<ul class="phase">
+<li>PH 変換から down Green を再構成する helper を作る。</li>
+<li><code>measure_sample_extended</code> を追加し、既存 <code>measure_sample</code> はそのまま残す。</li>
+<li><code>E_v1</code>, <code>nn_charge_corr</code>, 必要なら <code>S_CDW(pi,pi)</code> を出す。</li>
+<li>既存の report/summary parser は列追加に弱い可能性があるため、extended run 用 summary header を別名にするのが安全。</li>
+</ul>
+
+<h2 id="v2">9. 次近接 $V_2$ の扱い</h2>
+
+<p>
+次近接 $V_2$ まで入れる場合、Yao et al. は plaquette-centered field による拡張を
+示している。
+</p>
+
+$$
+H_I =
+-\frac{g}{2}\sum_i
+\left[
+Q_i
++aQ_{i+\hat{x}}
++aQ_{i+\hat{y}}
++a^2Q_{i+\hat{x}+\hat{y}}
+\right]^2.
+$$
+
+<p>
+これは plaquette 中心に4サイトへ結合する補助場を置く形式である。
+局所更新は rank-4 対角更新になり、測定・安定化は最近接版より重くなる。
+</p>
+
+<div class="note">
+$V_2$ は初期実装に含めない方がよい。理由は、$U,V_1,V_2$ を任意に独立掃引できる
+一般形ではなく、$g,a$ から誘導される係数関係を満たす必要があるためである。
+まず $V_1$ の sign-free complex PH path を完成させ、その後に plaquette 版の係数対応を
+別途導出・検証する。
+</div>
+
+<h2 id="validation">10. 検証計画</h2>
+
+<table>
+<thead><tr><th>段階</th><th>検証内容</th><th>合格条件</th></tr></thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>$V_1=0$ regression</td>
+<td>既存 onsite path と、エネルギー・粒子数・doublon が統計誤差内で一致する。</td>
+</tr>
+<tr>
+<td>2</td>
+<td>HS 係数テスト</td>
+<td>与えた $U,V_1$ から復元した $U_{\mathrm{eff}},V_{\mathrm{eff}}$ が入力と一致する。</td>
+</tr>
+<tr>
+<td>3</td>
+<td>rank-2 更新テスト</td>
+<td>1 update 後の Green が from-scratch rebuild と $10^{-10}$ 程度で一致する。</td>
+</tr>
+<tr>
+<td>4</td>
+<td>小クラスタ ED 比較</td>
+<td>2x2 OBC, 2x3 OBC, 1D L=4/6 などで $E(T)$ と $N$ が一致する。PBC 2x2 は hopping bond の縮退に注意。</td>
+</tr>
+<tr>
+<td>5</td>
+<td>sign-free sanity</td>
+<td>$U=4,V_1=0.5,1.0$ など $|V_1|\le U/4$ で平均 sign が 1、または complex phase が機械精度で 0。</td>
+</tr>
+<tr>
+<td>6</td>
+<td>境界外入力</td>
+<td><code>nn_bond_yao</code> mode では $|U|&lt;4|V_1|$ を明示エラーにする。</td>
+</tr>
+<tr>
+<td>7</td>
+<td>物理 sanity</td>
+<td>$V_1&gt;0$ で CDW correlation が増え、AFM correlation が弱まる傾向を小サイズで確認する。</td>
+</tr>
+</tbody>
+</table>
+
+<h2 id="refs">11. 参照</h2>
+
+<ul>
+<li><a href="../refs/afqmc_nonlocal_interactions_survey.html">refs/afqmc_nonlocal_interactions_survey.html</a>:
+非オンサイト相互作用サーベイ。Golor-Wessel, Yao-Wang-Wang, Kennedy らの位置づけ。</li>
+<li><a href="https://arxiv.org/abs/2207.11555">Yao, Wang &amp; Wang, arXiv:2207.11555</a>:
+square 半充填 extended Hubbard の bond-field DQMC。$|U|\ge4|V|$ の sign-free 領域と HS 式。</li>
+<li><a href="https://arxiv.org/abs/1509.02367">Golor &amp; Wessel, arXiv:1509.02367</a>:
+非局所密度相互作用に対する bond-centered AFQMC の先行研究。</li>
+<li><a href="2026-07-02-afqmc-code-reference.html">docs/2026-07-02-afqmc-code-reference.html</a>:
+現行 AF_QMC 実装の B 行列、Green 更新、UDV stack、測定量の参照。</li>
+</ul>
+</body>
+</html>

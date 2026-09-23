@@ -1,0 +1,129 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>AF_QMC Bad Parameter Results</title>
+<style>
+body{font-family:Arial,Helvetica,sans-serif;line-height:1.45;margin:28px;color:#222}
+h1{font-size:25px;margin-bottom:8px} h2{font-size:19px;margin-top:28px} h3{font-size:16px;margin-top:20px}
+.meta,.note{background:#f6f8fa;border-left:4px solid #5b8def;padding:10px 14px;margin:12px 0}
+table{border-collapse:collapse;font-size:12px;margin:10px 0 22px;min-width:900px}
+th,td{border:1px solid #ddd;padding:4px 7px;text-align:right;white-space:nowrap} th:first-child,td:first-child{text-align:left}
+.wide{overflow-x:auto} code{background:#f2f2f2;padding:1px 4px;border-radius:3px}
+.grid{display:grid;grid-template-columns:1fr;gap:14px} @media(min-width:1100px){.grid{grid-template-columns:1fr 1fr}}
+figure{margin:10px 0 22px} img{max-width:100%;height:auto;border:1px solid #ddd} figcaption{font-size:13px;color:#555;margin-top:4px}
+</style>
+</head>
+<body>
+<h1>AF_QMC Bad Parameter Results</h1>
+<div class="meta">
+<div><b>datetime:</b> 2026-07-13 23:21 JST</div>
+<div><b>model:</b> GPT-5 Codex</div>
+<div><b>summary:</b> 回収済み production / diagnostic run のうち、NaN、非物理 doublon、巨大誤差で usable から除外したパラメータを明示する。</div>
+</div>
+<div class="note">
+Bad criterion: non-finite observable, sign != 1, doublon outside [0,0.25],
+dE/site &gt; 0.01, or dD &gt; 0.005. Production-impacting bad parameters are L=16,U=8 at T=0.1 APP and T=0.05 PP/APP, plus strong-coupling low-T points: L=4,U=12 at T=0.02,0.01; L=4,U=16 at T=0.0300075,0.02,0.01; and L=6,U=16 at T=0.0300075.
+</div>
+
+<h2>Bad Parameter Figures</h2>
+<div class="grid">
+<figure><img src="figures/recovered_production_20260713/bad_parameter_map.png" alt="Bad temperatures by campaign, L, U, and boundary condition."><figcaption>Bad temperatures by campaign, L, U, and boundary condition.</figcaption></figure>
+<figure><img src="figures/recovered_production_20260713/bad_parameter_clean_vs_bad.png" alt="Last clean temperature and failed lower-temperature attempts."><figcaption>Last clean temperature and failed lower-temperature attempts.</figcaption></figure>
+</div>
+
+<h2>Production-Impacting Bad Parameters</h2>
+<div class="wide">
+<table><thead><tr><th>campaign</th><th>L</th><th>U</th><th>bc</th><th>dtau</th><th>bad T</th><th>bad beta</th><th>n rows</th><th>reason</th></tr></thead><tbody><tr><td>L14/L16 U=4,8 production</td><td>16</td><td>8</td><td>APP</td><td>0.025</td><td>0.1</td><td>10</td><td>1</td><td>large energy error; large doublon error</td></tr>
+<tr><td>L14/L16 U=4,8 production</td><td>16</td><td>8</td><td>APP</td><td>0.025</td><td>0.05</td><td>20</td><td>1</td><td>unphysical doublon; large energy error; large doublon error</td></tr>
+<tr><td>L14/L16 U=4,8 production</td><td>16</td><td>8</td><td>PP</td><td>0.025</td><td>0.05</td><td>20</td><td>1</td><td>unphysical doublon; large energy error; large doublon error</td></tr>
+<tr><td>U=12,16 strong-coupling production</td><td>4</td><td>12</td><td>APP</td><td>0.025</td><td>0.02, 0.01</td><td>50, 100</td><td>2</td><td>NaN / non-finite observable</td></tr>
+<tr><td>U=12,16 strong-coupling production</td><td>4</td><td>12</td><td>PP</td><td>0.025</td><td>0.02, 0.01</td><td>50, 100</td><td>2</td><td>NaN / non-finite observable</td></tr>
+<tr><td>U=12,16 strong-coupling production</td><td>4</td><td>16</td><td>APP</td><td>0.025</td><td>0.0300075, 0.02, 0.01</td><td>33.325, 50, 100</td><td>3</td><td>NaN / non-finite observable</td></tr>
+<tr><td>U=12,16 strong-coupling production</td><td>4</td><td>16</td><td>PP</td><td>0.025</td><td>0.0300075, 0.02, 0.01</td><td>33.325, 50, 100</td><td>3</td><td>NaN / non-finite observable</td></tr>
+<tr><td>U=12,16 strong-coupling production</td><td>6</td><td>16</td><td>APP</td><td>0.025</td><td>0.0300075</td><td>33.325</td><td>1</td><td>NaN / non-finite observable</td></tr>
+<tr><td>U=12,16 strong-coupling production</td><td>6</td><td>16</td><td>PP</td><td>0.025</td><td>0.0300075</td><td>33.325</td><td>1</td><td>NaN / non-finite observable</td></tr></tbody></table>
+</div>
+
+<h2>Diagnostic / Snapfix Bad Parameters</h2>
+<div class="wide">
+<table><thead><tr><th>campaign</th><th>L</th><th>U</th><th>bc</th><th>dtau</th><th>bad T</th><th>bad beta</th><th>n rows</th><th>reason</th></tr></thead><tbody><tr><td>4x4 U=12,16,20 snapfix</td><td>4</td><td>12</td><td>APP</td><td>0.025</td><td>0.02</td><td>50</td><td>1</td><td>NaN / non-finite observable</td></tr>
+<tr><td>4x4 U=12,16,20 snapfix</td><td>4</td><td>12</td><td>PP</td><td>0.025</td><td>0.02</td><td>50</td><td>1</td><td>NaN / non-finite observable</td></tr>
+<tr><td>4x4 U=12,16,20 snapfix</td><td>4</td><td>16</td><td>APP</td><td>0.025</td><td>0.0300075, 0.02</td><td>33.325, 50</td><td>2</td><td>NaN / non-finite observable</td></tr>
+<tr><td>4x4 U=12,16,20 snapfix</td><td>4</td><td>16</td><td>PP</td><td>0.025</td><td>0.0300075, 0.02</td><td>33.325, 50</td><td>2</td><td>NaN / non-finite observable</td></tr>
+<tr><td>4x4 U=12,16,20 snapfix</td><td>4</td><td>20</td><td>APP</td><td>0.025</td><td>0.0300075, 0.02</td><td>33.325, 50</td><td>2</td><td>NaN / non-finite observable</td></tr>
+<tr><td>4x4 U=12,16,20 snapfix</td><td>4</td><td>20</td><td>PP</td><td>0.025</td><td>0.0300075, 0.02</td><td>33.325, 50</td><td>2</td><td>NaN / non-finite observable</td></tr>
+<tr><td>U=12,16 stab=2 diagnostic</td><td>4</td><td>12</td><td>APP</td><td>0.025</td><td>0.02, 0.01</td><td>50, 100</td><td>2</td><td>NaN / non-finite observable</td></tr>
+<tr><td>U=12,16 stab=2 diagnostic</td><td>4</td><td>12</td><td>PP</td><td>0.025</td><td>0.02, 0.01</td><td>50, 100</td><td>2</td><td>NaN / non-finite observable</td></tr>
+<tr><td>U=12,16 stab=2 diagnostic</td><td>4</td><td>16</td><td>APP</td><td>0.025</td><td>0.0300075, 0.02, 0.01</td><td>33.325, 50, 100</td><td>3</td><td>NaN / non-finite observable</td></tr>
+<tr><td>U=12,16 stab=2 diagnostic</td><td>4</td><td>16</td><td>PP</td><td>0.025</td><td>0.0300075, 0.02, 0.01</td><td>33.325, 50, 100</td><td>3</td><td>NaN / non-finite observable</td></tr></tbody></table>
+</div>
+
+<h2>Exact Bad Rows With Raw Results</h2>
+<div class="wide">
+<table><thead><tr><th>campaign</th><th>run</th><th>Lx</th><th>Ly</th><th>U</th><th>bc</th><th>T</th><th>beta</th><th>dtau</th><th>E_hub</th><th>dE_hub</th><th>E/site</th><th>dE/site</th><th>doublon</th><th>dD</th><th>sign</th><th>reason</th></tr></thead><tbody><tr><td>4x4 U=12,16,20 snapfix</td><td>kugui_F1cpu_2d4x4_U12_APP_dtau0p025_T1p5_to_0p02_nrep120_n10k_gridT_alt_snapfix_U12to20_20260706</td><td>4</td><td>4</td><td>12</td><td>APP</td><td>0.02</td><td>50</td><td>0.025</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>1</td><td>NaN / non-finite observable</td></tr>
+<tr><td>4x4 U=12,16,20 snapfix</td><td>kugui_F1cpu_2d4x4_U12_PP_dtau0p025_T1p5_to_0p02_nrep120_n10k_gridT_alt_snapfix_U12to20_20260706</td><td>4</td><td>4</td><td>12</td><td>PP</td><td>0.02</td><td>50</td><td>0.025</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>1</td><td>NaN / non-finite observable</td></tr>
+<tr><td>4x4 U=12,16,20 snapfix</td><td>kugui_F1cpu_2d4x4_U16_APP_dtau0p025_T1p5_to_0p02_nrep120_n10k_gridT_alt_snapfix_U12to20_20260706</td><td>4</td><td>4</td><td>16</td><td>APP</td><td>0.02</td><td>50</td><td>0.025</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>1</td><td>NaN / non-finite observable</td></tr>
+<tr><td>4x4 U=12,16,20 snapfix</td><td>kugui_F1cpu_2d4x4_U16_APP_dtau0p025_T1p5_to_0p02_nrep120_n10k_gridT_alt_snapfix_U12to20_20260706</td><td>4</td><td>4</td><td>16</td><td>APP</td><td>0.0300075</td><td>33.325</td><td>0.025</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>1</td><td>NaN / non-finite observable</td></tr>
+<tr><td>4x4 U=12,16,20 snapfix</td><td>kugui_F1cpu_2d4x4_U16_PP_dtau0p025_T1p5_to_0p02_nrep120_n10k_gridT_alt_snapfix_U12to20_20260706</td><td>4</td><td>4</td><td>16</td><td>PP</td><td>0.02</td><td>50</td><td>0.025</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>1</td><td>NaN / non-finite observable</td></tr>
+<tr><td>4x4 U=12,16,20 snapfix</td><td>kugui_F1cpu_2d4x4_U16_PP_dtau0p025_T1p5_to_0p02_nrep120_n10k_gridT_alt_snapfix_U12to20_20260706</td><td>4</td><td>4</td><td>16</td><td>PP</td><td>0.0300075</td><td>33.325</td><td>0.025</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>1</td><td>NaN / non-finite observable</td></tr>
+<tr><td>4x4 U=12,16,20 snapfix</td><td>kugui_F1cpu_2d4x4_U20_APP_dtau0p025_T1p5_to_0p02_nrep120_n10k_gridT_alt_snapfix_U12to20_20260706</td><td>4</td><td>4</td><td>20</td><td>APP</td><td>0.02</td><td>50</td><td>0.025</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>1</td><td>NaN / non-finite observable</td></tr>
+<tr><td>4x4 U=12,16,20 snapfix</td><td>kugui_F1cpu_2d4x4_U20_APP_dtau0p025_T1p5_to_0p02_nrep120_n10k_gridT_alt_snapfix_U12to20_20260706</td><td>4</td><td>4</td><td>20</td><td>APP</td><td>0.0300075</td><td>33.325</td><td>0.025</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>1</td><td>NaN / non-finite observable</td></tr>
+<tr><td>4x4 U=12,16,20 snapfix</td><td>kugui_F1cpu_2d4x4_U20_PP_dtau0p025_T1p5_to_0p02_nrep120_n10k_gridT_alt_snapfix_U12to20_20260706</td><td>4</td><td>4</td><td>20</td><td>PP</td><td>0.02</td><td>50</td><td>0.025</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>1</td><td>NaN / non-finite observable</td></tr>
+<tr><td>4x4 U=12,16,20 snapfix</td><td>kugui_F1cpu_2d4x4_U20_PP_dtau0p025_T1p5_to_0p02_nrep120_n10k_gridT_alt_snapfix_U12to20_20260706</td><td>4</td><td>4</td><td>20</td><td>PP</td><td>0.0300075</td><td>33.325</td><td>0.025</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>1</td><td>NaN / non-finite observable</td></tr>
+<tr><td>L14/L16 U=4,8 production</td><td>kugui_F1cpu_2d16x16_U8_APP_dtau0p025_T0p05_nrep120_n10k_gridT_alt_fc0416a_prebuilt_L14L16_20260706</td><td>16</td><td>16</td><td>8</td><td>APP</td><td>0.05</td><td>20</td><td>0.025</td><td>-1013.74</td><td>877</td><td>-3.95991</td><td>3.42578</td><td>-0.375291</td><td>0.43</td><td>1</td><td>unphysical doublon; large energy error; large doublon error</td></tr>
+<tr><td>L14/L16 U=4,8 production</td><td>kugui_F1cpu_2d16x16_U8_APP_dtau0p025_T0p1_nrep120_n10k_gridT_alt_fc0416a_prebuilt_L14L16_20260706</td><td>16</td><td>16</td><td>8</td><td>APP</td><td>0.1</td><td>10</td><td>0.025</td><td>-163.941</td><td>28.5</td><td>-0.640393</td><td>0.111328</td><td>0.039242</td><td>0.014</td><td>1</td><td>large energy error; large doublon error</td></tr>
+<tr><td>L14/L16 U=4,8 production</td><td>kugui_F1cpu_2d16x16_U8_PP_dtau0p025_T0p05_nrep120_n10k_gridT_alt_fc0416a_prebuilt_L14L16_20260706</td><td>16</td><td>16</td><td>8</td><td>PP</td><td>0.05</td><td>20</td><td>0.025</td><td>-1329.1</td><td>1160</td><td>-5.19179</td><td>4.53125</td><td>-0.529352</td><td>0.57</td><td>1</td><td>unphysical doublon; large energy error; large doublon error</td></tr>
+<tr><td>U=12,16 stab=2 diagnostic</td><td>kugui_F1cpu_2d4x4_U12_APP_dtau0p025_T0p04_to_0p01_nrep120_n10k_gridT_alt_fc0416a_prebuilt_U12U16_stab2_20260707</td><td>4</td><td>4</td><td>12</td><td>APP</td><td>0.01</td><td>100</td><td>0.025</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>1</td><td>NaN / non-finite observable</td></tr>
+<tr><td>U=12,16 stab=2 diagnostic</td><td>kugui_F1cpu_2d4x4_U12_APP_dtau0p025_T0p04_to_0p01_nrep120_n10k_gridT_alt_fc0416a_prebuilt_U12U16_stab2_20260707</td><td>4</td><td>4</td><td>12</td><td>APP</td><td>0.02</td><td>50</td><td>0.025</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>1</td><td>NaN / non-finite observable</td></tr>
+<tr><td>U=12,16 stab=2 diagnostic</td><td>kugui_F1cpu_2d4x4_U12_PP_dtau0p025_T0p04_to_0p01_nrep120_n10k_gridT_alt_fc0416a_prebuilt_U12U16_stab2_20260707</td><td>4</td><td>4</td><td>12</td><td>PP</td><td>0.01</td><td>100</td><td>0.025</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>1</td><td>NaN / non-finite observable</td></tr>
+<tr><td>U=12,16 stab=2 diagnostic</td><td>kugui_F1cpu_2d4x4_U12_PP_dtau0p025_T0p04_to_0p01_nrep120_n10k_gridT_alt_fc0416a_prebuilt_U12U16_stab2_20260707</td><td>4</td><td>4</td><td>12</td><td>PP</td><td>0.02</td><td>50</td><td>0.025</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>1</td><td>NaN / non-finite observable</td></tr>
+<tr><td>U=12,16 stab=2 diagnostic</td><td>kugui_F1cpu_2d4x4_U16_APP_dtau0p025_T0p04_to_0p01_nrep120_n10k_gridT_alt_fc0416a_prebuilt_U12U16_stab2_20260707</td><td>4</td><td>4</td><td>16</td><td>APP</td><td>0.01</td><td>100</td><td>0.025</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>1</td><td>NaN / non-finite observable</td></tr>
+<tr><td>U=12,16 stab=2 diagnostic</td><td>kugui_F1cpu_2d4x4_U16_APP_dtau0p025_T0p04_to_0p01_nrep120_n10k_gridT_alt_fc0416a_prebuilt_U12U16_stab2_20260707</td><td>4</td><td>4</td><td>16</td><td>APP</td><td>0.02</td><td>50</td><td>0.025</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>1</td><td>NaN / non-finite observable</td></tr>
+<tr><td>U=12,16 stab=2 diagnostic</td><td>kugui_F1cpu_2d4x4_U16_APP_dtau0p025_T0p04_to_0p01_nrep120_n10k_gridT_alt_fc0416a_prebuilt_U12U16_stab2_20260707</td><td>4</td><td>4</td><td>16</td><td>APP</td><td>0.0300075</td><td>33.325</td><td>0.025</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>1</td><td>NaN / non-finite observable</td></tr>
+<tr><td>U=12,16 stab=2 diagnostic</td><td>kugui_F1cpu_2d4x4_U16_PP_dtau0p025_T0p04_to_0p01_nrep120_n10k_gridT_alt_fc0416a_prebuilt_U12U16_stab2_20260707</td><td>4</td><td>4</td><td>16</td><td>PP</td><td>0.01</td><td>100</td><td>0.025</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>1</td><td>NaN / non-finite observable</td></tr>
+<tr><td>U=12,16 stab=2 diagnostic</td><td>kugui_F1cpu_2d4x4_U16_PP_dtau0p025_T0p04_to_0p01_nrep120_n10k_gridT_alt_fc0416a_prebuilt_U12U16_stab2_20260707</td><td>4</td><td>4</td><td>16</td><td>PP</td><td>0.02</td><td>50</td><td>0.025</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>1</td><td>NaN / non-finite observable</td></tr>
+<tr><td>U=12,16 stab=2 diagnostic</td><td>kugui_F1cpu_2d4x4_U16_PP_dtau0p025_T0p04_to_0p01_nrep120_n10k_gridT_alt_fc0416a_prebuilt_U12U16_stab2_20260707</td><td>4</td><td>4</td><td>16</td><td>PP</td><td>0.0300075</td><td>33.325</td><td>0.025</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>1</td><td>NaN / non-finite observable</td></tr>
+<tr><td>U=12,16 strong-coupling production</td><td>kugui_F1cpu_2d4x4_U12_APP_dtau0p025_T0p04_to_0p01_nrep120_n10k_gridT_alt_fc0416a_prebuilt_U12U16_20260707</td><td>4</td><td>4</td><td>12</td><td>APP</td><td>0.01</td><td>100</td><td>0.025</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>1</td><td>NaN / non-finite observable</td></tr>
+<tr><td>U=12,16 strong-coupling production</td><td>kugui_F1cpu_2d4x4_U12_APP_dtau0p025_T0p04_to_0p01_nrep120_n10k_gridT_alt_fc0416a_prebuilt_U12U16_20260707</td><td>4</td><td>4</td><td>12</td><td>APP</td><td>0.02</td><td>50</td><td>0.025</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>1</td><td>NaN / non-finite observable</td></tr>
+<tr><td>U=12,16 strong-coupling production</td><td>kugui_F1cpu_2d4x4_U12_PP_dtau0p025_T0p04_to_0p01_nrep120_n10k_gridT_alt_fc0416a_prebuilt_U12U16_20260707</td><td>4</td><td>4</td><td>12</td><td>PP</td><td>0.01</td><td>100</td><td>0.025</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>1</td><td>NaN / non-finite observable</td></tr>
+<tr><td>U=12,16 strong-coupling production</td><td>kugui_F1cpu_2d4x4_U12_PP_dtau0p025_T0p04_to_0p01_nrep120_n10k_gridT_alt_fc0416a_prebuilt_U12U16_20260707</td><td>4</td><td>4</td><td>12</td><td>PP</td><td>0.02</td><td>50</td><td>0.025</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>1</td><td>NaN / non-finite observable</td></tr>
+<tr><td>U=12,16 strong-coupling production</td><td>kugui_F1cpu_2d4x4_U16_APP_dtau0p025_T0p04_to_0p01_nrep120_n10k_gridT_alt_fc0416a_prebuilt_U12U16_20260707</td><td>4</td><td>4</td><td>16</td><td>APP</td><td>0.01</td><td>100</td><td>0.025</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>1</td><td>NaN / non-finite observable</td></tr>
+<tr><td>U=12,16 strong-coupling production</td><td>kugui_F1cpu_2d4x4_U16_APP_dtau0p025_T0p04_to_0p01_nrep120_n10k_gridT_alt_fc0416a_prebuilt_U12U16_20260707</td><td>4</td><td>4</td><td>16</td><td>APP</td><td>0.02</td><td>50</td><td>0.025</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>1</td><td>NaN / non-finite observable</td></tr>
+<tr><td>U=12,16 strong-coupling production</td><td>kugui_F1cpu_2d4x4_U16_APP_dtau0p025_T0p04_to_0p01_nrep120_n10k_gridT_alt_fc0416a_prebuilt_U12U16_20260707</td><td>4</td><td>4</td><td>16</td><td>APP</td><td>0.0300075</td><td>33.325</td><td>0.025</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>1</td><td>NaN / non-finite observable</td></tr>
+<tr><td>U=12,16 strong-coupling production</td><td>kugui_F1cpu_2d4x4_U16_PP_dtau0p025_T0p04_to_0p01_nrep120_n10k_gridT_alt_fc0416a_prebuilt_U12U16_20260707</td><td>4</td><td>4</td><td>16</td><td>PP</td><td>0.01</td><td>100</td><td>0.025</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>1</td><td>NaN / non-finite observable</td></tr>
+<tr><td>U=12,16 strong-coupling production</td><td>kugui_F1cpu_2d4x4_U16_PP_dtau0p025_T0p04_to_0p01_nrep120_n10k_gridT_alt_fc0416a_prebuilt_U12U16_20260707</td><td>4</td><td>4</td><td>16</td><td>PP</td><td>0.02</td><td>50</td><td>0.025</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>1</td><td>NaN / non-finite observable</td></tr>
+<tr><td>U=12,16 strong-coupling production</td><td>kugui_F1cpu_2d4x4_U16_PP_dtau0p025_T0p04_to_0p01_nrep120_n10k_gridT_alt_fc0416a_prebuilt_U12U16_20260707</td><td>4</td><td>4</td><td>16</td><td>PP</td><td>0.0300075</td><td>33.325</td><td>0.025</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>1</td><td>NaN / non-finite observable</td></tr>
+<tr><td>U=12,16 strong-coupling production</td><td>kugui_F1cpu_2d6x6_U16_APP_dtau0p025_T0p04_to_0p03_nrep120_n10k_gridT_alt_fc0416a_prebuilt_U12U16_20260707</td><td>6</td><td>6</td><td>16</td><td>APP</td><td>0.0300075</td><td>33.325</td><td>0.025</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>1</td><td>NaN / non-finite observable</td></tr>
+<tr><td>U=12,16 strong-coupling production</td><td>kugui_F1cpu_2d6x6_U16_PP_dtau0p025_T0p04_to_0p03_nrep120_n10k_gridT_alt_fc0416a_prebuilt_U12U16_20260707</td><td>6</td><td>6</td><td>16</td><td>PP</td><td>0.0300075</td><td>33.325</td><td>0.025</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>nan</td><td>1</td><td>NaN / non-finite observable</td></tr></tbody></table>
+</div>
+
+<h2>Clean Boundary For Context</h2>
+<div class="wide">
+<table><thead><tr><th>set</th><th>L</th><th>U</th><th>lowest clean T</th><th>max beta</th><th>E/site</th><th>dE/site</th><th>doublon</th><th>dD</th><th>BC</th></tr></thead><tbody><tr><td>large L U=4,8</td><td>8</td><td>4</td><td>0.05</td><td>20</td><td>-0.863056</td><td>0.00016056</td><td>0.126149</td><td>3.73129e-05</td><td>APP+PP</td></tr>
+<tr><td>large L U=4,8</td><td>8</td><td>8</td><td>0.05</td><td>20</td><td>-0.529253</td><td>0.000125997</td><td>0.0537438</td><td>1.27279e-05</td><td>APP+PP</td></tr>
+<tr><td>large L U=4,8</td><td>10</td><td>4</td><td>0.05</td><td>20</td><td>-0.862287</td><td>0.000100061</td><td>0.126091</td><td>2.26385e-05</td><td>APP+PP</td></tr>
+<tr><td>large L U=4,8</td><td>10</td><td>8</td><td>0.05</td><td>20</td><td>-0.528978</td><td>0.000286688</td><td>0.0536824</td><td>3.47131e-05</td><td>APP+PP</td></tr>
+<tr><td>large L U=4,8</td><td>12</td><td>4</td><td>0.05</td><td>20</td><td>-0.861967</td><td>0.00013348</td><td>0.126068</td><td>3.20351e-05</td><td>APP+PP</td></tr>
+<tr><td>large L U=4,8</td><td>12</td><td>8</td><td>0.05</td><td>20</td><td>-0.5288</td><td>0.000124886</td><td>0.0536846</td><td>1.44222e-05</td><td>APP+PP</td></tr>
+<tr><td>large L U=4,8</td><td>14</td><td>4</td><td>0.05</td><td>20</td><td>-0.861642</td><td>9.64947e-05</td><td>0.12606</td><td>2.28035e-05</td><td>APP+PP</td></tr>
+<tr><td>large L U=4,8</td><td>14</td><td>8</td><td>0.05</td><td>20</td><td>-0.528739</td><td>0.000118091</td><td>0.0536445</td><td>1.39014e-05</td><td>APP+PP</td></tr>
+<tr><td>large L U=4,8</td><td>16</td><td>4</td><td>0.05</td><td>20</td><td>-0.861579</td><td>8.16736e-05</td><td>0.126043</td><td>1.91442e-05</td><td>APP+PP</td></tr>
+<tr><td>large L U=4,8</td><td>16</td><td>8</td><td>0.149813</td><td>6.67499</td><td>-0.517615</td><td>9.17582e-05</td><td>0.0529006</td><td>1.04043e-05</td><td>APP+PP</td></tr>
+<tr><td>strong coupling</td><td>4</td><td>12</td><td>0.030007</td><td>33.325</td><td>-0.3835</td><td>0.000317583</td><td>0.0278762</td><td>2.15697e-05</td><td>APP+PP</td></tr>
+<tr><td>strong coupling</td><td>4</td><td>16</td><td>0.04</td><td>25</td><td>-0.299678</td><td>0.000383671</td><td>0.0165936</td><td>1.94487e-05</td><td>APP+PP</td></tr>
+<tr><td>strong coupling</td><td>4</td><td>20</td><td>0.05</td><td>20</td><td>-0.248226</td><td>0.000420957</td><td>0.0109185</td><td>1.69706e-05</td><td>APP+PP</td></tr>
+<tr><td>strong coupling</td><td>6</td><td>12</td><td>0.030007</td><td>33.325</td><td>-0.378544</td><td>0.000208213</td><td>0.0276942</td><td>1.3435e-05</td><td>APP+PP</td></tr>
+<tr><td>strong coupling</td><td>6</td><td>16</td><td>0.04</td><td>25</td><td>-0.295263</td><td>0.000256328</td><td>0.016468</td><td>1.27279e-05</td><td>APP+PP</td></tr>
+<tr><td>strong coupling</td><td>8</td><td>12</td><td>0.05</td><td>20</td><td>-0.377086</td><td>0.000160238</td><td>0.0275894</td><td>1.06066e-05</td><td>APP+PP</td></tr>
+<tr><td>strong coupling</td><td>8</td><td>16</td><td>0.05</td><td>20</td><td>-0.294322</td><td>0.000201673</td><td>0.0164067</td><td>1.02591e-05</td><td>APP+PP</td></tr>
+<tr><td>strong coupling</td><td>12</td><td>12</td><td>0.05</td><td>20</td><td>-0.376514</td><td>0.000112698</td><td>0.0275335</td><td>7.43303e-06</td><td>APP+PP</td></tr>
+<tr><td>strong coupling</td><td>12</td><td>16</td><td>0.05</td><td>20</td><td>-0.294957</td><td>0.00114318</td><td>0.0163164</td><td>7.51665e-05</td><td>APP+PP</td></tr></tbody></table>
+</div>
+
+<p>Source TSVs:
+<code>data/analysis/recovered_production_20260713/bad_parameter_groups.tsv</code> and
+<code>data/analysis/recovered_production_20260713/bad_parameter_results.tsv</code>.
+Back to <a href="2026-07-03-temperature-summary-with-tables.html">main temperature summary</a>.</p>
+</body>
+</html>
