@@ -1,6 +1,6 @@
 ---
 date: 2026-09-23
-datetime: 2026-09-23 15:43 JST
+datetime: 2026-09-23 16:17 JST
 model: OpenAI GPT-6 (Codex)
 summary: |
   SAI-QMC 0.1の日本語利用案内。英語READMEに対応する。
@@ -218,8 +218,8 @@ Trotter外挿を収録しています。チェックサムと出典は
 
 ## 引用とライセンス
 
+本ソフトウェアを利用する際は、SAI-QMCを引用してください。
 バージョン0.1の引用情報は[CITATION.cff](CITATION.cff)にあります。
-実際に使用したリリースまたはコミットを引用してください。
 アルゴリズムの参考文献は[REFERENCES.md](REFERENCES.md)に記載し、
 Yuichi Otsuka氏の博士論文Appendix Aを含みます。
 博士論文や第三者の論文のPDF・OCRテキストは配布しません。

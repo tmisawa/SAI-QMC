@@ -1,6 +1,6 @@
 ---
 date: 2026-09-23
-datetime: 2026-09-23 15:43 JST
+datetime: 2026-09-23 16:17 JST
 model: OpenAI GPT-6 (Codex)
 summary: |
   User guide for SAI-QMC 0.1, a finite-temperature determinant QMC code.
@@ -219,8 +219,8 @@ every parameter combination supported by the input parser.
 
 ## Citation and license
 
-Citation metadata for version 0.1 are in [CITATION.cff](CITATION.cff); cite the
-release or commit actually used. The algorithmic references are in
+Please cite SAI-QMC if you use this software. Citation metadata for version 0.1
+are in [CITATION.cff](CITATION.cff). The algorithmic references are in
 [REFERENCES.md](REFERENCES.md), including Yuichi Otsuka's doctoral thesis,
 Appendix A. The thesis and third-party article PDFs/OCR are not distributed here.
 

@@ -1,5 +1,5 @@
 cff-version: 1.2.0
-message: "Please cite SAI-QMC and the exact release or commit used, together with the relevant algorithmic references in REFERENCES.md."
+message: "Please cite SAI-QMC if you use this software."
 type: software
 title: SAI-QMC
 version: '0.1'

@@ -1,6 +1,21 @@
 # LOG
 
 ---
+date: 2026-09-23
+datetime: 2026-09-23 16:17 JST
+model: OpenAI GPT-6 (Codex)
+summary: |
+  Simplified the citation request to ask users to cite SAI-QMC.
+  Aligned the citation message and English/Japanese README guidance.
+---
+
+## 2026-09-23: Simplified citation guidance
+
+- Use "Please cite SAI-QMC if you use this software" in CITATION.cff and
+  align the English and Japanese README citation requests.
+- Retain software version metadata and the separate algorithmic reference list.
+
+---
 date: 2026-09-08
 datetime: 2026-09-08 13:47 JST
 model: OpenAI GPT-6 (Codex)
