@@ -73,15 +73,15 @@ collide() { # description extra_lines protected_file
   [ "$(cat "$tmp/$3")" = SENTINEL ] || { echo "FAIL $3 clobbered: $1"; fail=1; }
   [ "$(cat "$tmp/hopping_used.txt")" = SENTINEL ] || { echo "FAIL hopping dump preceded collision check: $1"; fail=1; }
 }
-collide "default replica log" 'global_interval=3\nreplica_bin_file=replicas.csv\n' replicas.csv
-collide "default profile file" 'global_interval=3\nprofile=1\nreplica_bin_file=profile.csv\n' profile.csv
+collide "default replica log" 'global_interval=3\nreplica_bin_file=replicas.dat\n' replicas.dat
+collide "default profile file" 'global_interval=3\nprofile=1\nreplica_bin_file=profile.dat\n' profile.dat
 collide "explicit szz file" 'global_interval=3\nreplica_bin_file=szz.tsv\n' szz.tsv
 collide "stabilization drift" 'global_interval=3\nstab_drift_file=shared.tsv\nreplica_bin_file=shared.tsv\n' shared.tsv
 collide "UDV scale" 'global_interval=3\nudv_scale_file=shared.tsv\nreplica_bin_file=shared.tsv\n' shared.tsv
 collide "centered UDV" 'global_interval=3\ngreen_rebuild=centered\nudv_centered_file=shared.tsv\nreplica_bin_file=shared.tsv\n' shared.tsv
 collide "fixed hopping output" 'global_interval=3\nreplica_bin_file=hopping_used.txt\n' hopping_used.txt
-# an inactive default name is not reserved: profile=0 leaves profile.csv free
-sed -e '/^replica_bin_file=/d' "$tmp/base.in" > "$tmp/d.in"; printf 'replica_bin_file=profile.csv\n' >> "$tmp/d.in"
+# an inactive default name is not reserved: profile=0 leaves profile.dat free
+sed -e '/^replica_bin_file=/d' "$tmp/base.in" > "$tmp/d.in"; printf 'replica_bin_file=profile.dat\n' >> "$tmp/d.in"
 (cd "$tmp" && "$bin" d.in > /dev/null) || { echo "FAIL inactive default name rejected"; fail=1; }
 # injected write / close failures end the run with a nonzero status (I6)
 sed -e '/^global_interval=/d' -e '/^replica_bin_file=/d' "$tmp/base.in" > "$tmp/e.in"

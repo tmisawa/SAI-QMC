@@ -162,9 +162,8 @@ dtau²外挿の18判定とbeta4の旧run比較はすべてpass。
 | beta16 / dtau0.05 / interval100、SU(2)差 | SE=0.0465765（上限0.04） | undetermined。12本全体を延長 |
 
 初回の各判定と全replicaの量は、raw dataとともに初回の `comparison.json` に保持する。
-追加検証は、初回判定を踏まえて明文化した
-[延長手順](docs/superpowers/plans/2026-09-21-global-hs-update-implementation.md#validation-extension-protocol-2026-09-21-2129-jst)
-と、各段階の実行前に固定したmanifestに従って完了した。
+追加検証は、初回判定を踏まえて明文化した延長手順（r1〜r3の段階、延長sweep数、判定基準を実行前に固定した内部の実装計画。
+本repositoryには含めず、条件と結果は下記の機械可読集計に残す）と、各段階の実行前に固定したmanifestに従って完了した。
 
 ### 追加検証の経過
 

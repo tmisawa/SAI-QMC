@@ -182,6 +182,47 @@ Cコンパイラと互換性のあるものを選んでください。
 ローカル検証で使用したOpen MPIとApple Clangの環境では、
 `OMPI_CC=clang make dqmc_mpi dqmc_hybrid`でClangを明示的に選択します。
 
+## 大域HS場更新
+
+低温・大`U`では、局所flipだけの更新でreplicaが全`S^z`の非零sectorに似た
+長寿命状態に留まることがあります。opt-inのsite world-line更新は、1つのsiteの
+Hubbard–Stratonovich場を全time sliceで一括反転する提案に対し、安定化した
+行列式の比でMetropolis判定します。各passは全siteを固定順に試行し、Green関数を再構築します。
+
+| key | 値 | 既定 | 意味 |
+| --- | --- | --- | --- |
+| `global_update` | `none` / `site` | `none` | `site`でsite world-line大域更新を行う |
+| `global_interval` | 正の整数 | 100 | 何sweepごとに大域passを1回行うか。warmupから通算する |
+| `replica_bin_file` | path | 空 | replica・binごとのsign付き和を書くTSV。大域更新と独立に有効化できる |
+
+```text
+global_update=site
+global_interval=10
+replica_bin_file=bins.tsv
+```
+
+`nwarm=7`・`global_interval=3`なら、通算sweep 3・6がwarmup、9・12・…が測定中のpassです。
+通算番号は`beta`ごとに0へ戻し、bin境界では戻しません。無効時は既定の乱数列・測定・出力を維持し、
+`global_interval`は`global_update=none`でも正の整数として検証します。
+
+有効時はスカラー出力に`global_acceptance global_attempts`の2列が加わります。
+受理率は測定期間の全replicaの`Σaccepted / Σattempts`で、試行がなければ`nan 0`です。
+passのコストはsite数・time slice数・stabilization block数とともに増え、`profile=1`の
+`dqmc_global` regionで計時できます。
+
+`replica_bin_file`は全`beta`を1ファイルに書き、beta index、replica ID、bin IDの順に並べます。
+`sweep_begin/end`はwarmupを除く測定sweepの番号（1始まり、両端を含む）です。
+格子・条件・規格化と列名はcomment headerに記録します。物理量は`Σ sum_sign_O / Σ sum_sign`で求め、
+`sum_sign_Ehub`は全系のenergy、`sum_sign_D`はper siteです。`Szz`は`S^z=(n_up−n_down)/2`、
+`Sperp`は`SxSx+SySy`で、規格化はともに`1/N`。`Q`はsquareの`(pi,pi)`またはchainの`pi`、`0`は`q=0`、
+未選択のqは`nan`です。同じbinの`3*Szz(Q)−1.5*Sperp(Q)`は`spin_consistency_file`の`−3*DeltaSU2`に対応します。
+binの出力先が有効な他の出力先と同じ場合はファイルを書く前に拒否し、数値エラーがあった`beta`の行は出さず、
+完了済み`beta`の行は保持します。open・write・closeの失敗は非0終了です。
+
+4×2 cluster・`U/t=8`での検証は[VALIDATION.md](VALIDATION.md)と
+[docs/validation/global-hs-4x2-2026-09-21.json](docs/validation/global-hs-4x2-2026-09-21.json)に記録しています。
+site反転の受理率は低温で急速に下がるため、任意のサイズ・温度で混合を保証するものではありません。
+
 ## 検証と制約
 
 ```sh

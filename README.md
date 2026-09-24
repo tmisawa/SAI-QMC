@@ -184,6 +184,55 @@ installations. Use an MPI C compiler wrapper compatible with the selected C
 compiler. For the Open MPI/Apple Clang setup used in local validation,
 `OMPI_CC=clang make dqmc_mpi dqmc_hybrid` selects Clang explicitly.
 
+## Global HS-field update
+
+Low-temperature, large-`U` runs updated only by local flips can leave a replica in
+a long-lived state that resembles a nonzero total `S^z` sector. The optional site
+world-line update proposes flipping the Hubbard-Stratonovich field of one site on
+every time slice and accepts it by Metropolis with a stabilized determinant ratio.
+Each pass tries every site in a fixed order and rebuilds the Green functions.
+
+| key | values | default | meaning |
+| --- | --- | --- | --- |
+| `global_update` | `none` / `site` | `none` | `site` enables the site world-line global update |
+| `global_interval` | positive integer | 100 | sweeps between global passes, counted from the start of warmup |
+| `replica_bin_file` | path | empty | write sign-weighted sums per replica and bin (TSV); independent of the global update |
+
+```text
+global_update=site
+global_interval=10
+replica_bin_file=bins.tsv
+```
+
+With `nwarm=7` and `global_interval=3`, cumulative sweeps 3 and 6 are warmup passes
+and 9, 12, ... are measurement passes; the counter restarts for each `beta` but not
+at bin boundaries. Disabled runs keep the default random stream, measurements, and
+outputs. `global_interval` is validated even when `global_update=none`.
+
+When enabled, the scalar output gains two columns, `global_acceptance` and
+`global_attempts`: the acceptance ratio over all replicas during measurement
+(`nan 0` when nothing was attempted). The cost per pass grows with the number of
+sites, time slices, and stabilization blocks; `profile=1` reports it as the
+`dqmc_global` region.
+
+`replica_bin_file` writes all `beta` values to one file, ordered by beta index,
+replica id, and bin id. `sweep_begin/end` number the measurement sweeps after
+warmup (1-based, inclusive). The comment header records the lattice, conditions,
+normalization, and column names. Observables follow from `sum_sign_O / sum_sign`;
+`sum_sign_Ehub` is the total energy and `sum_sign_D` is per site. `Szz` uses
+`S^z=(n_up-n_down)/2`, `Sperp` is `SxSx+SySy`, both normalized by `1/N`; `Q` is
+`(pi,pi)` on the square lattice or `pi` on the chain, `0` is `q=0`, and unselected
+momenta are `nan`. The per-replica SU(2) difference `3*Szz(Q)-1.5*Sperp(Q)` equals
+`-3*DeltaSU2` of `spin_consistency_file`. A bin file that collides with another
+enabled output is rejected before any file is written; a numerical failure drops
+the rows of that `beta` while earlier `beta` rows are kept, and open, write, or
+close failures end the run with a nonzero status.
+
+Validation on the 4x2 cluster at `U/t=8` is recorded in [VALIDATION.md](VALIDATION.md)
+and [docs/validation/global-hs-4x2-2026-09-21.json](docs/validation/global-hs-4x2-2026-09-21.json).
+The acceptance rate of the site flip decreases rapidly at low temperature, so the
+update does not guarantee mixing for arbitrary sizes and temperatures.
+
 ## Validation and limits
 
 ```sh

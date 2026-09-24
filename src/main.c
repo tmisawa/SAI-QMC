@@ -2335,7 +2335,7 @@ int main(int argc, char **argv)
             free(sperp_values);
             free_measurement_arrays(Ehub, Egc, Eph, Nbin, Dbin, Sbin, Accbin);
             free_replica_arrays(seeds, results, replica_profs, replica_failed, p.nrep);
-            (void)close_outputs(&mpi_env, &replica_fp, &szz_fp, &sperp_fp,
+            (void)close_outputs(&mpi_env, &scalar_fp, &replica_fp, &szz_fp, &sperp_fp,
                                 &consistency_fp, &bin_fp, &prof);
             free_structure_plans(&szz_plan, &sperp_plan_storage, plans_shared);
             lattice_free(&L);
