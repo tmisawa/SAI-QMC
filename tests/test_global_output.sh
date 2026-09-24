@@ -80,6 +80,21 @@ collide "stabilization drift" 'global_interval=3\nstab_drift_file=shared.tsv\nre
 collide "UDV scale" 'global_interval=3\nudv_scale_file=shared.tsv\nreplica_bin_file=shared.tsv\n' shared.tsv
 collide "centered UDV" 'global_interval=3\ngreen_rebuild=centered\nudv_centered_file=shared.tsv\nreplica_bin_file=shared.tsv\n' shared.tsv
 collide "fixed hopping output" 'global_interval=3\nreplica_bin_file=hopping_used.txt\n' hopping_used.txt
+collide "szz file via ./ alias" 'global_interval=3\nreplica_bin_file=./szz.tsv\n' szz.tsv
+# the run-time input itself must be protected (review P1): reject and keep the input intact
+sed -e '/^replica_bin_file=/d' -e '/^global_interval=/d' "$tmp/base.in" > "$tmp/self.in"
+printf 'global_interval=3\nreplica_bin_file=self.in\n' >> "$tmp/self.in"
+cp "$tmp/self.in" "$tmp/self.expected"
+if (cd "$tmp" && "$bin" self.in > /dev/null 2> self.err); then echo "FAIL input-file collision accepted"; fail=1; fi
+grep -q '^ERROR: output path collision: replica_bin_file and input' "$tmp/self.err" || { echo "FAIL input-file collision diagnostic"; fail=1; }
+cmp -s "$tmp/self.in" "$tmp/self.expected" || { echo "FAIL input file clobbered"; fail=1; }
+# a hard link of the szz file is the same file (identity, not string, comparison)
+sed -e '/^replica_bin_file=/d' -e '/^global_interval=/d' "$tmp/base.in" > "$tmp/link.in"
+printf 'global_interval=3\nreplica_bin_file=szz_link.tsv\n' >> "$tmp/link.in"
+printf 'SENTINEL\n' > "$tmp/szz.tsv"; rm -f "$tmp/szz_link.tsv"; ln "$tmp/szz.tsv" "$tmp/szz_link.tsv"
+if (cd "$tmp" && "$bin" link.in > /dev/null 2> link.err); then echo "FAIL hard-link collision accepted"; fail=1; fi
+[ "$(cat "$tmp/szz.tsv")" = SENTINEL ] || { echo "FAIL hard-linked szz file clobbered"; fail=1; }
+rm -f "$tmp/szz_link.tsv" "$tmp/szz.tsv"
 # an inactive default name is not reserved: profile=0 leaves profile.dat free
 sed -e '/^replica_bin_file=/d' "$tmp/base.in" > "$tmp/d.in"; printf 'replica_bin_file=profile.dat\n' >> "$tmp/d.in"
 (cd "$tmp" && "$bin" d.in > /dev/null) || { echo "FAIL inactive default name rejected"; fail=1; }
@@ -100,4 +115,32 @@ if [ -f "$tmp/bins2.tsv" ]; then
 else
   echo "FAIL successful beta 0 has no bin file"; fail=1
 fi
+# a square lattice with one direction of length 1 keeps the measured af momentum in the bin file (review P2)
+mkdir "$tmp/l1"
+cat > "$tmp/l1/input.in" <<'EOF'
+lattice=square
+Lx=4
+Ly=1
+pbc=1
+t=-1.0
+U=4
+dtau=0.1
+beta_list=1
+nwarm=3
+nmeas=8
+nbin=2
+stab=4
+nrep=1
+seed=9
+szz_q=af
+szz_file=szz.tsv
+sperp_q=af
+sperp_file=sperp.tsv
+global_update=site
+global_interval=2
+replica_bin_file=bins.tsv
+EOF
+(cd "$tmp/l1" && "$bin" input.in > stdout.txt) || { echo "FAIL 4x1 run"; fail=1; }
+grep -q '^# szz_Q_index=0 szz_0_index=-1 sperp_Q_index=0$' "$tmp/l1/bins.tsv" || { echo "FAIL 4x1 q indices"; fail=1; }
+awk -F'\t' '!/^#/ { if ($18 == "nan" || $19 == "nan") bad=1; n++ } END { exit (bad || n != 2) }' "$tmp/l1/bins.tsv" || { echo "FAIL 4x1 Q columns are nan"; fail=1; }
 [ "$fail" -eq 0 ] && echo OK || exit 1

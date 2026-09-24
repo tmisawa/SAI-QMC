@@ -2,6 +2,30 @@
 
 ---
 date: 2026-09-24
+datetime: 2026-09-24 11:08 JST
+model: Claude Fable 5.1 (Claude Code)
+summary: |
+  Fixed two review findings on the replica-bin output before merging PR #1:
+  the bin file could overwrite the input or an alias of another output, and
+  lattices with a direction of length 1 lost the measured staggered momentum.
+---
+
+## 2026-09-24: Review fixes for the replica-bin output (PR #1)
+
+- The bin-file collision check now protects the run-time input file and
+  `latfile`, and compares paths by file identity (`output_paths_equal`: same
+  string, same inode, or same resolved path) instead of by string only.
+  `replica_bin_file=input.in` or `./szz.dat` against `szz_file=szz.dat` are
+  rejected before any file is written.
+- The staggered momentum recorded in the bin file follows the `af` selector:
+  a direction of length 1 carries momentum 0, so `square Lx=4 Ly=1` keeps
+  `szz_Q_index`/`sperp_Q_index` and finite `Szz(Q)`/`Sperp(Q)` sums.
+- Regression checks added to `tests/test_global_output.sh`: input-file and
+  `./`-alias and hard-link collisions, and the 4x1 `af` case.
+- `make test` and `OMPI_CC=cc OMP_NUM_THREADS=2 make test_omp test_mpi test_hybrid` pass.
+
+---
+date: 2026-09-24
 datetime: 2026-09-24 10:41 JST
 model: Claude Fable 5.1 (Claude Code)
 summary: |

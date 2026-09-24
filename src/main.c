@@ -39,7 +39,7 @@ typedef struct {
 } ActiveOutputPath;
 
 /* No files are opened here. Returns the conflicting output name, or NULL. */
-static const char *replica_bin_conflict(const Params *p)
+static const char *replica_bin_conflict(const Params *p, const char *input_path)
 {
     if (p->replica_bin_file[0] == '\0') {
         return NULL;
@@ -47,6 +47,8 @@ static const char *replica_bin_conflict(const Params *p)
     const int write_replica_log = strcmp(p->replica_log, "none") != 0 &&
                                   (p->replica_log[0] != '\0' || p->nrep > 1);
     const ActiveOutputPath outputs[] = {
+        {"input", input_path},
+        {"latfile", strcmp(p->lattice, "file") == 0 ? p->latfile : NULL},
         {"hopping_used.txt", "hopping_used.txt"},
         {"output_file", strcmp(p->output_file, "none") != 0 ? p->output_file : NULL},
         {"stab_drift_file", p->stab_drift_file},
@@ -64,8 +66,10 @@ static const char *replica_bin_conflict(const Params *p)
                                       ? p->spin_consistency_file : NULL}
     };
     for (size_t k = 0; k < sizeof outputs / sizeof outputs[0]; k++) {
+        /* Same string, same existing file (inode), or same resolved path:
+           the bin file must never replace an input or another enabled output. */
         if (outputs[k].path != NULL && outputs[k].path[0] != '\0' &&
-            strcmp(outputs[k].path, p->replica_bin_file) == 0) {
+            output_paths_equal(p->replica_bin_file, outputs[k].path)) {
             return outputs[k].name;
         }
     }
@@ -468,10 +472,13 @@ static void fill_bin_meta(ReplicaBinMeta *meta, const Params *p,
                           const StructureFactorPlan *sperp_plan)
 {
     const int is_square = (strcmp(p->lattice, "square") == 0);
-    const int Qx = p->Lx / 2;
-    const int Qy = is_square ? p->Ly / 2 : 0;
+    /* Same rule as the "af" selector of structure_factor_plan_init: a direction of
+       length 1 carries momentum 0, and every direction longer than 1 must be even. */
+    const int Qx = p->Lx > 1 ? p->Lx / 2 : 0;
+    const int Qy = (is_square && p->Ly > 1) ? p->Ly / 2 : 0;
     const int is_file = strcmp(p->lattice, "file") == 0;
-    const int has_Q = !is_file && (p->Lx % 2 == 0) && (!is_square || p->Ly % 2 == 0);
+    const int has_Q = !is_file && (p->Lx <= 1 || p->Lx % 2 == 0) &&
+                      (!is_square || p->Ly <= 1 || p->Ly % 2 == 0);
     meta->beta_index = beta_index;
     meta->Ltr = Ltr;
     meta->nsite = L->n;
@@ -836,7 +843,7 @@ int main(int argc, char **argv)
         return 1;
     }
     if (p.replica_bin_file[0] != '\0') {
-        const char *conflict = replica_bin_conflict(&p);
+        const char *conflict = replica_bin_conflict(&p, argv[1]);
         if (mpi_any_failed(&mpi_env, conflict != NULL)) {
             if (mpi_is_root(&mpi_env)) {
                 fprintf(stderr, "ERROR: output path collision: replica_bin_file and %s both use %s\n",
