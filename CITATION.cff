@@ -3,6 +3,7 @@ message: "Please cite SAI-QMC if you use this software."
 type: software
 title: SAI-QMC
 version: '0.1'
+date-released: '2026-09-24'
 authors:
   - family-names: Misawa
     given-names: Takahiro
@@ -13,4 +14,4 @@ keywords:
   - Hubbard model
   - scientific software
 license: MIT
-# A release date and DOI will be recorded when available.
+# A DOI will be recorded when available.
