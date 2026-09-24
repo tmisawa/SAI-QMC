@@ -1,6 +1,42 @@
 # LOG
 
 ---
+date: 2026-09-24
+datetime: 2026-09-24 09:34 JST
+model: Claude Fable 5.1 (Claude Code)
+summary: |
+  Ported the opt-in site world-line global HS-field update and the per-replica
+  bin output from the private development history into the develop branch.
+  All serial, OpenMP, MPI, hybrid and slow tests pass; outputs match the source build.
+---
+
+## 2026-09-24: Global HS-field update and replica-bin output
+
+- Applied the thirteen source, test, validation and build commits of the global
+  update (upstream range 463dc75..890b6e6, merged upstream as c422af0) onto
+  `feat/global-hs-update`, branched from the new `develop` branch.
+  The internal design and implementation plan documents were not imported.
+- New input keys `global_update`, `global_interval` and `replica_bin_file`;
+  see [README.md](README.md#global-hs-field-update). Disabled runs keep the
+  default random stream and outputs (`tests/test_global_disabled.sh`).
+- Adapted the port to the 0.1 output conventions: the scalar output mirror keeps
+  the new `global_acceptance global_attempts` columns, and the collision checks
+  cover `output_file` and `replica_bin_file` with the `.dat` default names.
+  The replica-bin file itself keeps the upstream tab-separated layout.
+- `make test_global_default` (byte comparison with a historical build) needs
+  Git commit 463dc75, which this repository does not contain; it is not part
+  of `make test` and fails with that explanation here.
+- Verification: `make test`, `OMPI_CC=cc OMP_NUM_THREADS=2 make test_omp test_mpi
+  test_hybrid` and `make test_slow` (including the 4x2 global-update regression)
+  pass on macOS/Apple Clang/Accelerate. For the two baseline fixtures with and
+  without `global_update=site`, stdout and `bins.tsv` are byte-identical to a
+  clean build of upstream 890b6e6; `szz`, `sperp` and replica-log rows agree
+  numerically and differ only in the 0.1 header/separator conventions.
+- Validation data: [VALIDATION.md](VALIDATION.md) section 6 and
+  [docs/validation/global-hs-4x2-2026-09-21.json](docs/validation/global-hs-4x2-2026-09-21.json).
+  The scientific limits recorded there are unchanged; no release version is assigned.
+
+---
 date: 2026-09-23
 datetime: 2026-09-23 16:17 JST
 model: OpenAI GPT-6 (Codex)
