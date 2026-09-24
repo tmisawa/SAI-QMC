@@ -2,6 +2,25 @@
 
 ---
 date: 2026-09-24
+datetime: 2026-09-24 10:41 JST
+model: Claude Fable 5.1 (Claude Code)
+summary: |
+  Released version 0.1 on 2026-09-24 as tag v0.1 and a GitHub release of the
+  public main branch, which has been public since 2026-09-23.
+---
+
+## 2026-09-24: Version 0.1 release
+
+- Version 0.1 is the `main` state made public on 2026-09-23 (the numerical
+  implementation through August 22, 2026, with the input/output and
+  documentation improvements recorded above).
+- Release date: 2026-09-24 (tag `v0.1` and the GitHub release).
+  `date-released` in [CITATION.cff](CITATION.cff) is 2026-09-24. A DOI is not
+  assigned yet.
+- The global HS-field update ported on the `develop` branch is not part of 0.1.
+
+---
+date: 2026-09-24
 datetime: 2026-09-24 09:34 JST
 model: Claude Fable 5.1 (Claude Code)
 summary: |
