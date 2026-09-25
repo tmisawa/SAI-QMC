@@ -1,6 +1,7 @@
 #include "test_util.h"
 #include "dqmc.h"
 #include "field.h"
+#include "global_select.h"
 #include "green.h"
 #include "lattice.h"
 #include "model.h"
@@ -324,6 +325,43 @@ static void check_failure_sets_status(void)
     sys_free(&c);
 }
 
+/* Stage A diagnostic: one entry per attempt, accepted count matches the pass counters,
+   and the random stream is unchanged by the diagnostic. */
+static void check_site_diag_records(int half)
+{
+    Sys a, b;
+    sys_make(&a, 4, 1, 8, 4.0, half, DQMC_SWEEP_FORWARD, GREEN_REBUILD_COMBINE, 21);
+    sys_make(&b, 4, 1, 8, 4.0, half, DQMC_SWEEP_FORWARD, GREEN_REBUILD_COMBINE, 21);
+    CHECK(dqmc_enable_global_site_diag(&b.D, 1) == 0);
+    CHECK(b.D.site_diag != NULL);
+    for (int pass = 0; pass < 3; pass++) {
+        dqmc_sweep(&a.D);
+        dqmc_sweep(&b.D);
+        CHECK(dqmc_global_site_pass(&a.D) == 0);
+        CHECK(dqmc_global_site_pass(&b.D) == 0);
+    }
+    /* same field and same counters with and without the diagnostic */
+    CHECK(memcmp(a.f.s, b.f.s, (size_t)a.f.n * (size_t)a.f.L) == 0);
+    CHECK(a.D.global_attempts == b.D.global_attempts);
+    CHECK(a.D.global_accepted == b.D.global_accepted);
+    CHECK(rng_double(&a.r) == rng_double(&b.r));
+    unsigned long long att[2] = {0ULL, 0ULL}, acc[2] = {0ULL, 0ULL};
+    for (int r = 0; r < 2; r++) {
+        for (int k = 0; k < GLOBAL_SITE_DIAG_NBIN; k++) {
+            att[r] += b.D.site_diag->attempts[r][k];
+            acc[r] += b.D.site_diag->accepted[r][k];
+        }
+    }
+    CHECK(att[0] == 3ULL * 4ULL && att[1] == 3ULL * 4ULL);
+    CHECK(acc[0] == b.D.global_accepted && acc[1] == b.D.global_accepted);
+    /* disabling frees; enabling twice is idempotent */
+    CHECK(dqmc_enable_global_site_diag(&b.D, 1) == 0);
+    CHECK(dqmc_enable_global_site_diag(&b.D, 0) == 0);
+    CHECK(b.D.site_diag == NULL);
+    sys_free(&a);
+    sys_free(&b);
+}
+
 int main(void)
 {
     check_matches_local_ratio();
@@ -347,5 +385,7 @@ int main(void)
     CHECK(g_saw_none);   /* an all-rejected pass was exercised */
     CHECK(g_saw_some);   /* a mixed pass was exercised */
     CHECK(g_saw_all);    /* an all-accepted pass was exercised */
+    check_site_diag_records(1);
+    check_site_diag_records(0);
     TEST_END();
 }

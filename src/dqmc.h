@@ -2,6 +2,7 @@
 #define DQMC_H
 
 #include "field.h"
+#include "global_select.h"
 #include "green.h"
 #include "model.h"
 #include "profiler.h"
@@ -85,6 +86,11 @@ typedef struct {
     unsigned long long accept_accepted;
     unsigned long long global_attempts;
     unsigned long long global_accepted;
+    /* Stage A diagnostic (spec 3.3): NULL unless dqmc_enable_global_site_diag(D, 1). */
+    GlobalSiteDiag *site_diag;
+    int *site_diag_sums;
+    double *site_diag_p;
+    double *site_diag_d;
 
     DqmcStabDrift stab_drift;
     DqmcUdvScaleDiag udv_scale_diag;
@@ -99,6 +105,9 @@ int dqmc_init_modes(Dqmc *D, Model *m, Field *f, Rng *rng, int stab_interval,
 void dqmc_init(Dqmc *D, Model *m, Field *f, Rng *rng, int stab_interval,
                Profiler *prof);
 void dqmc_free(Dqmc *D);
+/* Attach (enabled=1) or detach (enabled=0) the site-flip histogram. Recording
+   happens in dqmc_global_site_pass only; it never draws random numbers. */
+int dqmc_enable_global_site_diag(Dqmc *D, int enabled);
 int dqmc_enable_stab_drift(Dqmc *D, int enabled);
 int dqmc_enable_udv_scale_diag(Dqmc *D, const char *path, int beta_index,
                                int Ltr, int replica_id,

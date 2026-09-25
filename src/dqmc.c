@@ -498,8 +498,40 @@ void dqmc_init(Dqmc *D, Model *m, Field *f, Rng *rng, int stab_interval,
                          DQMC_SWEEP_FORWARD);
 }
 
+int dqmc_enable_global_site_diag(Dqmc *D, int enabled)
+{
+    if (D == NULL) {
+        return 1;
+    }
+    if (!enabled) {
+        free(D->site_diag);
+        free(D->site_diag_sums);
+        free(D->site_diag_p);
+        free(D->site_diag_d);
+        D->site_diag = NULL;
+        D->site_diag_sums = NULL;
+        D->site_diag_p = NULL;
+        D->site_diag_d = NULL;
+        return 0;
+    }
+    if (D->site_diag != NULL) {
+        return 0;
+    }
+    D->site_diag = calloc(1, sizeof(GlobalSiteDiag));
+    D->site_diag_sums = malloc((size_t)D->n * sizeof(int));
+    D->site_diag_p = malloc((size_t)D->n * sizeof(double));
+    D->site_diag_d = malloc((size_t)D->n * sizeof(double));
+    if (D->site_diag == NULL || D->site_diag_sums == NULL ||
+        D->site_diag_p == NULL || D->site_diag_d == NULL) {
+        (void)dqmc_enable_global_site_diag(D, 0);
+        return 1;
+    }
+    return 0;
+}
+
 void dqmc_free(Dqmc *D)
 {
+    (void)dqmc_enable_global_site_diag(D, 0);
     if (D->stab_drift.allocated) {
         if (!D->use_ph) {
             green_free(&D->stab_drift.Gd_ref);
@@ -1045,9 +1077,20 @@ int dqmc_global_site_pass(Dqmc *D)
     int sgn = 0;
     int rc = dqmc_log_weight(D, &logw, &sgn);
     for (int i = 0; rc == 0 && i < D->n; i++) {
+        double pi = 0.0, di = 0.0;
+        if (D->site_diag != NULL) {
+            field_site_sums(D->f, D->site_diag_sums);
+            (void)global_site_indicators(D->site_diag_sums, D->m->bipart, D->n,
+                                         D->L, D->site_diag_p, D->site_diag_d);
+            pi = D->site_diag_p[i];
+            di = D->site_diag_d[i];
+        }
         const double u = rng_double(D->rng); /* always one draw per site */
         int accepted = 0;
         rc = dqmc_global_site_step(D, i, u, &logw, &sgn, &accepted);
+        if (rc == 0 && D->site_diag != NULL) {
+            global_site_diag_add(D->site_diag, pi, di, accepted);
+        }
     }
     if (rc == 0) {
         const int rcu = green_from_scratch(&D->Gu, 0);
