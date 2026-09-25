@@ -197,6 +197,7 @@ Each pass tries every site in a fixed order and rebuilds the Green functions.
 | `global_update` | `none` / `site` | `none` | `site` enables the site world-line global update |
 | `global_interval` | positive integer | 100 | sweeps between global passes, counted from the start of warmup |
 | `replica_bin_file` | path | empty | write sign-weighted sums per replica and bin (TSV); independent of the global update |
+| `global_site_diag_file` | path | empty | write a histogram of site-flip attempts and acceptances by polarization; requires `global_update=site` |
 
 ```text
 global_update=site
@@ -227,6 +228,8 @@ momenta are `nan`. The per-replica SU(2) difference `3*Szz(Q)-1.5*Sperp(Q)` equa
 enabled output is rejected before any file is written; a numerical failure drops
 the rows of that `beta` while earlier `beta` rows are kept, and open, write, or
 close failures end the run with a nonzero status.
+
+`global_site_diag_file` records, per `beta` and replica, how many world-line flips were attempted and accepted as a function of two per-site indicators: `p = |m_i|/L`, the polarization of the site's HS world line (`m_i` is the sum of its field over time slices; for a site whose physical spin is held fixed in the atomic limit, the mean of the signed `m_i/L` is `±tanh(lambda)`, written in the header as a scale, not as the expected value of `p` at finite `L`), and `d = -eps_i m_i sign(M)/L`, the mismatch with the majority staggered pattern (`eps_i` is the sublattice sign, `M = sum_j eps_j m_j`, and `sign(M) = +1` when `M = 0`). Each indicator has 50 bins; `p` uses width 0.02 on `[0,1]` and `d` uses width 0.04 on `[-1,1]`. Only measurement sweeps are counted. The output contains 100 TSV rows per `beta` and replica, and the diagnostic never changes the random stream or other outputs. If the key is omitted, including when `global_update=site` is used, no diagnostic is collected. It supports the design of weighted site selection, which is not yet implemented.
 
 Validation on the 4x2 cluster at `U/t=8` is recorded in [VALIDATION.md](VALIDATION.md)
 and [docs/validation/global-hs-4x2-2026-09-21.json](docs/validation/global-hs-4x2-2026-09-21.json).

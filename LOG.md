@@ -2,6 +2,32 @@
 
 ---
 date: 2026-09-25
+datetime: 2026-09-25 22:38 JST
+model: |
+  OpenAI GPT-5.6 Luna (documentation); OpenAI GPT-5.6 Sol (implementation);
+  OpenAI GPT-6 (coordination)
+summary: |
+  Documented the Stage A global site-flip diagnostic and its measurement-only
+  histogram semantics. Runs without the diagnostic key keep their existing
+  behavior; the Stage B weighted-site-selection hypothesis test remains pending.
+---
+
+## 2026-09-25: Document the global site-flip diagnostic
+
+- Added the `global_site_diag_file` input key to the English and Japanese
+  reference tables and described the per-beta, per-replica `p` and `d`
+  histograms, including their binning and the `sign(M) = +1` convention at
+  `M = 0`.
+- Clarified that the atomic-limit signed mean `±tanh(lambda)` is a header scale,
+  not the finite-`L` expectation of `p`, and that measurement-only diagnostics
+  leave the random stream and existing outputs unchanged when the key is absent.
+- Existing serial, OpenMP, MPI, and hybrid suites pass. The retained serial and
+  empty-rank MPI smokes produce the expected 600-row and 400-row diagnostic
+  files with matching attempt totals. Stage B remains pending the hypothesis
+  test.
+
+---
+date: 2026-09-25
 datetime: 2026-09-25 20:23 JST
 model: OpenAI GPT-6 (Codex)
 summary: |

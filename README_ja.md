@@ -194,6 +194,7 @@ Hubbard–Stratonovich場を全time sliceで一括反転する提案に対し、
 | `global_update` | `none` / `site` | `none` | `site`でsite world-line大域更新を行う |
 | `global_interval` | 正の整数 | 100 | 何sweepごとに大域passを1回行うか。warmupから通算する |
 | `replica_bin_file` | path | 空 | replica・binごとのsign付き和を書くTSV。大域更新と独立に有効化できる |
+| `global_site_diag_file` | path | 空 | site flipの試行数・受理数をpolarization別に集計するhistogramを書く。`global_update=site`が必要 |
 
 ```text
 global_update=site
@@ -218,6 +219,8 @@ passのコストはsite数・time slice数・stabilization block数とともに�
 未選択のqは`nan`です。同じbinの`3*Szz(Q)−1.5*Sperp(Q)`は`spin_consistency_file`の`−3*DeltaSU2`に対応します。
 binの出力先が有効な他の出力先と同じ場合はファイルを書く前に拒否し、数値エラーがあった`beta`の行は出さず、
 完了済み`beta`の行は保持します。open・write・closeの失敗は非0終了です。
+
+`global_site_diag_file`は、`beta`とreplicaごとに、siteのworld-line flipの試行数と受理数を、2つのsiteごとの指標に対して記録します。1つ目は`p = |m_i|/L`で、siteのHS world lineのpolarizationです（`m_i`はそのsiteの全time sliceにわたる場の和です。atomic limitで物理スピンを固定したsiteでは、符号付き`m_i/L`の平均は`±tanh(lambda)`になりますが、これはheaderに書くscaleであり、有限`L`での`p`の期待値ではありません）。2つ目は`d = -eps_i m_i sign(M)/L`で、majorityのstaggered patternからのmismatchです（`eps_i`はsublatticeの符号、`M = sum_j eps_j m_j`、`M = 0`では`sign(M) = +1`とします）。各指標は50 binで、`p`の幅は`[0,1]`で0.02、`d`の幅は`[-1,1]`で0.04です。数えるのは測定sweepだけで、`beta`とreplicaごとに100行のTSVを書きます。このdiagnosticは乱数列や他の出力を変更しません。キーを省略した場合（`global_update=site`だけを指定した場合も含む）はdiagnosticを収集しません。将来のweighted site selectionの設計に使えますが、weighted site selection自体はまだ実装していません。
 
 4×2 cluster・`U/t=8`での検証は[VALIDATION.md](VALIDATION.md)と
 [docs/validation/global-hs-4x2-2026-09-21.json](docs/validation/global-hs-4x2-2026-09-21.json)に記録しています。
