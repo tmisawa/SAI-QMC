@@ -1,4 +1,5 @@
 #include "test_util.h"
+#include "global_select.h"
 #include "measure.h"
 #include "replica.h"
 #include "replica_mpi.h"
@@ -208,6 +209,28 @@ int main(void)
         memset(b4, 0, sizeof b4);
         CHECK(isnan(replica_bins_global_acceptance(b4, 4, &att)));
         CHECK(att == 0ULL);
+    }
+    {
+        ReplicaResult rr[2];
+        CHECK(replica_result_alloc(&rr[0], 1) == 0);
+        CHECK(replica_result_alloc(&rr[1], 1) == 0);
+        CHECK(replica_result_enable_site_diag(&rr[0]) == 0);
+        rr[0].site_diag->attempts[0][3] = 7ULL;
+        rr[0].site_diag->accepted[1][49] = 2ULL;
+        double values[2 * REPLICA_MPI_SITE_DIAG_DOUBLES];
+        CHECK(replica_mpi_pack_site_diag(rr, 2, values) == 0);
+        GlobalSiteDiag out[2];
+        CHECK(replica_mpi_unpack_site_diag(values, 2, out) == 0);
+        CHECK(out[0].attempts[0][3] == 7ULL);
+        CHECK(out[0].accepted[1][49] == 2ULL);
+        CHECK(out[1].attempts[0][3] == 0ULL);   /* replica without a histogram packs zeros */
+        /* an empty rank is a normal case, not an error */
+        CHECK(replica_mpi_pack_site_diag(NULL, 0, NULL) == 0);
+        CHECK(replica_mpi_unpack_site_diag(NULL, 0, NULL) == 0);
+        CHECK(replica_mpi_pack_site_diag(NULL, 1, values) == 1);
+        CHECK(replica_mpi_pack_site_diag(rr, -1, values) == 1);
+        replica_result_free(&rr[0]);
+        replica_result_free(&rr[1]);
     }
     TEST_END();
 }

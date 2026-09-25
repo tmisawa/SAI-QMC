@@ -201,3 +201,60 @@ int replica_mpi_pack_sperp(const ReplicaResult *results, int local_nrep,
     return replica_mpi_pack_q_observable(results, local_nrep, nbin, nq,
                                          values, 1);
 }
+
+int replica_mpi_pack_site_diag(const ReplicaResult *results, int local_nrep,
+                               double *values)
+{
+    if (local_nrep < 0) {
+        return 1;
+    }
+    if (local_nrep == 0) {
+        return 0;
+    }
+    if (results == NULL || values == NULL) {
+        return 1;
+    }
+    for (int r = 0; r < local_nrep; r++) {
+        double *v = values + (size_t)r * REPLICA_MPI_SITE_DIAG_DOUBLES;
+        const GlobalSiteDiag *h = results[r].site_diag;
+        for (int k = 0; k < GLOBAL_SITE_DIAG_NBIN; k++) {
+            v[0 * GLOBAL_SITE_DIAG_NBIN + k] =
+                h ? (double)h->attempts[0][k] : 0.0;
+            v[1 * GLOBAL_SITE_DIAG_NBIN + k] =
+                h ? (double)h->attempts[1][k] : 0.0;
+            v[2 * GLOBAL_SITE_DIAG_NBIN + k] =
+                h ? (double)h->accepted[0][k] : 0.0;
+            v[3 * GLOBAL_SITE_DIAG_NBIN + k] =
+                h ? (double)h->accepted[1][k] : 0.0;
+        }
+    }
+    return 0;
+}
+
+int replica_mpi_unpack_site_diag(const double *values, int nrep,
+                                 GlobalSiteDiag *out)
+{
+    if (nrep < 0) {
+        return 1;
+    }
+    if (nrep == 0) {
+        return 0;
+    }
+    if (values == NULL || out == NULL) {
+        return 1;
+    }
+    for (int r = 0; r < nrep; r++) {
+        const double *v = values + (size_t)r * REPLICA_MPI_SITE_DIAG_DOUBLES;
+        for (int k = 0; k < GLOBAL_SITE_DIAG_NBIN; k++) {
+            out[r].attempts[0][k] =
+                (unsigned long long)v[0 * GLOBAL_SITE_DIAG_NBIN + k];
+            out[r].attempts[1][k] =
+                (unsigned long long)v[1 * GLOBAL_SITE_DIAG_NBIN + k];
+            out[r].accepted[0][k] =
+                (unsigned long long)v[2 * GLOBAL_SITE_DIAG_NBIN + k];
+            out[r].accepted[1][k] =
+                (unsigned long long)v[3 * GLOBAL_SITE_DIAG_NBIN + k];
+        }
+    }
+    return 0;
+}
