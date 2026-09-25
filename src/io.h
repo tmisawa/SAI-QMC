@@ -30,6 +30,7 @@ typedef struct {
     char global_update[16];
     int global_interval;
     char replica_bin_file[256];
+    char global_site_diag_file[256];
 
     char szz_q[256];
     char szz_file[256];

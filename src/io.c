@@ -97,6 +97,7 @@ static void defaults(Params *p)
     strcpy(p->global_update, "none");
     p->global_interval = 100;
     p->replica_bin_file[0] = '\0';
+    p->global_site_diag_file[0] = '\0';
 
     strcpy(p->szz_q, "none");
     strcpy(p->szz_file, "szz.dat");
@@ -157,7 +158,8 @@ static int is_strict_string_key(const char *key)
            strcmp(key, "spin_consistency_file") == 0 ||
            strcmp(key, "global_update") == 0 ||
            strcmp(key, "global_interval") == 0 ||
-           strcmp(key, "replica_bin_file") == 0;
+           strcmp(key, "replica_bin_file") == 0 ||
+           strcmp(key, "global_site_diag_file") == 0;
 }
 
 int params_read(Params *p, const char *path)
@@ -317,6 +319,8 @@ int params_read(Params *p, const char *path)
             }
         } else if (strcmp(key, "replica_bin_file") == 0) {
             memcpy(p->replica_bin_file, val, strlen(val) + 1); /* val < 256 by the strict parse */
+        } else if (strcmp(key, "global_site_diag_file") == 0) {
+            memcpy(p->global_site_diag_file, val, strlen(val) + 1); /* val < 256 by the strict parse */
         } else if (strcmp(key, "szz_q") == 0) {
             memcpy(p->szz_q, val, strlen(val) + 1);
         } else if (strcmp(key, "szz_file") == 0) {
@@ -402,6 +406,12 @@ int params_read(Params *p, const char *path)
         strcmp(p->global_update, "site") != 0) {
         fprintf(stderr, "ERROR: global_update must be none or site (got %s)\n",
                 p->global_update);
+        return 1;
+    }
+    if (p->global_site_diag_file[0] != '\0' &&
+        strcmp(p->global_update, "site") != 0) {
+        fprintf(stderr,
+                "ERROR: global_site_diag_file requires global_update=site\n");
         return 1;
     }
 

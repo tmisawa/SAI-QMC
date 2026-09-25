@@ -43,6 +43,15 @@ int main(void)
     CHECK(read_with("global_interval=\n", &p) != 0);
     CHECK(read_with("replica_bin_file=\n", &p) != 0);
     CHECK(read_with("replica_bin_file=a b.tsv\n", &p) != 0);
+    CHECK(read_with("", &p) == 0);
+    CHECK(p.global_site_diag_file[0] == '\0');
+    CHECK(read_with("global_update=site\nglobal_site_diag_file=site_diag.tsv\n", &p) == 0);
+    CHECK(strcmp(p.global_site_diag_file, "site_diag.tsv") == 0);
+    /* only meaningful with the site update: reject otherwise (never silently ignore) */
+    CHECK(read_with("global_site_diag_file=site_diag.tsv\n", &p) != 0);
+    CHECK(read_with("global_update=none\nglobal_site_diag_file=site_diag.tsv\n", &p) != 0);
+    CHECK(read_with("global_update=site\nglobal_site_diag_file=\n", &p) != 0);
+    CHECK(read_with("global_update=site\nglobal_site_diag_file=a b.tsv\n", &p) != 0);
     /* path length: 255 characters are accepted unchanged, 256 and 300 are rejected (never truncated) */
     char line[400];
     char path[301];
