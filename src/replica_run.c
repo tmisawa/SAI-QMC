@@ -216,7 +216,23 @@ int dqmc_run_replica(const Params *p, const Lattice *L, int beta_index,
         return 1;
     }
 
+    const int use_site_diag =
+        use_global && p->global_site_diag_file[0] != '\0';
     if (replica_result_alloc(result, p->nbin) != 0) {
+        dqmc_free(&D);
+        field_free(&f);
+        model_free(&m);
+        profiler_set_current(old_prof);
+        return 1;
+    }
+    if (use_site_diag &&
+        (dqmc_enable_global_site_diag(&D, 1) != 0 ||
+         replica_result_enable_site_diag(result) != 0)) {
+        fprintf(stderr,
+                "ERROR: failed to allocate site diagnostic storage "
+                "(replica=%d seed=%llu)\n",
+                replica_id, seed);
+        replica_result_free(result);
         dqmc_free(&D);
         field_free(&f);
         model_free(&m);
@@ -491,6 +507,9 @@ int dqmc_run_replica(const Params *p, const Lattice *L, int beta_index,
         }
     }
 
+    if (use_site_diag) {
+        *result->site_diag = *D.site_diag;
+    }
     result->status = 0;
     if (append_stab_drift_row(p, beta_index, Ltr, replica_id, seed, &D) != 0) {
         free(szz_sample);

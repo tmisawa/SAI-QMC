@@ -172,6 +172,18 @@ int replica_result_enable_sperp(ReplicaResult *result, int nq)
                           : q_observable_enable(result, &result->sperp, nq);
 }
 
+int replica_result_enable_site_diag(ReplicaResult *result)
+{
+    if (result == NULL) {
+        return 1;
+    }
+    if (result->site_diag != NULL) {
+        return 0;
+    }
+    result->site_diag = calloc(1, sizeof(GlobalSiteDiag));
+    return result->site_diag == NULL;
+}
+
 static int q_add_is_valid(const ReplicaResult *result,
                           const ReplicaQObservable *observable, int bin,
                           const double *values, int nq, double sign)
@@ -302,9 +314,11 @@ void replica_result_free(ReplicaResult *result)
     free(result->bins);
     free(result->szz.sum_sign_values);
     free(result->sperp.sum_sign_values);
+    free(result->site_diag);
     result->bins = NULL;
     result->szz.sum_sign_values = NULL;
     result->sperp.sum_sign_values = NULL;
+    result->site_diag = NULL;
     result->nbin = 0;
     result->szz.nq = 0;
     result->sperp.nq = 0;

@@ -1,4 +1,5 @@
 #include "test_util.h"
+#include "global_select.h"
 #include "measure.h"
 #include "replica.h"
 
@@ -176,6 +177,18 @@ int main(void)
     CHECK(r0.nbin + r1.nbin == 4);
     replica_result_free(&r0);
     replica_result_free(&r1);
+
+    {
+        ReplicaResult r;
+        CHECK(replica_result_alloc(&r, 2) == 0);
+        CHECK(r.site_diag == NULL);
+        CHECK(replica_result_enable_site_diag(&r) == 0);
+        CHECK(r.site_diag != NULL);
+        CHECK(r.site_diag->attempts[0][0] == 0ULL);
+        CHECK(replica_result_enable_site_diag(&r) == 0);
+        replica_result_free(&r);
+        CHECK(r.site_diag == NULL);
+    }
 
     TEST_END();
 }

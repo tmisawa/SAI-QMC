@@ -53,7 +53,7 @@ static int run(const Params *p, ReplicaResult *res)
 int main(void)
 {
     Params p;
-    ReplicaResult a, b, c;
+    ReplicaResult a, b, c, d;
 
     /* none: no attempts, identical to a run that never heard of the key */
     base_params(&p);
@@ -81,13 +81,39 @@ int main(void)
         CHECK(b.bins[bi].global_attempts == expect[bi]);
         CHECK(b.bins[bi].global_accepted <= b.bins[bi].global_attempts);
     }
+    CHECK(b.site_diag == NULL);
+
+    strcpy(p.global_site_diag_file, "x.tsv");
+    if (run(&p, &d) != 0) {
+        CHECK(0 && "diagnostic replica run failed");
+        replica_result_free(&a);
+        replica_result_free(&b);
+        TEST_END();
+    }
+    CHECK(d.site_diag != NULL);
+    unsigned long long att = 0ULL, acc = 0ULL;
+    for (int k = 0; k < GLOBAL_SITE_DIAG_NBIN; k++) {
+        att += d.site_diag->attempts[0][k];
+        acc += d.site_diag->accepted[0][k];
+    }
+    unsigned long long batt = 0ULL, bacc = 0ULL;
+    for (int bi = 0; bi < d.nbin; bi++) {
+        batt += d.bins[bi].global_attempts;
+        bacc += d.bins[bi].global_accepted;
+        CHECK_CLOSE(d.bins[bi].sum_sign_Ehub,
+                    b.bins[bi].sum_sign_Ehub, 0.0);
+    }
+    CHECK(att == batt);
+    CHECK(acc == bacc);
 
     /* interval longer than the run: no pass at all */
+    p.global_site_diag_file[0] = '\0';
     p.global_interval = 1000;
     if (run(&p, &c) != 0) {
         CHECK(0 && "long-interval replica run failed");
         replica_result_free(&a);
         replica_result_free(&b);
+        replica_result_free(&d);
         TEST_END();
     }
     for (int bi = 0; bi < 4; bi++) {
@@ -98,5 +124,6 @@ int main(void)
     replica_result_free(&a);
     replica_result_free(&b);
     replica_result_free(&c);
+    replica_result_free(&d);
     TEST_END();
 }

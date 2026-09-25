@@ -1,6 +1,7 @@
 #ifndef REPLICA_H
 #define REPLICA_H
 
+#include "global_select.h"
 #include "measure.h"
 
 typedef struct {
@@ -30,6 +31,7 @@ typedef struct {
     int replica_id;
     unsigned long long seed;
     int status;
+    GlobalSiteDiag *site_diag;
 } ReplicaResult;
 
 unsigned long long replica_seed(unsigned long long base_seed, int beta_index,
@@ -45,6 +47,7 @@ int replica_bin_values(const ReplicaBin *bin, double *Ehub, double *Egc,
 int replica_result_alloc(ReplicaResult *result, int nbin);
 int replica_result_enable_szz(ReplicaResult *result, int nq);
 int replica_result_enable_sperp(ReplicaResult *result, int nq);
+int replica_result_enable_site_diag(ReplicaResult *result);
 int replica_result_add_szz(ReplicaResult *result, int bin, const double *szz,
                            int nq, double sign);
 int replica_result_add_sperp(ReplicaResult *result, int bin,
