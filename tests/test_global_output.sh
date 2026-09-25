@@ -95,6 +95,37 @@ printf 'SENTINEL\n' > "$tmp/szz.tsv"; rm -f "$tmp/szz_link.tsv"; ln "$tmp/szz.ts
 if (cd "$tmp" && "$bin" link.in > /dev/null 2> link.err); then echo "FAIL hard-link collision accepted"; fail=1; fi
 [ "$(cat "$tmp/szz.tsv")" = SENTINEL ] || { echo "FAIL hard-linked szz file clobbered"; fail=1; }
 rm -f "$tmp/szz_link.tsv" "$tmp/szz.tsv"
+# Dangling symlinks still name the same future output, including relative
+# targets in another directory and links on the spin-output side.
+for kind in relative absolute chain reverse; do
+  dir="$tmp/dangling_$kind"
+  mkdir -p "$dir/links"
+  sed '/^replica_bin_file=/d' "$tmp/base.in" > "$dir/input.in"
+  printf 'replica_bin_file=bins.tsv\n' >> "$dir/input.in"
+  cp "$dir/input.in" "$dir/input.expected"
+  printf 'SENTINEL\n' > "$dir/hopping_used.txt"
+  case "$kind" in
+    relative) ln -s szz.tsv "$dir/bins.tsv" ;;
+    absolute) ln -s "$dir/szz.tsv" "$dir/bins.tsv" ;;
+    chain) ln -s links/next "$dir/bins.tsv"; ln -s ../szz.tsv "$dir/links/next" ;;
+    reverse) ln -s bins.tsv "$dir/szz.tsv" ;;
+  esac
+  if (cd "$dir" && "$bin" input.in > stdout.txt 2> error.txt); then
+    echo "FAIL dangling-$kind collision accepted"; fail=1
+  fi
+  grep -q '^ERROR: output path collision: replica_bin_file and szz_file' "$dir/error.txt" || { echo "FAIL dangling-$kind diagnostic"; fail=1; }
+  cmp -s "$dir/input.in" "$dir/input.expected" || { echo "FAIL dangling-$kind input clobbered"; fail=1; }
+  [ "$(cat "$dir/hopping_used.txt")" = SENTINEL ] || { echo "FAIL dangling-$kind hopping clobbered"; fail=1; }
+  [ ! -e "$dir/szz.tsv" ] && [ ! -e "$dir/bins.tsv" ] || { echo "FAIL dangling-$kind output created"; fail=1; }
+done
+# A dangling link to a distinct new file is a valid output destination.
+dir="$tmp/dangling_distinct"
+mkdir "$dir"
+cp "$tmp/base.in" "$dir/input.in"
+ln -s actual-bins.tsv "$dir/bins.tsv"
+(cd "$dir" && "$bin" input.in > stdout.txt) || { echo "FAIL distinct dangling destination"; fail=1; }
+grep -q '^# replica-bin sums;' "$dir/actual-bins.tsv" || { echo "FAIL distinct dangling bin output"; fail=1; }
+grep -q '^# definition=Szz' "$dir/szz.tsv" || { echo "FAIL distinct dangling spin output"; fail=1; }
 # an inactive default name is not reserved: profile=0 leaves profile.dat free
 sed -e '/^replica_bin_file=/d' "$tmp/base.in" > "$tmp/d.in"; printf 'replica_bin_file=profile.dat\n' >> "$tmp/d.in"
 (cd "$tmp" && "$bin" d.in > /dev/null) || { echo "FAIL inactive default name rejected"; fail=1; }

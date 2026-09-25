@@ -84,6 +84,18 @@ fi
 grep -q 'output_file.*collides with szz_file' "$run_dir/output_collision/error.txt"
 test ! -e "$run_dir/output_collision/szz.dat"
 
+# The scalar destination uses the same path comparison as the replica-bin file.
+case_dir dangling_collision
+printf '%s\n' 'output_file=alias.dat' 'szz_q=af' \
+    >> "$run_dir/dangling_collision/input.txt"
+ln -s szz.dat "$run_dir/dangling_collision/alias.dat"
+if (cd "$run_dir/dangling_collision" && run_qmc > stdout.txt 2> error.txt); then
+    echo 'dangling spin/scalar collision unexpectedly succeeded' >&2; exit 1
+fi
+grep -q 'output_file.*collides with szz_file' "$run_dir/dangling_collision/error.txt"
+test ! -e "$run_dir/dangling_collision/szz.dat"
+test ! -e "$run_dir/dangling_collision/hopping_used.txt"
+
 case_dir hardlink
 printf '%s\n' 'output_file=alias.dat' >> "$run_dir/hardlink/input.txt"
 ln "$run_dir/hardlink/input.txt" "$run_dir/hardlink/alias.dat"

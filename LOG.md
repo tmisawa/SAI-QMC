@@ -1,6 +1,31 @@
 # LOG
 
 ---
+date: 2026-09-25
+datetime: 2026-09-25 20:23 JST
+model: OpenAI GPT-6 (Codex)
+summary: |
+  Resolve dangling output symlinks before checking for file collisions.
+  Prevent replica-bin and scalar output streams from overwriting another
+  enabled output when the shared target file has not been created yet.
+---
+
+## 2026-09-25: Detect output collisions through dangling symlinks
+
+- Follow relative and absolute symlink targets before resolving the parent of
+  a new output file. Relative targets use the link's own directory; link chains
+  are bounded to prevent infinite recursion, and long targets are read without
+  truncation. A link to a distinct new destination remains usable.
+- Add replica-bin regressions for relative, absolute, chained, and reverse
+  aliases. Collisions must fail before changing inputs or creating outputs.
+  Add a scalar-output collision regression and unit checks for long targets,
+  distinct destinations, and cycles.
+- `make test` passes, as do `test_global_output`, `test_global_output_omp`,
+  `test_global_parallel`, `test_scalar`, and `test_scalar_parallel` with Open MPI
+  and two OpenMP threads. The path unit test also passes ASan/UBSan.
+- Numerical kernels are unchanged. Slow scientific regressions were not rerun.
+
+---
 date: 2026-09-24
 datetime: 2026-09-24 11:08 JST
 model: Claude Fable 5.1 (Claude Code)
