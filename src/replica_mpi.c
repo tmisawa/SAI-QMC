@@ -120,6 +120,10 @@ void replica_mpi_pack_bins(const ReplicaResult *results, int local_nrep,
                 (double)bin->accept_accepted;
             values[flat * REPLICA_MPI_BIN_DOUBLES + 7] =
                 (double)bin->accept_attempts;
+            values[flat * REPLICA_MPI_BIN_DOUBLES + 8] =
+                (double)bin->global_accepted;
+            values[flat * REPLICA_MPI_BIN_DOUBLES + 9] =
+                (double)bin->global_attempts;
             counts[flat] = bin->count;
         }
     }
@@ -143,6 +147,10 @@ void replica_mpi_unpack_bins(const double *values, const int *counts,
             (unsigned long long)values[i * REPLICA_MPI_BIN_DOUBLES + 6];
         bin->accept_attempts =
             (unsigned long long)values[i * REPLICA_MPI_BIN_DOUBLES + 7];
+        bin->global_accepted =
+            (unsigned long long)values[i * REPLICA_MPI_BIN_DOUBLES + 8];
+        bin->global_attempts =
+            (unsigned long long)values[i * REPLICA_MPI_BIN_DOUBLES + 9];
         bin->count = counts[i];
     }
 }

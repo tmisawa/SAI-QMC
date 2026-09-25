@@ -312,3 +312,28 @@ void replica_result_free(ReplicaResult *result)
     result->seed = 0;
     result->status = 0;
 }
+
+void replica_bin_add_global(ReplicaBin *bin, unsigned long long accepted,
+                            unsigned long long attempts)
+{
+    if (bin == NULL) {
+        return;
+    }
+    bin->global_accepted += accepted;
+    bin->global_attempts += attempts;
+}
+
+double replica_bins_global_acceptance(const ReplicaBin *bins, int nbins,
+                                      unsigned long long *attempts)
+{
+    unsigned long long acc = 0ULL;
+    unsigned long long att = 0ULL;
+    for (int k = 0; bins != NULL && k < nbins; k++) {
+        acc += bins[k].global_accepted;
+        att += bins[k].global_attempts;
+    }
+    if (attempts != NULL) {
+        *attempts = att;
+    }
+    return att == 0ULL ? NAN : (double)acc / (double)att;
+}

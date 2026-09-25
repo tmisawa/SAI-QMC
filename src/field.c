@@ -45,3 +45,19 @@ double field_N(const Field *f, double sigma, signed char s_il)
     }
     return exp(-2.0 * f->lambda * sigma * (double)s_il) - 1.0;
 }
+
+void field_flip_site_worldline(Field *f, int i)
+{
+    for (int l = 0; l < f->L; l++) {
+        f->s[l * f->n + i] = (signed char)(-f->s[l * f->n + i]);
+    }
+}
+
+int field_site_sum(const Field *f, int i)
+{
+    int m = 0;
+    for (int l = 0; l < f->L; l++) {
+        m += f->s[l * f->n + i];
+    }
+    return m;
+}

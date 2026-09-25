@@ -1,6 +1,55 @@
 # LOG
 
 ---
+date: 2026-09-25
+datetime: 2026-09-25 20:23 JST
+model: OpenAI GPT-6 (Codex)
+summary: |
+  Resolve dangling output symlinks before checking for file collisions.
+  Prevent replica-bin and scalar output streams from overwriting another
+  enabled output when the shared target file has not been created yet.
+---
+
+## 2026-09-25: Detect output collisions through dangling symlinks
+
+- Follow relative and absolute symlink targets before resolving the parent of
+  a new output file. Relative targets use the link's own directory; link chains
+  are bounded to prevent infinite recursion, and long targets are read without
+  truncation. A link to a distinct new destination remains usable.
+- Add replica-bin regressions for relative, absolute, chained, and reverse
+  aliases. Collisions must fail before changing inputs or creating outputs.
+  Add a scalar-output collision regression and unit checks for long targets,
+  distinct destinations, and cycles.
+- `make test` passes, as do `test_global_output`, `test_global_output_omp`,
+  `test_global_parallel`, `test_scalar`, and `test_scalar_parallel` with Open MPI
+  and two OpenMP threads. The path unit test also passes ASan/UBSan.
+- Numerical kernels are unchanged. Slow scientific regressions were not rerun.
+
+---
+date: 2026-09-24
+datetime: 2026-09-24 11:08 JST
+model: Claude Fable 5.1 (Claude Code)
+summary: |
+  Fixed two review findings on the replica-bin output before merging PR #1:
+  the bin file could overwrite the input or an alias of another output, and
+  lattices with a direction of length 1 lost the measured staggered momentum.
+---
+
+## 2026-09-24: Review fixes for the replica-bin output (PR #1)
+
+- The bin-file collision check now protects the run-time input file and
+  `latfile`, and compares paths by file identity (`output_paths_equal`: same
+  string, same inode, or same resolved path) instead of by string only.
+  `replica_bin_file=input.in` or `./szz.dat` against `szz_file=szz.dat` are
+  rejected before any file is written.
+- The staggered momentum recorded in the bin file follows the `af` selector:
+  a direction of length 1 carries momentum 0, so `square Lx=4 Ly=1` keeps
+  `szz_Q_index`/`sperp_Q_index` and finite `Szz(Q)`/`Sperp(Q)` sums.
+- Regression checks added to `tests/test_global_output.sh`: input-file and
+  `./`-alias and hard-link collisions, and the 4x1 `af` case.
+- `make test` and `OMPI_CC=cc OMP_NUM_THREADS=2 make test_omp test_mpi test_hybrid` pass.
+
+---
 date: 2026-09-24
 datetime: 2026-09-24 10:41 JST
 model: Claude Fable 5.1 (Claude Code)
@@ -18,6 +67,42 @@ summary: |
   `date-released` in [CITATION.cff](CITATION.cff) is 2026-09-24. A DOI is not
   assigned yet.
 - The global HS-field update ported on the `develop` branch is not part of 0.1.
+
+---
+date: 2026-09-24
+datetime: 2026-09-24 09:34 JST
+model: Claude Fable 5.1 (Claude Code)
+summary: |
+  Ported the opt-in site world-line global HS-field update and the per-replica
+  bin output from the private development history into the develop branch.
+  All serial, OpenMP, MPI, hybrid and slow tests pass; outputs match the source build.
+---
+
+## 2026-09-24: Global HS-field update and replica-bin output
+
+- Applied the thirteen source, test, validation and build commits of the global
+  update (upstream range 463dc75..890b6e6, merged upstream as c422af0) onto
+  `feat/global-hs-update`, branched from the new `develop` branch.
+  The internal design and implementation plan documents were not imported.
+- New input keys `global_update`, `global_interval` and `replica_bin_file`;
+  see [README.md](README.md#global-hs-field-update). Disabled runs keep the
+  default random stream and outputs (`tests/test_global_disabled.sh`).
+- Adapted the port to the 0.1 output conventions: the scalar output mirror keeps
+  the new `global_acceptance global_attempts` columns, and the collision checks
+  cover `output_file` and `replica_bin_file` with the `.dat` default names.
+  The replica-bin file itself keeps the upstream tab-separated layout.
+- `make test_global_default` (byte comparison with a historical build) needs
+  Git commit 463dc75, which this repository does not contain; it is not part
+  of `make test` and fails with that explanation here.
+- Verification: `make test`, `OMPI_CC=cc OMP_NUM_THREADS=2 make test_omp test_mpi
+  test_hybrid` and `make test_slow` (including the 4x2 global-update regression)
+  pass on macOS/Apple Clang/Accelerate. For the two baseline fixtures with and
+  without `global_update=site`, stdout and `bins.tsv` are byte-identical to a
+  clean build of upstream 890b6e6; `szz`, `sperp` and replica-log rows agree
+  numerically and differ only in the 0.1 header/separator conventions.
+- Validation data: [VALIDATION.md](VALIDATION.md) section 6 and
+  [docs/validation/global-hs-4x2-2026-09-21.json](docs/validation/global-hs-4x2-2026-09-21.json).
+  The scientific limits recorded there are unchanged; no release version is assigned.
 
 ---
 date: 2026-09-23

@@ -463,6 +463,8 @@ int dqmc_init_modes(Dqmc *D, Model *m, Field *f, Rng *rng, int stab_interval,
     }
     D->status = 0;
     D->sweep_count = 0;
+    D->global_attempts = 0;
+    D->global_accepted = 0;
     const int rcu = green_from_scratch(&D->Gu, 0);
     const int rcd = D->use_ph ? 0 : green_from_scratch(&D->Gd, 0);
     if (rcu != 0 || rcd != 0 || D->Gu.det_sign == 0 ||
@@ -960,4 +962,110 @@ void dqmc_sweep(Dqmc *D)
     } else {
         dqmc_sweep_forward(D, 1);
     }
+}
+
+int dqmc_log_weight(Dqmc *D, double *logw, int *sign)
+{
+    if (D == NULL || logw == NULL || sign == NULL) {
+        return 1;
+    }
+    int su = 0;
+    double lu = 0.0;
+    if (green_logdet_full(&D->Gu, D->stab_interval, &su, &lu) != 0 ||
+        su == 0) {
+        return 1;
+    }
+    if (D->use_ph) {
+        long total = 0;
+        const int len = D->L * D->n;
+        for (int k = 0; k < len; k++) {
+            total += D->f->s[k];
+        }
+        const double w = 2.0 * lu - D->f->lambda * (double)total;
+        if (!isfinite(w)) {
+            return 1;
+        }
+        *logw = w;
+        *sign = 1;
+        return 0;
+    }
+    int sd = 0;
+    double ld = 0.0;
+    if (green_logdet_full(&D->Gd, D->stab_interval, &sd, &ld) != 0 ||
+        sd == 0) {
+        return 1;
+    }
+    if (!isfinite(lu + ld)) {
+        return 1;
+    }
+    *logw = lu + ld;
+    *sign = su * sd;
+    return 0;
+}
+
+int dqmc_global_site_step(Dqmc *D, int i, double u, double *logw, int *sign,
+                          int *accepted)
+{
+    if (accepted != NULL) {
+        *accepted = 0;
+    }
+    if (D == NULL || logw == NULL || sign == NULL || accepted == NULL ||
+        i < 0 || i >= D->n || D->status) {
+        return 1;
+    }
+    field_flip_site_worldline(D->f, i);
+    double logw_new = 0.0;
+    int sign_new = 0;
+    const int rc = dqmc_log_weight(D, &logw_new, &sign_new);
+    const double delta = logw_new - *logw;
+    if (rc != 0 || !isfinite(delta)) {
+        field_flip_site_worldline(D->f, i); /* leave the field as it was */
+        D->status = 1;
+        return 1;
+    }
+    D->global_attempts++;
+    if (delta >= 0.0 || u < exp(delta)) {
+        D->global_accepted++;
+        *logw = logw_new;
+        *sign = sign_new;
+        *accepted = 1;
+    } else {
+        field_flip_site_worldline(D->f, i);
+    }
+    return 0;
+}
+
+int dqmc_global_site_pass(Dqmc *D)
+{
+    if (D == NULL || D->status) {
+        return 1;
+    }
+    PROF_BEGIN(D->prof, t_global);
+    double logw = 0.0;
+    int sgn = 0;
+    int rc = dqmc_log_weight(D, &logw, &sgn);
+    for (int i = 0; rc == 0 && i < D->n; i++) {
+        const double u = rng_double(D->rng); /* always one draw per site */
+        int accepted = 0;
+        rc = dqmc_global_site_step(D, i, u, &logw, &sgn, &accepted);
+    }
+    if (rc == 0) {
+        const int rcu = green_from_scratch(&D->Gu, 0);
+        const int rcd = D->use_ph ? 0 : green_from_scratch(&D->Gd, 0);
+        if (rcu != 0 || rcd != 0 || D->Gu.det_sign == 0 ||
+            (!D->use_ph && D->Gd.det_sign == 0)) {
+            rc = 1;
+        } else if (D->use_ph) {
+            dqmc_map_ph_down(D);
+            D->sign = 1.0;
+        } else {
+            D->sign = (double)(D->Gu.det_sign * D->Gd.det_sign);
+        }
+    }
+    dqmc_invalidate_carried(D);
+    if (rc != 0) {
+        D->status = 1;
+    }
+    PROF_END(D->prof, PROF_DQMC_GLOBAL, t_global);
+    return rc;
 }

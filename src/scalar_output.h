@@ -3,7 +3,8 @@
 
 #include <stdio.h>
 
-/* Compare existing file identities and paths with an existing parent directory. */
+/* Compare existing file identities and paths with an existing parent directory,
+ * following final symlinks even when their target file does not exist yet. */
 int output_paths_equal(const char *a, const char *b);
 
 /* Keep the historical stdout stream and optionally mirror it to a data file.

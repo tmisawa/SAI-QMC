@@ -30,5 +30,32 @@ int main(void)
         CHECK_CLOSE(x1, x2, 0.0);
     }
 
+    {
+        Rng rw;
+        rng_seed(&rw, 777);
+        Field g;
+        field_init(&g, 3, 5, 4.0, 0.1, &rw);
+        signed char before[15];
+        for (int k = 0; k < 15; k++) {
+            before[k] = g.s[k];
+        }
+        int m1 = 0;
+        for (int l = 0; l < 5; l++) {
+            m1 += g.s[l * 3 + 1];
+        }
+        CHECK(field_site_sum(&g, 1) == m1);
+        field_flip_site_worldline(&g, 1);
+        for (int l = 0; l < 5; l++) {
+            CHECK(g.s[l * 3 + 0] == before[l * 3 + 0]);
+            CHECK(g.s[l * 3 + 1] == -before[l * 3 + 1]);
+            CHECK(g.s[l * 3 + 2] == before[l * 3 + 2]);
+        }
+        CHECK(field_site_sum(&g, 1) == -m1);
+        field_flip_site_worldline(&g, 1);
+        for (int k = 0; k < 15; k++) {
+            CHECK(g.s[k] == before[k]);
+        }
+        field_free(&g);
+    }
     TEST_END();
 }

@@ -546,3 +546,33 @@ void green_wrap_backward(Green *G)
 
     PROF_END(prof, PROF_GREEN_WRAP, t_green_wrap);
 }
+
+int green_logdet_full(Green *G, int stab, int *det_sign, double *logabs)
+{
+    if (det_sign != NULL) {
+        *det_sign = 0;
+    }
+    if (G == NULL || det_sign == NULL || logabs == NULL || stab <= 0) {
+        return 1;
+    }
+    const int n = G->n;
+    const int L = G->L;
+    UDV udv;
+    udv_init(&udv, n);
+    udv_identity(&udv);
+    int rc = 0;
+    for (int begin = 0; begin < L; begin += stab) {
+        const int len = (begin + stab <= L) ? stab : (L - begin);
+        green_build_Bblock(G, begin, len, G->B, G->Binv, G->tmp);
+        green_udv_lmul(G, &udv, G->B);
+        if (G->work.failed) {
+            rc = 1;
+            break;
+        }
+    }
+    if (rc == 0) {
+        rc = udv_logdet_one_plus_work(&udv, det_sign, logabs, &G->work);
+    }
+    udv_free(&udv);
+    return rc;
+}

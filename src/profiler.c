@@ -25,7 +25,7 @@ static const char *region_name(ProfRegion region)
         "jackknife",         "udv_lmul", "udv_rmul", "udv_combine",
         "udv_inv_one_plus",
         "green_stack_build", "green_from_stack",
-        "la_gemm",           "la_inverse", "la_expm_sym"};
+        "la_gemm",           "la_inverse", "la_expm_sym", "dqmc_global"};
     return (region >= 0 && region < PROF_REGION_COUNT) ? names[region]
                                                        : "unknown";
 }

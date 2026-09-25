@@ -5,6 +5,7 @@
 
 #include <math.h>
 #include <limits.h>
+#include <string.h>
 
 static void fill_bin(ReplicaBin *bin, double scale)
 {
@@ -169,5 +170,44 @@ int main(void)
                              &nan_nn, &nan_dd, &nan_ss) != 0);
     replica_result_free(&nan_result);
 
+    {
+        ReplicaResult rr;
+        CHECK(replica_result_alloc(&rr, 2) == 0);
+        replica_bin_add_global(&rr.bins[0], 3ULL, 8ULL);
+        replica_bin_add_global(&rr.bins[0], 1ULL, 8ULL);
+        replica_bin_add_global(&rr.bins[1], 0ULL, 0ULL);
+        CHECK(rr.bins[0].global_accepted == 4ULL);
+        CHECK(rr.bins[0].global_attempts == 16ULL);
+        double values[2 * REPLICA_MPI_BIN_DOUBLES];
+        int counts[2];
+        replica_mpi_pack_bins(&rr, 1, 2, values, counts);
+        ReplicaBin out[2];
+        memset(out, 0, sizeof out);
+        replica_mpi_unpack_bins(values, counts, 2, out);
+        CHECK(out[0].global_accepted == 4ULL);
+        CHECK(out[0].global_attempts == 16ULL);
+        CHECK(out[1].global_attempts == 0ULL);
+        CHECK(REPLICA_MPI_BIN_DOUBLES == 10);
+        replica_result_free(&rr);
+    }
+    {
+        /* spec 7.8: a count ratio, not a mean of per-bin ratios */
+        ReplicaBin b4[4];
+        memset(b4, 0, sizeof b4);
+        b4[1].global_accepted = 8ULL;
+        b4[1].global_attempts = 8ULL;
+        b4[3].global_accepted = 8ULL;
+        b4[3].global_attempts = 8ULL;
+        unsigned long long att = 99ULL;
+        CHECK_CLOSE(replica_bins_global_acceptance(b4, 4, &att), 1.0, 0.0);
+        CHECK(att == 16ULL);
+        b4[1].global_accepted = 2ULL;
+        b4[3].global_attempts = 24ULL;
+        b4[3].global_accepted = 6ULL;
+        CHECK_CLOSE(replica_bins_global_acceptance(b4, 4, NULL), 8.0 / 32.0, 1e-15);
+        memset(b4, 0, sizeof b4);
+        CHECK(isnan(replica_bins_global_acceptance(b4, 4, &att)));
+        CHECK(att == 0ULL);
+    }
     TEST_END();
 }
