@@ -19,5 +19,7 @@ double field_N(const Field *f, double sigma, signed char s_il);
 void field_flip_site_worldline(Field *f, int i);
 /* Returns sum_l s_{i,l}. */
 int field_site_sum(const Field *f, int i);
+/* out[i] = sum_l s_{i,l} for every site (out has f->n entries). */
+void field_site_sums(const Field *f, int *out);
 
 #endif

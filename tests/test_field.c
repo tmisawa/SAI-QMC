@@ -57,5 +57,32 @@ int main(void)
         }
         field_free(&g);
     }
+
+    {
+        /* 4 sites x 6 slices with a known configuration: m = (6, -6, 0, 2) */
+        Rng rs;
+        rng_seed(&rs, 4242);
+        Field h;
+        field_init(&h, 4, 6, 4.0, 0.1, &rs);
+        for (int l = 0; l < 6; l++) {
+            h.s[l * 4 + 0] = 1;
+            h.s[l * 4 + 1] = -1;
+            h.s[l * 4 + 2] = (signed char)((l % 2 == 0) ? 1 : -1);
+            h.s[l * 4 + 3] = (signed char)((l < 4) ? 1 : -1);
+        }
+        int sums[4] = {99, 99, 99, 99};
+        field_site_sums(&h, sums);
+        CHECK(sums[0] == 6 && sums[1] == -6 && sums[2] == 0 && sums[3] == 2);
+        for (int i = 0; i < 4; i++) {
+            CHECK(sums[i] == field_site_sum(&h, i));
+        }
+        field_flip_site_worldline(&h, 3);
+        field_site_sums(&h, sums);
+        CHECK(sums[0] == 6 && sums[1] == -6 && sums[2] == 0 && sums[3] == -2);
+        field_flip_site_worldline(&h, 3);
+        field_site_sums(&h, sums);
+        CHECK(sums[3] == 2);
+        field_free(&h);
+    }
     TEST_END();
 }

@@ -61,3 +61,16 @@ int field_site_sum(const Field *f, int i)
     }
     return m;
 }
+
+void field_site_sums(const Field *f, int *out)
+{
+    for (int i = 0; i < f->n; i++) {
+        out[i] = 0;
+    }
+    for (int l = 0; l < f->L; l++) {
+        const signed char *row = f->s + (size_t)l * (size_t)f->n;
+        for (int i = 0; i < f->n; i++) {
+            out[i] += row[i];
+        }
+    }
+}
