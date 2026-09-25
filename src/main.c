@@ -1,5 +1,6 @@
 #include "dqmc.h"
 #include "field.h"
+#include "global_site_diag_out.h"
 #include "io.h"
 #include "lattice.h"
 #include "measure.h"
@@ -505,6 +506,50 @@ static void fill_bin_meta(ReplicaBinMeta *meta, const Params *p,
     meta->sperp_Q_index = has_Q ? plan_q_index(sperp_plan, Qx, Qy) : -1;
 }
 
+static void fill_site_diag_meta(GlobalSiteDiagMeta *meta, const Params *p,
+                                const Lattice *L, int beta_index, int Ltr)
+{
+    meta->beta_index = beta_index;
+    meta->Ltr = Ltr;
+    meta->nsite = L->n;
+    meta->beta_requested = p->beta_list[beta_index];
+    meta->U = p->U;
+    meta->dtau = p->dtau;
+    meta->lambda = acosh(exp(0.5 * p->dtau * p->U));
+    meta->nwarm = p->nwarm;
+    meta->nmeas = p->nmeas;
+    meta->nbin = p->nbin;
+    meta->lattice = p->lattice;
+    meta->Lx = L->Lx;
+    meta->Ly = L->Ly;
+    meta->pbc = p->pbc;
+    meta->global_interval = p->global_interval;
+    meta->global_site_select = "fixed";
+}
+
+static int write_site_diag_view(FILE *fp, const GlobalSiteDiag *diags, int nrep,
+                                const int *ids,
+                                const unsigned long long *seeds,
+                                const GlobalSiteDiagMeta *meta,
+                                int write_header)
+{
+    if (fp == NULL) {
+        return 0;
+    }
+    int failed =
+        global_site_diag_write(fp, diags, nrep, ids, seeds, meta,
+                               write_header) != 0;
+#ifdef AFQMC_TEST_HOOKS
+    failed |= getenv("AFQMC_TEST_DIAG_WRITE_FAIL") != NULL;
+#endif
+    if (failed) {
+        fprintf(stderr,
+                "ERROR: failed to write global_site_diag_file at beta_index=%d\n",
+                meta->beta_index);
+        return 1;
+    }
+    return 0;
+}
 
 static int write_bin_view(FILE *fp, const ReplicaBinView *view,
                           const ReplicaBinMeta *meta, int write_header)
@@ -576,6 +621,36 @@ static int write_serial_bins(FILE *fp, const ReplicaResult *results,
     return failed;
 }
 
+static int write_serial_site_diag(FILE *fp, const ReplicaResult *results,
+                                  const Params *p, const Lattice *L,
+                                  int beta_index, int Ltr)
+{
+    if (fp == NULL) {
+        return 0;
+    }
+    GlobalSiteDiag *diags = calloc((size_t)p->nrep, sizeof *diags);
+    int *ids = malloc((size_t)p->nrep * sizeof *ids);
+    unsigned long long *seeds = malloc((size_t)p->nrep * sizeof *seeds);
+    int failed = diags == NULL || ids == NULL || seeds == NULL;
+    if (!failed) {
+        for (int r = 0; r < p->nrep; r++) {
+            if (results[r].site_diag != NULL) {
+                diags[r] = *results[r].site_diag;
+            }
+            ids[r] = results[r].replica_id;
+            seeds[r] = results[r].seed;
+        }
+        GlobalSiteDiagMeta meta;
+        fill_site_diag_meta(&meta, p, L, beta_index, Ltr);
+        failed = write_site_diag_view(fp, diags, p->nrep, ids, seeds, &meta,
+                                      beta_index == 0);
+    }
+    free(diags);
+    free(ids);
+    free(seeds);
+    return failed;
+}
+
 #ifdef AFQMC_USE_MPI
 static int write_gathered_bins(FILE *fp, const ReplicaBin *bins,
                                 const double *szz, const double *sperp,
@@ -608,7 +683,7 @@ static int write_gathered_bins(FILE *fp, const ReplicaBin *bins,
 static int close_outputs(const MpiEnv *env, FILE **scalar_fp,
                          FILE **replica_fp, FILE **szz_fp,
                          FILE **sperp_fp, FILE **consistency_fp,
-                         FILE **bin_fp, Profiler *prof)
+                         FILE **bin_fp, FILE **site_diag_fp, Profiler *prof)
 {
     int failed = 0;
     profiler_set_current(NULL);
@@ -653,6 +728,18 @@ static int close_outputs(const MpiEnv *env, FILE **scalar_fp,
             if (close_rc != 0) {
                 fprintf(stderr, "ERROR: failed to close replica_bin_file\n");
                 failed = 1;
+            }
+        }
+        if (site_diag_fp != NULL && *site_diag_fp != NULL) {
+            int close_rc = fclose(*site_diag_fp);
+            *site_diag_fp = NULL;
+#ifdef AFQMC_TEST_HOOKS
+            close_rc |= getenv("AFQMC_TEST_DIAG_CLOSE_FAIL") != NULL;
+#endif
+            if (close_rc != 0) {
+                fprintf(stderr,
+                        "ERROR: failed to close global_site_diag_file\n");
+                failed |= 1;
             }
         }
         profiler_close(prof);
@@ -1165,11 +1252,20 @@ int main(int argc, char **argv)
     FILE *sperp_fp = NULL;
     FILE *consistency_fp = NULL;
     FILE *bin_fp = NULL;
+    FILE *site_diag_fp = NULL;
     if (p.replica_bin_file[0] != '\0' && mpi_is_root(&mpi_env)) {
         bin_fp = fopen(p.replica_bin_file, "w");
         if (bin_fp == NULL) {
             fprintf(stderr, "ERROR: cannot open replica_bin_file %s\n",
                     p.replica_bin_file);
+            setup_failed = 1;
+        }
+    }
+    if (p.global_site_diag_file[0] != '\0' && mpi_is_root(&mpi_env)) {
+        site_diag_fp = fopen(p.global_site_diag_file, "w");
+        if (site_diag_fp == NULL) {
+            fprintf(stderr, "ERROR: cannot open global_site_diag_file %s\n",
+                    p.global_site_diag_file);
             setup_failed = 1;
         }
     }
@@ -1284,7 +1380,7 @@ int main(int argc, char **argv)
 
     if (mpi_any_failed(&mpi_env, setup_failed)) {
         (void)close_outputs(&mpi_env, &scalar_fp, &replica_fp, &szz_fp, &sperp_fp,
-                            &consistency_fp, &bin_fp, &prof);
+                            &consistency_fp, &bin_fp, &site_diag_fp, &prof);
         free_structure_plans(&szz_plan, &sperp_plan_storage, plans_shared);
         lattice_free(&L);
         mpi_finalize_if_enabled(&mpi_env);
@@ -1302,7 +1398,7 @@ int main(int argc, char **argv)
                         beta, p.dtau, beta / p.dtau);
             }
             (void)close_outputs(&mpi_env, &scalar_fp, &replica_fp, &szz_fp, &sperp_fp,
-                                &consistency_fp, &bin_fp, &prof);
+                                &consistency_fp, &bin_fp, &site_diag_fp, &prof);
             free_structure_plans(&szz_plan, &sperp_plan_storage,
                                  plans_shared);
             lattice_free(&L);
@@ -1334,7 +1430,7 @@ int main(int argc, char **argv)
             free_replica_arrays(seeds, results, replica_profs, replica_failed,
                                 p.nrep);
             (void)close_outputs(&mpi_env, &scalar_fp, &replica_fp, &szz_fp, &sperp_fp,
-                                &consistency_fp, &bin_fp, &prof);
+                                &consistency_fp, &bin_fp, &site_diag_fp, &prof);
             free_structure_plans(&szz_plan, &sperp_plan_storage,
                                  plans_shared);
             lattice_free(&L);
@@ -1354,7 +1450,7 @@ int main(int argc, char **argv)
             free_replica_arrays(seeds, results, replica_profs, replica_failed,
                                 p.nrep);
             (void)close_outputs(&mpi_env, &scalar_fp, &replica_fp, &szz_fp, &sperp_fp,
-                                &consistency_fp, &bin_fp, &prof);
+                                &consistency_fp, &bin_fp, &site_diag_fp, &prof);
             free_structure_plans(&szz_plan, &sperp_plan_storage,
                                  plans_shared);
             lattice_free(&L);
@@ -1403,6 +1499,12 @@ int main(int argc, char **argv)
             double *sperp_values = NULL;
             int *sperp_counts = NULL;
             int *sperp_displs = NULL;
+            double *local_site_diag = NULL;
+            double *all_site_diag = NULL;
+            int *sd_counts = NULL;
+            int *sd_displs = NULL;
+            const int site_diag_enabled =
+                p.global_site_diag_file[0] != '\0';
             ReplicaBin *global_bins = NULL;
             double *Ehub = NULL;
             double *Egc = NULL;
@@ -1518,7 +1620,23 @@ int main(int argc, char **argv)
                 sperp_counts = calloc((size_t)mpi_env.nranks, sizeof(int));
                 sperp_displs = calloc((size_t)mpi_env.nranks, sizeof(int));
             }
+            if (site_diag_enabled && local_nrep > 0) {
+                local_site_diag =
+                    malloc((size_t)local_nrep *
+                           REPLICA_MPI_SITE_DIAG_DOUBLES * sizeof(double));
+                if (local_site_diag == NULL) {
+                    gather_alloc_failed = 1;
+                }
+            }
+            if (site_diag_enabled) {
+                sd_counts = malloc((size_t)mpi_env.nranks * sizeof(int));
+                sd_displs = malloc((size_t)mpi_env.nranks * sizeof(int));
+                if (sd_counts == NULL || sd_displs == NULL) {
+                    gather_alloc_failed = 1;
+                }
+            }
             gather_alloc_failed =
+                gather_alloc_failed ||
                 (local_bins > 0 &&
                  (local_values == NULL || local_counts == NULL)) ||
                 value_counts == NULL || value_displs == NULL ||
@@ -1613,6 +1731,14 @@ int main(int argc, char **argv)
                         }
                     }
                 }
+                if (site_diag_enabled) {
+                    all_site_diag =
+                        malloc((size_t)p.nrep *
+                               REPLICA_MPI_SITE_DIAG_DOUBLES * sizeof(double));
+                    if (all_site_diag == NULL) {
+                        gather_alloc_failed = 1;
+                    }
+                }
             }
             if (mpi_any_failed(&mpi_env, gather_alloc_failed)) {
                 mpi_beta_failed = 1;
@@ -1631,6 +1757,12 @@ int main(int argc, char **argv)
                     local_pack_failed ||
                     replica_mpi_pack_sperp(local_results, local_nrep, p.nbin,
                                            sperp_plan->nq, local_sperp);
+            }
+            if (site_diag_enabled) {
+                local_pack_failed =
+                    local_pack_failed ||
+                    replica_mpi_pack_site_diag(local_results, local_nrep,
+                                               local_site_diag) != 0;
             }
             if (mpi_any_failed(&mpi_env, local_pack_failed)) {
                 mpi_beta_failed = 1;
@@ -1656,6 +1788,13 @@ int main(int argc, char **argv)
                         p.nrep, p.nbin, mpi_env.nranks, sperp_plan->nq,
                         sperp_counts, sperp_displs);
             }
+            if (site_diag_enabled) {
+                gather_layout_failed =
+                    gather_layout_failed ||
+                    replica_mpi_gatherv_layout(
+                        p.nrep, 1, mpi_env.nranks,
+                        REPLICA_MPI_SITE_DIAG_DOUBLES, sd_counts, sd_displs);
+            }
             if (mpi_any_failed(&mpi_env, gather_layout_failed)) {
                 mpi_beta_failed = 1;
                 goto mpi_beta_cleanup;
@@ -1676,6 +1815,13 @@ int main(int argc, char **argv)
                 MPI_Gatherv(local_sperp, local_bins * sperp_plan->nq,
                             MPI_DOUBLE, all_sperp, sperp_counts, sperp_displs,
                             MPI_DOUBLE, 0, MPI_COMM_WORLD);
+            }
+            if (site_diag_enabled) {
+                MPI_Gatherv(
+                    local_site_diag,
+                    local_nrep * REPLICA_MPI_SITE_DIAG_DOUBLES, MPI_DOUBLE,
+                    all_site_diag, sd_counts, sd_displs, MPI_DOUBLE, 0,
+                    MPI_COMM_WORLD);
             }
 
             root_post_failed = 0;
@@ -1874,6 +2020,27 @@ int main(int argc, char **argv)
                         bin_fp, global_bins, all_szz, all_sperp, seeds,
                         &p, &L, b, Ltr, &szz_plan, sperp_plan);
                 }
+                if (!root_post_failed && site_diag_fp != NULL) {
+                    GlobalSiteDiag *diags =
+                        calloc((size_t)p.nrep, sizeof *diags);
+                    int *ids = malloc((size_t)p.nrep * sizeof *ids);
+                    if (diags == NULL || ids == NULL ||
+                        replica_mpi_unpack_site_diag(
+                            all_site_diag, p.nrep, diags) != 0) {
+                        root_post_failed = 1;
+                    } else {
+                        for (int r = 0; r < p.nrep; r++) {
+                            ids[r] = r;
+                        }
+                        GlobalSiteDiagMeta meta;
+                        fill_site_diag_meta(&meta, &p, &L, b, Ltr);
+                        root_post_failed = write_site_diag_view(
+                            site_diag_fp, diags, p.nrep, ids, seeds, &meta,
+                            b == 0);
+                    }
+                    free(diags);
+                    free(ids);
+                }
                 if (p.profile) {
                     profiler_set_mpi_metadata(&prof, p.nrep, p.parallel,
                                               mpi_env.nranks);
@@ -1910,6 +2077,10 @@ int main(int argc, char **argv)
             free(sperp_values);
             free(sperp_counts);
             free(sperp_displs);
+            free(local_site_diag);
+            free(all_site_diag);
+            free(sd_counts);
+            free(sd_displs);
             free(global_bins);
             free_measurement_arrays(Ehub, Egc, Eph, Nbin, Dbin, Sbin,
                                     Accbin);
@@ -1919,7 +2090,8 @@ int main(int argc, char **argv)
                                 p.nrep);
             if (mpi_any_failed(&mpi_env, mpi_beta_failed)) {
                 (void)close_outputs(&mpi_env, &scalar_fp, &replica_fp, &szz_fp,
-                                    &sperp_fp, &consistency_fp, &bin_fp, &prof);
+                                    &sperp_fp, &consistency_fp, &bin_fp,
+                                    &site_diag_fp, &prof);
                 free_structure_plans(&szz_plan, &sperp_plan_storage,
                                      plans_shared);
                 lattice_free(&L);
@@ -1988,7 +2160,7 @@ int main(int argc, char **argv)
             free_replica_arrays(seeds, results, replica_profs, replica_failed,
                                 p.nrep);
             (void)close_outputs(&mpi_env, &scalar_fp, &replica_fp, &szz_fp, &sperp_fp,
-                                &consistency_fp, &bin_fp, &prof);
+                                &consistency_fp, &bin_fp, &site_diag_fp, &prof);
             free_structure_plans(&szz_plan, &sperp_plan_storage,
                                  plans_shared);
             lattice_free(&L);
@@ -2015,7 +2187,7 @@ int main(int argc, char **argv)
             free_replica_arrays(seeds, results, replica_profs, replica_failed,
                                 p.nrep);
             (void)close_outputs(&mpi_env, &scalar_fp, &replica_fp, &szz_fp, &sperp_fp,
-                                &consistency_fp, &bin_fp, &prof);
+                                &consistency_fp, &bin_fp, &site_diag_fp, &prof);
             free_structure_plans(&szz_plan, &sperp_plan_storage,
                                  plans_shared);
             lattice_free(&L);
@@ -2033,7 +2205,7 @@ int main(int argc, char **argv)
                 free_replica_arrays(seeds, results, replica_profs,
                                     replica_failed, p.nrep);
                 (void)close_outputs(&mpi_env, &scalar_fp, &replica_fp, &szz_fp,
-                                    &sperp_fp, &consistency_fp, &bin_fp, &prof);
+                                    &sperp_fp, &consistency_fp, &bin_fp, &site_diag_fp, &prof);
                 free_structure_plans(&szz_plan, &sperp_plan_storage,
                                      plans_shared);
                 lattice_free(&L);
@@ -2052,7 +2224,7 @@ int main(int argc, char **argv)
                 free_replica_arrays(seeds, results, replica_profs,
                                     replica_failed, p.nrep);
                 (void)close_outputs(&mpi_env, &scalar_fp, &replica_fp, &szz_fp,
-                                    &sperp_fp, &consistency_fp, &bin_fp, &prof);
+                                    &sperp_fp, &consistency_fp, &bin_fp, &site_diag_fp, &prof);
                 free_structure_plans(&szz_plan, &sperp_plan_storage,
                                      plans_shared);
                 lattice_free(&L);
@@ -2077,7 +2249,7 @@ int main(int argc, char **argv)
                 free_replica_arrays(seeds, results, replica_profs,
                                     replica_failed, p.nrep);
                 (void)close_outputs(&mpi_env, &scalar_fp, &replica_fp, &szz_fp,
-                                    &sperp_fp, &consistency_fp, &bin_fp, &prof);
+                                    &sperp_fp, &consistency_fp, &bin_fp, &site_diag_fp, &prof);
                 free_structure_plans(&szz_plan, &sperp_plan_storage,
                                      plans_shared);
                 lattice_free(&L);
@@ -2100,7 +2272,7 @@ int main(int argc, char **argv)
                 free_replica_arrays(seeds, results, replica_profs,
                                     replica_failed, p.nrep);
                 (void)close_outputs(&mpi_env, &scalar_fp, &replica_fp, &szz_fp,
-                                    &sperp_fp, &consistency_fp, &bin_fp, &prof);
+                                    &sperp_fp, &consistency_fp, &bin_fp, &site_diag_fp, &prof);
                 free_structure_plans(&szz_plan, &sperp_plan_storage,
                                      plans_shared);
                 lattice_free(&L);
@@ -2135,7 +2307,7 @@ int main(int argc, char **argv)
                     free_replica_arrays(seeds, results, replica_profs,
                                         replica_failed, p.nrep);
                     (void)close_outputs(&mpi_env, &scalar_fp, &replica_fp, &szz_fp,
-                                        &sperp_fp, &consistency_fp, &bin_fp, &prof);
+                                        &sperp_fp, &consistency_fp, &bin_fp, &site_diag_fp, &prof);
                     free_structure_plans(&szz_plan, &sperp_plan_storage,
                                          plans_shared);
                     lattice_free(&L);
@@ -2161,7 +2333,8 @@ int main(int argc, char **argv)
                         free_replica_arrays(seeds, results, replica_profs,
                                             replica_failed, p.nrep);
                         (void)close_outputs(&mpi_env, &scalar_fp, &replica_fp, &szz_fp,
-                                            &sperp_fp, &consistency_fp, &bin_fp, &prof);
+                                            &sperp_fp, &consistency_fp, &bin_fp,
+                                            &site_diag_fp, &prof);
                         free_structure_plans(&szz_plan, &sperp_plan_storage,
                                              plans_shared);
                         lattice_free(&L);
@@ -2187,7 +2360,8 @@ int main(int argc, char **argv)
                         free_replica_arrays(seeds, results, replica_profs,
                                             replica_failed, p.nrep);
                         (void)close_outputs(&mpi_env, &scalar_fp, &replica_fp, &szz_fp,
-                                            &sperp_fp, &consistency_fp, &bin_fp, &prof);
+                                            &sperp_fp, &consistency_fp, &bin_fp,
+                                            &site_diag_fp, &prof);
                         free_structure_plans(&szz_plan, &sperp_plan_storage,
                                              plans_shared);
                         lattice_free(&L);
@@ -2217,7 +2391,8 @@ int main(int argc, char **argv)
                         free_replica_arrays(seeds, results, replica_profs,
                                             replica_failed, p.nrep);
                         (void)close_outputs(&mpi_env, &scalar_fp, &replica_fp, &szz_fp,
-                                            &sperp_fp, &consistency_fp, &bin_fp, &prof);
+                                            &sperp_fp, &consistency_fp, &bin_fp,
+                                            &site_diag_fp, &prof);
                         free_structure_plans(&szz_plan, &sperp_plan_storage,
                                              plans_shared);
                         lattice_free(&L);
@@ -2244,7 +2419,8 @@ int main(int argc, char **argv)
                         free_replica_arrays(seeds, results, replica_profs,
                                             replica_failed, p.nrep);
                         (void)close_outputs(&mpi_env, &scalar_fp, &replica_fp, &szz_fp,
-                                            &sperp_fp, &consistency_fp, &bin_fp, &prof);
+                                            &sperp_fp, &consistency_fp, &bin_fp,
+                                            &site_diag_fp, &prof);
                         free_structure_plans(&szz_plan, &sperp_plan_storage,
                                              plans_shared);
                         lattice_free(&L);
@@ -2279,7 +2455,7 @@ int main(int argc, char **argv)
             free_replica_arrays(seeds, results, replica_profs, replica_failed,
                                 p.nrep);
             (void)close_outputs(&mpi_env, &scalar_fp, &replica_fp, &szz_fp, &sperp_fp,
-                                &consistency_fp, &bin_fp, &prof);
+                                &consistency_fp, &bin_fp, &site_diag_fp, &prof);
             free_structure_plans(&szz_plan, &sperp_plan_storage,
                                  plans_shared);
             lattice_free(&L);
@@ -2300,7 +2476,7 @@ int main(int argc, char **argv)
             free_replica_arrays(seeds, results, replica_profs, replica_failed,
                                 p.nrep);
             (void)close_outputs(&mpi_env, &scalar_fp, &replica_fp, &szz_fp, &sperp_fp,
-                                &consistency_fp, &bin_fp, &prof);
+                                &consistency_fp, &bin_fp, &site_diag_fp, &prof);
             free_structure_plans(&szz_plan, &sperp_plan_storage,
                                  plans_shared);
             lattice_free(&L);
@@ -2321,7 +2497,7 @@ int main(int argc, char **argv)
             free_replica_arrays(seeds, results, replica_profs, replica_failed,
                                 p.nrep);
             (void)close_outputs(&mpi_env, &scalar_fp, &replica_fp, &szz_fp, &sperp_fp,
-                                &consistency_fp, &bin_fp, &prof);
+                                &consistency_fp, &bin_fp, &site_diag_fp, &prof);
             free_structure_plans(&szz_plan, &sperp_plan_storage,
                                  plans_shared);
             lattice_free(&L);
@@ -2345,7 +2521,7 @@ int main(int argc, char **argv)
             free_replica_arrays(seeds, results, replica_profs, replica_failed,
                                 p.nrep);
             (void)close_outputs(&mpi_env, &scalar_fp, &replica_fp, &szz_fp, &sperp_fp,
-                                &consistency_fp, &bin_fp, &prof);
+                                &consistency_fp, &bin_fp, &site_diag_fp, &prof);
             free_structure_plans(&szz_plan, &sperp_plan_storage,
                                  plans_shared);
             lattice_free(&L);
@@ -2363,8 +2539,30 @@ int main(int argc, char **argv)
             free_measurement_arrays(Ehub, Egc, Eph, Nbin, Dbin, Sbin, Accbin);
             free_replica_arrays(seeds, results, replica_profs, replica_failed, p.nrep);
             (void)close_outputs(&mpi_env, &scalar_fp, &replica_fp, &szz_fp, &sperp_fp,
-                                &consistency_fp, &bin_fp, &prof);
+                                &consistency_fp, &bin_fp, &site_diag_fp, &prof);
             free_structure_plans(&szz_plan, &sperp_plan_storage, plans_shared);
+            lattice_free(&L);
+            mpi_finalize_if_enabled(&mpi_env);
+            return 1;
+        }
+
+        if (write_serial_site_diag(site_diag_fp, results, &p, &L, b, Ltr) !=
+            0) {
+            fprintf(stderr,
+                    "ERROR: failed to finalize site diagnostics at beta=%.17g\n",
+                    beta);
+            free(szz_bins);
+            free(szz_values);
+            free(sperp_bins);
+            free(sperp_values);
+            free_measurement_arrays(Ehub, Egc, Eph, Nbin, Dbin, Sbin, Accbin);
+            free_replica_arrays(seeds, results, replica_profs, replica_failed,
+                                p.nrep);
+            (void)close_outputs(&mpi_env, &scalar_fp, &replica_fp, &szz_fp,
+                                &sperp_fp, &consistency_fp, &bin_fp,
+                                &site_diag_fp, &prof);
+            free_structure_plans(&szz_plan, &sperp_plan_storage,
+                                 plans_shared);
             lattice_free(&L);
             mpi_finalize_if_enabled(&mpi_env);
             return 1;
@@ -2381,7 +2579,8 @@ int main(int argc, char **argv)
     }
 
     const int close_failed = close_outputs(
-        &mpi_env, &scalar_fp, &replica_fp, &szz_fp, &sperp_fp, &consistency_fp, &bin_fp, &prof);
+        &mpi_env, &scalar_fp, &replica_fp, &szz_fp, &sperp_fp, &consistency_fp,
+        &bin_fp, &site_diag_fp, &prof);
     free_structure_plans(&szz_plan, &sperp_plan_storage, plans_shared);
     lattice_free(&L);
     if (mpi_any_failed(&mpi_env, close_failed)) {
