@@ -4,8 +4,8 @@
 date: 2026-09-25
 datetime: 2026-09-25 22:38 JST
 model: |
-  OpenAI GPT-5.6 Luna (documentation); OpenAI GPT-5.6 Sol (implementation);
-  OpenAI GPT-6 (coordination)
+  OpenAI GPT-5.6 Luna (implementation and documentation); OpenAI GPT-5.6 Sol
+  (implementation); OpenAI GPT-6 (coordination)
 summary: |
   Documented the Stage A global site-flip diagnostic and its measurement-only
   histogram semantics. Runs without the diagnostic key keep their existing
