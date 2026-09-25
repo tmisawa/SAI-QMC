@@ -38,12 +38,12 @@ typedef struct {
     const char *path;
 } ActiveOutputPath;
 
-/* No files are opened here. Returns the conflicting output name, or NULL. */
-static const char *replica_bin_conflict(const Params *p, const char *input_path)
+/* Name of the input or enabled output that candidate would overwrite
+ * (identity comparison), or NULL. self names the output being checked and is
+ * skipped in the list. No files are opened here. */
+static const char *output_conflict(const Params *p, const char *input_path,
+                                   const char *candidate, const char *self)
 {
-    if (p->replica_bin_file[0] == '\0') {
-        return NULL;
-    }
     const int write_replica_log = strcmp(p->replica_log, "none") != 0 &&
                                   (p->replica_log[0] != '\0' || p->nrep > 1);
     const ActiveOutputPath outputs[] = {
@@ -63,13 +63,16 @@ static const char *replica_bin_conflict(const Params *p, const char *input_path)
         {"szz_file", strcmp(p->szz_q, "none") != 0 ? p->szz_file : NULL},
         {"sperp_file", strcmp(p->sperp_q, "none") != 0 ? p->sperp_file : NULL},
         {"spin_consistency_file", strcmp(p->spin_consistency_file, "none") != 0
-                                      ? p->spin_consistency_file : NULL}
+                                      ? p->spin_consistency_file : NULL},
+        {"replica_bin_file", p->replica_bin_file},
+        {"global_site_diag_file", p->global_site_diag_file}
     };
     for (size_t k = 0; k < sizeof outputs / sizeof outputs[0]; k++) {
         /* Same string, same existing file (inode), or same resolved path:
-           the bin file must never replace an input or another enabled output. */
-        if (outputs[k].path != NULL && outputs[k].path[0] != '\0' &&
-            output_paths_equal(p->replica_bin_file, outputs[k].path)) {
+           an opt-in output must never replace an input or another enabled output. */
+        if (strcmp(outputs[k].name, self) != 0 && outputs[k].path != NULL &&
+            outputs[k].path[0] != '\0' &&
+            output_paths_equal(candidate, outputs[k].path)) {
             return outputs[k].name;
         }
     }
@@ -119,7 +122,9 @@ static int validate_scalar_output_path(const Params *p, const char *input_path)
         {"stab_drift_file", p->stab_drift_file[0] ? p->stab_drift_file : NULL},
         {"udv_scale_file", p->udv_scale_file[0] ? p->udv_scale_file : NULL},
         {"udv_centered_file", p->udv_centered_file[0] ? p->udv_centered_file : NULL},
-        {"replica_bin_file", p->replica_bin_file[0] ? p->replica_bin_file : NULL}
+        {"replica_bin_file", p->replica_bin_file[0] ? p->replica_bin_file : NULL},
+        {"global_site_diag_file", p->global_site_diag_file[0]
+            ? p->global_site_diag_file : NULL}
     };
     for (size_t i = 0; i < sizeof occupied / sizeof occupied[0]; i++) {
         if (occupied[i].path != NULL && occupied[i].path[0] != '\0' &&
@@ -843,12 +848,27 @@ int main(int argc, char **argv)
         return 1;
     }
     if (p.replica_bin_file[0] != '\0') {
-        const char *conflict = replica_bin_conflict(&p, argv[1]);
+        const char *conflict = output_conflict(&p, argv[1], p.replica_bin_file,
+                                               "replica_bin_file");
         if (mpi_any_failed(&mpi_env, conflict != NULL)) {
             if (mpi_is_root(&mpi_env)) {
                 fprintf(stderr, "ERROR: output path collision: replica_bin_file and %s both use %s\n",
                         conflict != NULL ? conflict : "an output on another rank",
                         p.replica_bin_file);
+            }
+            mpi_finalize_if_enabled(&mpi_env);
+            return 1;
+        }
+    }
+    if (p.global_site_diag_file[0] != '\0') {
+        const char *conflict = output_conflict(&p, argv[1],
+                                               p.global_site_diag_file,
+                                               "global_site_diag_file");
+        if (mpi_any_failed(&mpi_env, conflict != NULL)) {
+            if (mpi_is_root(&mpi_env)) {
+                fprintf(stderr, "ERROR: output path collision: global_site_diag_file and %s both use %s\n",
+                        conflict != NULL ? conflict : "an output on another rank",
+                        p.global_site_diag_file);
             }
             mpi_finalize_if_enabled(&mpi_env);
             return 1;
