@@ -228,10 +228,14 @@ static void check_exact_kernels(int half)
 static int g_saw_none, g_saw_some, g_saw_all;
 
 static void check_state_after_pass(int half, DqmcSweepMode sm, GreenRebuildMode gm,
-                                   int presweeps, double U, uint64_t seed)
+                                   int presweeps, double U, uint64_t seed,
+                                   int polarized)
 {
     Sys s;
     sys_make(&s, 4, 1, 10, U, half, sm, gm, seed);
+    if (polarized) {
+        CHECK(dqmc_set_global_site_select(&s.D, 1, 2.0) == 0);
+    }
     CHECK(s.D.use_ph == half);
     for (int k = 0; k < presweeps; k++) {
         dqmc_sweep(&s.D);
@@ -249,7 +253,8 @@ static void check_state_after_pass(int half, DqmcSweepMode sm, GreenRebuildMode 
         CHECK(green_delay_count(&s.D.Gd) == 0);
     }
     CHECK(s.D.carried_prefix_valid == 0 && s.D.carried_suffix_valid == 0);
-    /* every site is either fully flipped or untouched */
+    /* every site is either fully flipped or untouched; polarized selection may
+       re-flip a site within the pass. */
     int flipped_sites = 0;
     for (int i = 0; i < 4; i++) {
         const int same = s.f.s[i] == before[i];
@@ -258,7 +263,13 @@ static void check_state_after_pass(int half, DqmcSweepMode sm, GreenRebuildMode 
         }
         flipped_sites += !same;
     }
-    CHECK((unsigned long long)flipped_sites == s.D.global_accepted - acc0);
+    const unsigned long long acc = s.D.global_accepted - acc0;
+    if (polarized) {
+        CHECK((unsigned long long)flipped_sites <= acc);
+        CHECK(((unsigned long long)flipped_sites % 2ULL) == (acc % 2ULL));
+    } else {
+        CHECK((unsigned long long)flipped_sites == acc);
+    }
     g_saw_none |= (flipped_sites == 0);
     g_saw_some |= (flipped_sites > 0 && flipped_sites < 4);
     g_saw_all |= (flipped_sites == 4);
@@ -362,30 +373,222 @@ static void check_site_diag_records(int half)
     sys_free(&b);
 }
 
+/* Stage B (spec 3.2): the polarized pass equals a manual replay that uses the
+   selector with the weights of the pass-initial field and two draws per attempt
+   (site, then acceptance). System b is only a field + log-weight helper: it is
+   never swept, its field is copied from a before every round, and
+   dqmc_log_weight/dqmc_global_site_step work from the field alone (as in the
+   dense oracle). Three rounds so that a same-site re-selection is exercised. */
+static void check_polarized_replay(int half)
+{
+    Sys a, b;
+    sys_make(&a, 4, 1, 8, 4.0, half, DQMC_SWEEP_FORWARD, GREEN_REBUILD_COMBINE, 31);
+    sys_make(&b, 4, 1, 8, 4.0, half, DQMC_SWEEP_FORWARD, GREEN_REBUILD_COMBINE, 31);
+    CHECK(dqmc_set_global_site_select(&a.D, 1, 2.0) == 0);
+    CHECK(a.D.site_select_polarized == 1);
+    int repeats = 0;
+    for (int round = 0; round < 3; round++) {
+        dqmc_sweep(&a.D);
+        memcpy(b.f.s, a.f.s, 32);
+        int sums[4];
+        double p[4], d[4], w[4], cum[4];
+        field_site_sums(&b.f, sums);
+        CHECK(global_site_indicators(sums, b.m.bipart, 4, 8, p, d) == 0);
+        CHECK(global_site_weights_p(p, 4, global_site_weight_scale(b.f.lambda), 2.0, w, cum) == 0);
+        Rng replay = a.r;                       /* the stream the pass will use */
+        const unsigned long long acc0 = a.D.global_accepted;
+        CHECK(dqmc_global_site_pass(&a.D) == 0);
+        CHECK(a.D.global_attempts == 4ULL * (unsigned long long)(round + 1));
+        double lw = 0.0;
+        int sg = 0;
+        CHECK(dqmc_log_weight(&b.D, &lw, &sg) == 0);
+        unsigned long long accepted = 0ULL;
+        int chosen[4];
+        for (int k = 0; k < 4; k++) {
+            const double us = rng_double(&replay);
+            chosen[k] = global_site_select_index(cum, 4, us);
+            CHECK(chosen[k] >= 0 && chosen[k] < 4);
+            const double ua = rng_double(&replay);
+            int acc = 0;
+            CHECK(dqmc_global_site_step(&b.D, chosen[k], ua, &lw, &sg, &acc) == 0);
+            accepted += (unsigned long long)acc;
+        }
+        for (int k = 1; k < 4; k++) {
+            for (int j = 0; j < k; j++) {
+                repeats += chosen[k] == chosen[j];
+            }
+        }
+        CHECK(memcmp(a.f.s, b.f.s, 32) == 0);           /* same proposals, same decisions */
+        CHECK(a.D.global_accepted - acc0 == accepted);
+        CHECK(memcmp(&a.r, &replay, sizeof(Rng)) == 0); /* exactly 2 draws per attempt */
+    }
+    CHECK(repeats > 0);   /* some site was drawn twice in a pass (seed-dependent; change seed 31 once if not) */
+    /* switching the mode off restores the fixed order and frees the work arrays */
+    CHECK(dqmc_set_global_site_select(&a.D, 0, 0.0) == 0);
+    CHECK(a.D.site_select_polarized == 0 && a.D.site_select_cum == NULL);
+    CHECK(dqmc_set_global_site_select(&a.D, 1, -1.0) == 1);
+    sys_free(&a);
+    sys_free(&b);
+}
+
+/* Stage B: unusable weights are a numerical failure before any draw. Site 0 is
+   fully polarized (p = 1 > p_0 = tanh(lambda)), so alpha = 1e300 overflows. */
+static void check_polarized_unusable_weights_fail(void)
+{
+    Sys s;
+    sys_make(&s, 4, 1, 8, 4.0, 1, DQMC_SWEEP_FORWARD, GREEN_REBUILD_COMBINE, 61);
+    for (int l = 0; l < 8; l++) {
+        s.f.s[l * 4 + 0] = 1;
+    }
+    CHECK(dqmc_set_global_site_select(&s.D, 1, 1e300) == 0);   /* a finite input */
+    const Rng before = s.r;
+    CHECK(dqmc_global_site_pass(&s.D) == 1);
+    CHECK(s.D.status == 1);
+    CHECK(s.D.global_attempts == 0ULL);                          /* failed before the first draw */
+    CHECK(memcmp(&s.r, &before, sizeof(Rng)) == 0);
+    sys_free(&s);
+    /* Use the actual Field.lambda from U=4, dtau=0.1 (p0 ~= 0.574), not
+       Task 1's p0=0.5. alpha=80 gives finite but unusable weights here. */
+    Sys t;
+    sys_make(&t, 2, 0, 8, 4.0, 1, DQMC_SWEEP_FORWARD, GREEN_REBUILD_COMBINE, 62);
+    for (int l = 0; l < 8; l++) {
+        t.f.s[l * 2 + 0] = 1;
+        t.f.s[l * 2 + 1] = (l % 2) ? 1 : -1;                     /* m_1 = 0 */
+    }
+    int sums[2];
+    double p[2], d[2], w[2], cum[2];
+    field_site_sums(&t.f, sums);
+    CHECK(global_site_indicators(sums, t.m.bipart, 2, 8, p, d) == 0);
+    CHECK(p[0] == 1.0 && p[1] == 0.0);
+    const double p0 = global_site_weight_scale(t.f.lambda);
+    CHECK(isfinite(pow(p[0] / p0, 80.0) + 0.5));
+    CHECK(isfinite(pow(p[1] / p0, 80.0) + 0.5));
+    CHECK(global_site_weights_p(p, 2, p0, 80.0, w, cum) == 1);
+    CHECK(dqmc_set_global_site_select(&t.D, 1, 80.0) == 0);
+    const Rng rng_before = t.r;
+    signed char field_before[16];
+    memcpy(field_before, t.f.s, sizeof field_before);
+    CHECK(dqmc_global_site_pass(&t.D) == 1);
+    CHECK(t.D.status == 1 && t.D.global_attempts == 0ULL);
+    CHECK(t.D.global_accepted == 0ULL);
+    CHECK(memcmp(&t.r, &rng_before, sizeof(Rng)) == 0);
+    CHECK(memcmp(t.f.s, field_before, sizeof field_before) == 0);
+    sys_free(&t);
+}
+
+/* Stage B (spec 8): dense oracle. One polarized attempt is the kernel
+   P(c -> c^mask_i) = T_i(c) a_i(c) with T_i = w_i/W from the p-weights of c and
+   Metropolis a_i; T_i(c) equals T_i(c^mask_i), so detailed balance and pi P = pi
+   hold, and so does the n-attempt composition. */
+static void check_exact_kernels_polarized(int half)
+{
+    enum { NS = 2, LT = 4, NC = 256 };
+    Sys s;
+    sys_make(&s, NS, 0, LT, 4.0, half, DQMC_SWEEP_FORWARD, GREEN_REBUILD_COMBINE, 15);
+    Green Gd;
+    green_alloc(&Gd, &s.m, &s.f, -1.0);
+    static double logw[NC], pi[NC], P[NC][NC], T[NC][NS], v[NC], v2[NC];
+    const double p0 = global_site_weight_scale(s.f.lambda);
+    for (int c = 0; c < NC; c++) {
+        for (int k = 0; k < NS * LT; k++) {
+            s.f.s[k] = (c >> k & 1) ? 1 : -1;
+        }
+        logw[c] = dense_logw(&s, &Gd);
+        int sums[NS];
+        double p[NS], d[NS], w[NS], cum[NS];
+        field_site_sums(&s.f, sums);
+        CHECK(global_site_indicators(sums, s.m.bipart, NS, LT, p, d) == 0);
+        CHECK(global_site_weights_p(p, NS, p0, 2.0, w, cum) == 0);
+        for (int i = 0; i < NS; i++) {
+            T[c][i] = w[i] / cum[NS - 1];
+        }
+        /* the selector reproduces T: u below T_0 picks site 0, otherwise site 1 */
+        CHECK(global_site_select_index(cum, NS, 0.5 * T[c][0]) == 0);
+        CHECK(global_site_select_index(cum, NS, T[c][0] + 0.5 * T[c][1]) == 1);
+    }
+    double wmax = logw[0], Z = 0.0;
+    for (int c = 1; c < NC; c++) {
+        wmax = logw[c] > wmax ? logw[c] : wmax;
+    }
+    for (int c = 0; c < NC; c++) {
+        pi[c] = exp(logw[c] - wmax);
+        Z += pi[c];
+    }
+    for (int c = 0; c < NC; c++) {
+        pi[c] /= Z;
+    }
+    memset(P, 0, sizeof P);
+    for (int c = 0; c < NC; c++) {
+        double stay = 1.0;
+        for (int i = 0; i < NS; i++) {
+            int mask = 0;
+            for (int l = 0; l < LT; l++) {
+                mask |= 1 << (l * NS + i);
+            }
+            const int d = c ^ mask;
+            CHECK_CLOSE(T[c][i], T[d][i], 1e-15);        /* weight invariance -> Hastings factor 1 */
+            const double a = logw[d] >= logw[c] ? 1.0 : exp(logw[d] - logw[c]);
+            P[c][d] += T[c][i] * a;
+            stay -= T[c][i] * a;
+        }
+        P[c][c] += stay;
+        CHECK(stay >= -1e-15);
+    }
+    for (int c = 0; c < NC; c++) {
+        for (int d = 0; d < NC; d++) {
+            CHECK_CLOSE(pi[c] * P[c][d], pi[d] * P[d][c], 1e-14);   /* detailed balance */
+        }
+    }
+    for (int d = 0; d < NC; d++) {
+        v[d] = 0.0;
+        for (int c = 0; c < NC; c++) {
+            v[d] += pi[c] * P[c][d];
+        }
+        CHECK_CLOSE(v[d], pi[d], 1e-14);                /* one attempt keeps pi */
+    }
+    for (int d = 0; d < NC; d++) {
+        v2[d] = 0.0;
+        for (int c = 0; c < NC; c++) {
+            v2[d] += v[c] * P[c][d];
+        }
+        CHECK_CLOSE(v2[d], pi[d], 1e-14);               /* n = 2 attempts keep pi */
+    }
+    green_free(&Gd);
+    sys_free(&s);
+}
+
 int main(void)
 {
     check_matches_local_ratio();
     check_weight_paths();
-    check_state_after_pass(0, DQMC_SWEEP_FORWARD, GREEN_REBUILD_COMBINE, 2, 4.0, 41);
-    check_state_after_pass(0, DQMC_SWEEP_FORWARD, GREEN_REBUILD_CENTERED, 2, 4.0, 42);
-    check_state_after_pass(0, DQMC_SWEEP_FORWARD, GREEN_REBUILD_TWO_SIDED, 2, 4.0, 43);
-    check_state_after_pass(0, DQMC_SWEEP_FORWARD, GREEN_REBUILD_COMBINE, 1, 0.0, 44);
+    check_state_after_pass(0, DQMC_SWEEP_FORWARD, GREEN_REBUILD_COMBINE, 2, 4.0, 41, 0);
+    check_state_after_pass(0, DQMC_SWEEP_FORWARD, GREEN_REBUILD_CENTERED, 2, 4.0, 42, 0);
+    check_state_after_pass(0, DQMC_SWEEP_FORWARD, GREEN_REBUILD_TWO_SIDED, 2, 4.0, 43, 0);
+    check_state_after_pass(0, DQMC_SWEEP_FORWARD, GREEN_REBUILD_COMBINE, 1, 0.0, 44, 0);
     check_failure_sets_status();
     check_exact_kernels(1);
     check_exact_kernels(0);
-    check_state_after_pass(1, DQMC_SWEEP_FORWARD, GREEN_REBUILD_COMBINE, 0, 4.0, 21);
-    check_state_after_pass(1, DQMC_SWEEP_ALTERNATING, GREEN_REBUILD_COMBINE, 1, 4.0, 22); /* next: backward */
-    check_state_after_pass(1, DQMC_SWEEP_ALTERNATING, GREEN_REBUILD_COMBINE, 2, 4.0, 23); /* next: forward */
-    check_state_after_pass(1, DQMC_SWEEP_ALTERNATING, GREEN_REBUILD_CENTERED, 3, 4.0, 24);
-    check_state_after_pass(1, DQMC_SWEEP_FORWARD, GREEN_REBUILD_TWO_SIDED, 3, 4.0, 25);
-    check_state_after_pass(1, DQMC_SWEEP_ALTERNATING, GREEN_REBUILD_COMBINE, 1, 0.0, 26); /* U=0: delta=0, all accepted */
+    check_state_after_pass(1, DQMC_SWEEP_FORWARD, GREEN_REBUILD_COMBINE, 0, 4.0, 21, 0);
+    check_state_after_pass(1, DQMC_SWEEP_ALTERNATING, GREEN_REBUILD_COMBINE, 1, 4.0, 22, 0); /* next: backward */
+    check_state_after_pass(1, DQMC_SWEEP_ALTERNATING, GREEN_REBUILD_COMBINE, 2, 4.0, 23, 0); /* next: forward */
+    check_state_after_pass(1, DQMC_SWEEP_ALTERNATING, GREEN_REBUILD_CENTERED, 3, 4.0, 24, 0);
+    check_state_after_pass(1, DQMC_SWEEP_FORWARD, GREEN_REBUILD_TWO_SIDED, 3, 4.0, 25, 0);
+    check_state_after_pass(1, DQMC_SWEEP_ALTERNATING, GREEN_REBUILD_COMBINE, 1, 0.0, 26, 0); /* U=0: delta=0, all accepted */
     for (uint64_t seed = 40; seed < 60 && !(g_saw_none && g_saw_some); seed++) {
-        check_state_after_pass(1, DQMC_SWEEP_ALTERNATING, GREEN_REBUILD_COMBINE, 2, 8.0, seed);
+        check_state_after_pass(1, DQMC_SWEEP_ALTERNATING, GREEN_REBUILD_COMBINE, 2, 8.0, seed, 0);
     }
     CHECK(g_saw_none);   /* an all-rejected pass was exercised */
     CHECK(g_saw_some);   /* a mixed pass was exercised */
     CHECK(g_saw_all);    /* an all-accepted pass was exercised */
     check_site_diag_records(1);
     check_site_diag_records(0);
+    check_state_after_pass(1, DQMC_SWEEP_ALTERNATING, GREEN_REBUILD_COMBINE, 2, 4.0, 51, 1);
+    check_state_after_pass(0, DQMC_SWEEP_FORWARD, GREEN_REBUILD_TWO_SIDED, 2, 4.0, 52, 1);
+    check_state_after_pass(1, DQMC_SWEEP_ALTERNATING, GREEN_REBUILD_COMBINE, 1, 0.0, 53, 1); /* U=0: p0 = 1 rule, all accepted */
+    check_polarized_replay(1);
+    check_polarized_replay(0);
+    check_exact_kernels_polarized(1);
+    check_exact_kernels_polarized(0);
+    check_polarized_unusable_weights_fail();
     TEST_END();
 }

@@ -529,9 +529,49 @@ int dqmc_enable_global_site_diag(Dqmc *D, int enabled)
     return 0;
 }
 
+int dqmc_set_global_site_select(Dqmc *D, int polarized, double alpha)
+{
+    if (D == NULL) {
+        return 1;
+    }
+    free(D->site_select_sums);
+    free(D->site_select_p);
+    free(D->site_select_d);
+    free(D->site_select_w);
+    free(D->site_select_cum);
+    D->site_select_sums = NULL;
+    D->site_select_p = NULL;
+    D->site_select_d = NULL;
+    D->site_select_w = NULL;
+    D->site_select_cum = NULL;
+    D->site_select_polarized = 0;
+    D->site_select_power = 0.0;
+    if (!polarized) {
+        return 0;
+    }
+    if (!isfinite(alpha) || alpha < 0.0) {
+        return 1;
+    }
+    D->site_select_sums = malloc((size_t)D->n * sizeof(int));
+    D->site_select_p = malloc((size_t)D->n * sizeof(double));
+    D->site_select_d = malloc((size_t)D->n * sizeof(double));
+    D->site_select_w = malloc((size_t)D->n * sizeof(double));
+    D->site_select_cum = malloc((size_t)D->n * sizeof(double));
+    if (D->site_select_sums == NULL || D->site_select_p == NULL ||
+        D->site_select_d == NULL || D->site_select_w == NULL ||
+        D->site_select_cum == NULL) {
+        (void)dqmc_set_global_site_select(D, 0, 0.0);
+        return 1;
+    }
+    D->site_select_polarized = 1;
+    D->site_select_power = alpha;
+    return 0;
+}
+
 void dqmc_free(Dqmc *D)
 {
     (void)dqmc_enable_global_site_diag(D, 0);
+    (void)dqmc_set_global_site_select(D, 0, 0.0);
     if (D->stab_drift.allocated) {
         if (!D->use_ph) {
             green_free(&D->stab_drift.Gd_ref);
@@ -1076,7 +1116,38 @@ int dqmc_global_site_pass(Dqmc *D)
     double logw = 0.0;
     int sgn = 0;
     int rc = dqmc_log_weight(D, &logw, &sgn);
-    for (int i = 0; rc == 0 && i < D->n; i++) {
+    if (rc == 0 && D->site_select_polarized) {
+        /* spec 3.1: the p-weights are invariant under any world-line flip, so the
+           cumulative sums of this pass are computed once, before the first draw. */
+        field_site_sums(D->f, D->site_select_sums);
+        rc = global_site_indicators(D->site_select_sums, D->m->bipart, D->n, D->L,
+                                    D->site_select_p, D->site_select_d);
+        if (rc == 0) {
+            rc = global_site_weights_p(D->site_select_p, D->n,
+                                       global_site_weight_scale(D->f->lambda),
+                                       D->site_select_power, D->site_select_w,
+                                       D->site_select_cum);
+            if (rc != 0) {
+                /* the replica reports a generic numerical breakdown; name the cause */
+                fprintf(stderr,
+                        "ERROR: polarized site weights are not usable "
+                        "(non-finite, lost increment, relative weight below 2^-52, "
+                        "or unreachable RNG interval; "
+                        "global_site_power=%g)\n",
+                        D->site_select_power);
+            }
+        }
+    }
+    for (int k = 0; rc == 0 && k < D->n; k++) {
+        int i = k;
+        if (D->site_select_polarized) {
+            const double us = rng_double(D->rng);       /* draw 1: the site */
+            i = global_site_select_index(D->site_select_cum, D->n, us);
+            if (i < 0) {
+                rc = 1;
+                break;
+            }
+        }
         double pi = 0.0, di = 0.0;
         if (D->site_diag != NULL) {
             field_site_sums(D->f, D->site_diag_sums);
@@ -1085,7 +1156,7 @@ int dqmc_global_site_pass(Dqmc *D)
             pi = D->site_diag_p[i];
             di = D->site_diag_d[i];
         }
-        const double u = rng_double(D->rng); /* always one draw per site */
+        const double u = rng_double(D->rng); /* fixed: the only draw per site; polarized: draw 2 */
         int accepted = 0;
         rc = dqmc_global_site_step(D, i, u, &logw, &sgn, &accepted);
         if (rc == 0 && D->site_diag != NULL) {

@@ -91,6 +91,15 @@ typedef struct {
     int *site_diag_sums;
     double *site_diag_p;
     double *site_diag_d;
+    /* Stage B (spec 3.1/3.2): 0 = fixed order (default). Work arrays are NULL
+       unless dqmc_set_global_site_select(D, 1, alpha). */
+    int site_select_polarized;
+    double site_select_power;
+    int *site_select_sums;
+    double *site_select_p;
+    double *site_select_d;
+    double *site_select_w;
+    double *site_select_cum;
 
     DqmcStabDrift stab_drift;
     DqmcUdvScaleDiag udv_scale_diag;
@@ -108,6 +117,10 @@ void dqmc_free(Dqmc *D);
 /* Attach (enabled=1) or detach (enabled=0) the site-flip histogram. Recording
    happens in dqmc_global_site_pass only; it never draws random numbers. */
 int dqmc_enable_global_site_diag(Dqmc *D, int enabled);
+/* polarized=1: draw the site of each attempt with weight (p_i/p_0)^alpha + 1/n
+   (two random draws per attempt: site, then acceptance). polarized=0: fixed
+   order, one draw per site (default). Returns 1 on bad alpha or allocation failure. */
+int dqmc_set_global_site_select(Dqmc *D, int polarized, double alpha);
 int dqmc_enable_stab_drift(Dqmc *D, int enabled);
 int dqmc_enable_udv_scale_diag(Dqmc *D, const char *path, int beta_index,
                                int Ltr, int replica_id,
