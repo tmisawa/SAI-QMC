@@ -524,7 +524,7 @@ static void fill_site_diag_meta(GlobalSiteDiagMeta *meta, const Params *p,
     meta->Ly = L->Ly;
     meta->pbc = p->pbc;
     meta->global_interval = p->global_interval;
-    meta->global_site_select = "fixed";
+    meta->global_site_select = p->global_site_select;
 }
 
 static int write_site_diag_view(FILE *fp, const GlobalSiteDiag *diags, int nrep,
@@ -1237,6 +1237,10 @@ int main(int argc, char **argv)
         }
         if (strcmp(p.global_update, "site") == 0) {
             setup_failed |= scalar_output_printf(scalar_fp, " global_update=site global_interval=%d", p.global_interval);
+            if (strcmp(p.global_site_select, "fixed") != 0) {
+                setup_failed |= scalar_output_printf(scalar_fp, " global_site_select=%s global_site_power=%.17g",
+                                                     p.global_site_select, p.global_site_power);
+            }
         }
         setup_failed |= scalar_output_printf(scalar_fp, "\n");
         if (strcmp(p.global_update, "site") == 0) {

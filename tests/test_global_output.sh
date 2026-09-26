@@ -263,4 +263,51 @@ if [ -f "$tmp/diagfail/site_diag.tsv" ]; then
 else
   echo "FAIL successful beta 0 has no diag file"; fail=1
 fi
+
+# --- Stage B polarized selection (spec 4 / 3.2) ---
+sed -e '/^replica_bin_file=/d' "$tmp/base.in" > "$tmp/pol.in"
+printf 'replica_bin_file=bins.tsv\nglobal_site_diag_file=site_diag.tsv\nglobal_site_select=polarized\nglobal_site_power=2\n' >> "$tmp/pol.in"
+mkdir "$tmp/pol"; cp "$tmp/pol.in" "$tmp/pol/input.in"
+(cd "$tmp/pol" && "$bin" input.in > stdout.txt) || { echo "FAIL polarized run"; fail=1; }
+grep -q '^# lattice=.* global_update=site global_interval=3 global_site_select=polarized global_site_power=2$' "$tmp/pol/stdout.txt" || { echo "FAIL polarized header"; fail=1; }
+grep -q 'global_site_select=polarized' "$tmp/pol/site_diag.tsv" || { echo "FAIL polarized diag header"; fail=1; }
+# n attempts per pass are unchanged: 84 per beta on stdout, in bins.tsv and in the diagnostic
+awk '!/^#/ { if (NF != 16 || $16 != 84) bad=1 } END { exit bad }' "$tmp/pol/stdout.txt" || { echo "FAIL polarized attempts"; fail=1; }
+awk -F'\t' '!/^#/ { s[$1]+=$17 } END { exit !(s[0]==84 && s[1]==84) }' "$tmp/pol/bins.tsv" || { echo "FAIL polarized bin attempts"; fail=1; }
+awk -F'\t' '!/^#/ && $6=="p" { a[$1]+=$10 } END { exit !(a[0]==84 && a[1]==84) }' "$tmp/pol/site_diag.tsv" || { echo "FAIL polarized diag attempts"; fail=1; }
+[ "$(grep -vc '^#' "$tmp/pol/site_diag.tsv")" -eq 600 ] || { echo "FAIL polarized diag rows"; fail=1; }
+# the polarized stream differs from the fixed order (two draws per attempt)
+cmp -s "$tmp/pol/bins.tsv" "$tmp/diag/bins.tsv" && { echo "FAIL polarized identical to fixed"; fail=1; }
+# the polarized diagnostic records the accepted flips (sum over p bins = bins.tsv)
+acc_bins=$(awk -F'\t' '!/^#/ { s+=$16 } END { print s+0 }' "$tmp/pol/bins.tsv")
+acc_diag=$(awk -F'\t' '!/^#/ && $6=="p" { s+=$11 } END { print s+0 }' "$tmp/pol/site_diag.tsv")
+[ "$acc_bins" = "$acc_diag" ] || { echo "FAIL polarized accepted sum $acc_bins vs $acc_diag"; fail=1; }
+# the diagnostic never touches the polarized stream: without it every other output is identical
+mkdir "$tmp/polnodiag"; sed -e '/^global_site_diag_file=/d' "$tmp/pol.in" > "$tmp/polnodiag/input.in"
+(cd "$tmp/polnodiag" && "$bin" input.in > stdout.txt) || { echo "FAIL polarized run without diagnostic"; fail=1; }
+for f in stdout.txt bins.tsv szz.tsv sperp.tsv replicas.dat; do
+  cmp -s "$tmp/polnodiag/$f" "$tmp/pol/$f" || { echo "FAIL diagnostic changed polarized $f"; fail=1; }
+done
+# explicit fixed with a power value is byte-identical to the Stage A diagnostic run
+mkdir "$tmp/fixed"; sed -e 's/^global_site_select=polarized$/global_site_select=fixed/' -e 's/^global_site_power=2$/global_site_power=7.5/' "$tmp/pol.in" > "$tmp/fixed/input.in"
+(cd "$tmp/fixed" && "$bin" input.in > stdout.txt) || { echo "FAIL explicit-fixed run"; fail=1; }
+for f in stdout.txt bins.tsv szz.tsv sperp.tsv replicas.dat site_diag.tsv; do
+  cmp -s "$tmp/fixed/$f" "$tmp/diag/$f" || { echo "FAIL explicit fixed changed $f"; fail=1; }
+done
+grep -q 'global_site_select' "$tmp/fixed/stdout.txt" && { echo "FAIL fixed header must not name the selection"; fail=1; }
+# alpha = 0 (uniform random site) runs; an overflowing alpha is a numerical failure
+mkdir "$tmp/pol0"; sed -e 's/^global_site_power=2$/global_site_power=0/' "$tmp/pol.in" > "$tmp/pol0/input.in"
+(cd "$tmp/pol0" && "$bin" input.in > stdout.txt) || { echo "FAIL alpha=0 run"; fail=1; }
+grep -q 'global_site_power=0$' "$tmp/pol0/stdout.txt" || { echo "FAIL alpha=0 header"; fail=1; }
+mkdir "$tmp/polhuge"; sed -e 's/^global_site_power=2$/global_site_power=1e300/' "$tmp/pol.in" > "$tmp/polhuge/input.in"
+if (cd "$tmp/polhuge" && "$bin" input.in > stdout.txt 2> err.txt); then echo "FAIL overflowing weights accepted"; fail=1; fi
+grep -q 'numerical breakdown' "$tmp/polhuge/err.txt" || { echo "FAIL overflow not reported as numerical failure"; fail=1; }
+grep -F -q 'ERROR: polarized site weights are not usable' "$tmp/polhuge/err.txt" || { echo "FAIL overflow cause not named"; fail=1; }
+grep -F -q 'global_site_power=1e+300)' "$tmp/polhuge/err.txt" || { echo "FAIL overflow alpha not reported"; fail=1; }
+# invalid keys are rejected before any output
+printf 'SENTINEL\n' > "$tmp/hopping_used.txt"
+sed -e 's/^global_site_select=polarized$/global_site_select=staggered/' "$tmp/pol.in" > "$tmp/stag.in"
+if (cd "$tmp" && "$bin" stag.in > /dev/null 2> stag.err); then echo "FAIL staggered accepted"; fail=1; fi
+grep -q 'not implemented' "$tmp/stag.err" || { echo "FAIL staggered message"; fail=1; }
+[ "$(cat "$tmp/hopping_used.txt")" = SENTINEL ] || { echo "FAIL staggered wrote output"; fail=1; }
 [ "$fail" -eq 0 ] && echo OK || exit 1
