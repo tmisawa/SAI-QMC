@@ -195,6 +195,8 @@ Hubbard–Stratonovich場を全time sliceで一括反転する提案に対し、
 | `global_interval` | 正の整数 | 100 | 何sweepごとに大域passを1回行うか。warmupから通算する |
 | `replica_bin_file` | path | 空 | replica・binごとのsign付き和を書くTSV。大域更新と独立に有効化できる |
 | `global_site_diag_file` | path | 空 | site flipの試行数・受理数をpolarization別に集計するhistogramを書く。`global_update=site`が必要 |
+| `global_site_select` | `fixed` / `polarized` | `fixed` | flipを試すsiteの選び方。`polarized`は重み`(p_i/p_0)^alpha + 1/n`で抽選する |
+| `global_site_power` | 実数`>= 0` | 2 | polarized重みの指数`alpha`。`fixed`でも値を検証する |
 
 ```text
 global_update=site
@@ -232,8 +234,24 @@ binの出力先が有効な他の出力先と同じ場合はファイルを書�
 `d`の幅は`[-1,1]`で0.04です。数えるのは測定sweepだけで、`beta`とreplicaごとに
 100行のTSVを書きます。このdiagnosticは乱数列や他の出力を変更しません。
 キーを省略した場合（`global_update=site`だけを指定した場合も含む）はdiagnosticを
-収集しません。将来のweighted site selectionの設計に使えますが、weighted site
-selection自体はまだ実装していません。
+収集しません。以下で説明するweighted site selectionの設計に使われます。
+
+`global_site_select=polarized`は、site flipの固定順序を重み付き抽選に置き換えます。
+各passの先頭で全siteのpolarization `p_i = |m_i|/L`を1回計算し、`n`回の各試行で
+反転するsiteを`w_i = (p_i/p_0)^alpha + 1/n`に比例する確率で選びます。`p_0 = tanh(lambda)`は
+atomic limitのscale（`U = 0`では`p_0 = 1`）、`alpha = global_site_power`です。
+siteを反転しても他のsiteの`|m_j|`もそのsiteの`|m_i|`も変わらないため、重みは提案の前後で同じであり、
+受理はHastings補正のないMetropolis比です。各試行で乱数を2回（site、次に受理判定）使うので、
+同じseedでも`polarized`の乱数列と結果は`fixed`と異なります。`fixed`の実行は、これらのkeyの有無に
+かかわらず変わりません。同じpassで同じsiteを複数回選ぶことがあります。`1/n`により全siteが提案され得て、
+`alpha = 0`では一様ランダムなsite選択になります。選択方式が`fixed`でないときだけ、stdoutのheaderに
+` global_site_select=<value> global_site_power=<alpha>`が付き、diagnosticのheaderにも選択方式が入ります。
+重みが使えない場合（非有限、累積和の増分消失、相対重みが保守的な下限`2^-52`未満、または
+積の丸めを含めた53-bit乱数の到達点がないsite区間）は数値エラーとしてreplicaを終了します。
+相対重みの下限だけでは選択可能性を保証できないので、全区間の到達可能性も乱数消費前に検査します。
+staggered mismatch `d`による選択は実装していません。Stage Aの診断がこの指標を不支持としたためで、
+`global_site_select=staggered`は入力エラーです。polarized選択が混合を改善するかは、比較runの完了後に
+[VALIDATION.md](VALIDATION.md)へ記録します。
 
 4×2 cluster・`U/t=8`での検証は[VALIDATION.md](VALIDATION.md)と
 [docs/validation/global-hs-4x2-2026-09-21.json](docs/validation/global-hs-4x2-2026-09-21.json)に記録しています。

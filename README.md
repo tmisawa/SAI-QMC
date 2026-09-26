@@ -198,6 +198,8 @@ Each pass tries every site in a fixed order and rebuilds the Green functions.
 | `global_interval` | positive integer | 100 | sweeps between global passes, counted from the start of warmup |
 | `replica_bin_file` | path | empty | write sign-weighted sums per replica and bin (TSV); independent of the global update |
 | `global_site_diag_file` | path | empty | write a histogram of site-flip attempts and acceptances by polarization; requires `global_update=site` |
+| `global_site_select` | `fixed` / `polarized` | `fixed` | how the site of each flip attempt is chosen; `polarized` draws it with weight `(p_i/p_0)^alpha + 1/n` |
+| `global_site_power` | real number `>= 0` | 2 | the exponent `alpha` of the polarized weight; validated even when the selection is `fixed` |
 
 ```text
 global_update=site
@@ -243,7 +245,33 @@ Only measurement sweeps are counted. The output contains 100 TSV rows per
 `beta` and replica, and the diagnostic never changes the random stream or
 other outputs. If the key is omitted, including when `global_update=site` is
 used, no diagnostic is collected. It supports the design of weighted site
-selection, which is not yet implemented.
+selection described below.
+
+`global_site_select=polarized` replaces the fixed order of the site flips by a
+weighted draw. At the start of each pass the polarization `p_i = |m_i|/L` of
+every site is computed once and the site of each of the `n` attempts is drawn
+with probability proportional to `w_i = (p_i/p_0)^alpha + 1/n`, where
+`p_0 = tanh(lambda)` is the atomic-limit scale (`p_0 = 1` when `U = 0`) and
+`alpha = global_site_power`. Flipping a site does not change any `|m_j|`, so
+the weights are the same before and after every proposal and the acceptance is
+the plain Metropolis ratio, with no Hastings correction. Each attempt uses two
+random numbers (site, then acceptance) instead of one, so the random stream and
+the results of a `polarized` run differ from a `fixed` run with the same seed;
+`fixed` runs, with or without these keys, are unchanged. The same site can be
+drawn more than once in a pass. `1/n` keeps every site proposable; the
+exponent `alpha = 0` gives a uniform random site. When the selection is not
+`fixed`, the stdout header gains ` global_site_select=<value>
+global_site_power=<alpha>` and the diagnostic header names the selection.
+Weights that are not usable end the replica as a numerical failure: a
+non-finite weight, a cumulative sum whose increment is lost to rounding, a
+relative weight below the conservative limit `2^-52`, or a site interval that
+no 53-bit RNG value can reach after rounding the target multiplication. The
+last check is explicit; the relative-weight limit alone does not guarantee
+that every site remains selectable. These checks consume no random numbers.
+Selection by the staggered mismatch `d` is not implemented: the Stage A
+diagnostic rejected that indicator, and `global_site_select=staggered` is an
+input error. Whether the polarized selection improves mixing is recorded in
+[VALIDATION.md](VALIDATION.md) once the comparison runs are complete.
 
 Validation on the 4x2 cluster at `U/t=8` is recorded in [VALIDATION.md](VALIDATION.md)
 and [docs/validation/global-hs-4x2-2026-09-21.json](docs/validation/global-hs-4x2-2026-09-21.json).

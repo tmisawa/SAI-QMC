@@ -2,6 +2,24 @@
 
 ---
 date: 2026-09-26
+datetime: 2026-09-26 16:06 JST
+model: |
+  OpenAI GPT-5.6 Luna (implementation and tests); OpenAI GPT-5.6 Sol
+  and OpenAI GPT-5.6 Terra (reviews); OpenAI GPT-6 (coordination)
+summary: |
+  Added the opt-in polarized site selection (Stage B): weights (p_i/p_0)^alpha + 1/n,
+  two draws per attempt, no Hastings factor. Fixed-order runs stay byte-identical.
+  The comparison against the fixed baseline is pending.
+---
+
+## 2026-09-26: Polarized site selection (Stage B)
+
+- New keys `global_site_select` (`fixed`/`polarized`) and `global_site_power`; `staggered` is rejected as not implemented.
+- `dqmc_global_site_pass` computes the cumulative weights once per pass and draws site then acceptance; the fixed path is unchanged.
+- Tests: weight/selection unit tests including the dynamic-range rule, a dense 256-configuration oracle for the polarized kernel (detailed balance and stationarity), a replay test of the pass, explicit-fixed and diagnostic-only byte identity, header rule, unusable-weight failure, cross-mode agreement (serial/OpenMP/MPI/hybrid).
+
+---
+date: 2026-09-26
 datetime: 2026-09-26 12:58 JST
 model: OpenAI GPT-6 (Codex)
 summary: |
