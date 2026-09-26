@@ -187,7 +187,8 @@ Cコンパイラと互換性のあるものを選んでください。
 低温・大`U`では、局所flipだけの更新でreplicaが全`S^z`の非零sectorに似た
 長寿命状態に留まることがあります。opt-inのsite world-line更新は、1つのsiteの
 Hubbard–Stratonovich場を全time sliceで一括反転する提案に対し、安定化した
-行列式の比でMetropolis判定します。各passは全siteを固定順に試行し、Green関数を再構築します。
+行列式の比でMetropolis判定します。既定の`global_site_select=fixed`では、
+各passは全siteを固定順に試行し、Green関数を再構築します。
 
 | key | 値 | 既定 | 意味 |
 | --- | --- | --- | --- |

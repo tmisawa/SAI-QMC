@@ -190,7 +190,8 @@ Low-temperature, large-`U` runs updated only by local flips can leave a replica 
 a long-lived state that resembles a nonzero total `S^z` sector. The optional site
 world-line update proposes flipping the Hubbard-Stratonovich field of one site on
 every time slice and accepts it by Metropolis with a stabilized determinant ratio.
-Each pass tries every site in a fixed order and rebuilds the Green functions.
+With the default `global_site_select=fixed`, each pass tries every site in a fixed
+order and rebuilds the Green functions.
 
 | key | values | default | meaning |
 | --- | --- | --- | --- |

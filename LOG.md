@@ -2,6 +2,25 @@
 
 ---
 date: 2026-09-26
+datetime: 2026-09-26 16:16 JST
+model: OpenAI GPT-6 Codex
+summary: |
+  Clarified that fixed site order describes the default global-site selection mode.
+  The polarized mode continues to make n weighted attempts and may repeat a site.
+  Numerical source and C tests are unchanged.
+---
+
+## 2026-09-26: Clarify the default fixed-order site pass
+
+- Qualified the introductory English and Japanese descriptions of the global
+  update so fixed ordering applies specifically to `global_site_select=fixed`.
+- The later polarized-mode description remains authoritative for weighted draws,
+  repeated sites, and the exact `n` attempts per pass.
+- Expected numerical-error messages in successful C test logs come from covered
+  negative tests. Their stderr behavior is retained; no C source or test changed.
+
+---
+date: 2026-09-26
 datetime: 2026-09-26 16:06 JST
 model: |
   OpenAI GPT-5.6 Luna (implementation and tests); OpenAI GPT-5.6 Sol
