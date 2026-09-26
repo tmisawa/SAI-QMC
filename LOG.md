@@ -2,6 +2,26 @@
 
 ---
 date: 2026-09-26
+datetime: 2026-09-26 12:58 JST
+model: OpenAI GPT-6 (Codex)
+summary: |
+  Record the completed 120-replica Stage A diagnostic: p is supported and d rejected.
+  Count gates and all four test suites passed; weighted-selection effects remain untested.
+---
+
+## 2026-09-26: Record the 120-replica diagnostic result
+
+- Added conditions, checksums, fixed-rule bootstrap results, and a machine-readable
+  scientific record to [VALIDATION.md §8](VALIDATION.md).
+- Observed 63 accepted flips in 31 replicas. The corrected ratios are 145.8561
+  for p (95% interval 99.2728–196.8793) and 0.43405 for d (0.26251–0.67121).
+- All 12,000 measurement bins match the same-seed diagnostic-free baseline byte
+  for byte. This verifies saved aggregates, not complete proposal histories.
+- Numerical code is unchanged. Stage B implementation and mixing-effect tests
+  remain future work.
+
+---
+date: 2026-09-26
 datetime: 2026-09-26 11:55 JST
 model: OpenAI GPT-6 (Codex)
 summary: |

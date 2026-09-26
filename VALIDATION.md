@@ -1,8 +1,9 @@
 ---
 date: 2026-09-26
-datetime: 2026-09-26 11:55 JST
+datetime: 2026-09-26 12:58 JST
 model: OpenAI GPT-6 (Codex; revision), Codex GPT-5 (original)
 summary: |
+  120 replicaの追加診断は正常終了し、63受理・31 replicaでp支持、d不支持。段階Bの効果は未検証。
   Stage Aの4×4・12 replica診断pilotは正常終了。受理8件・4 replicaで両指標とも判定不能。
   半充填ハバード模型の E(T) を grand-canonical ED/TPQ と比較する検証手順。
   アンサンブル整合・dtau→0 外挿・規約変換・符号/粒子数チェック・2D の ED サイズ制約をまとめる。
@@ -349,5 +350,58 @@ bootstrapはreplica単位でseed 20260925・10,000 drawsを指定する。
 bins 19–49は0試行である。受理はすべてbins 11–16にあるが、試行の末尾とは異なる。
 上側をbins 8–49と表示するのは上記の固定suffix規則によるもので、空binによって件数や比は変わらない。
 
-次の診断候補は同じ条件・固定順序の120 replicaであり、結果は未取得。
+このpilot記録時点では、次の診断候補は同じ条件・固定順序の120 replicaであり、結果は未取得だった。後続結果は§8を参照。
 このpilotから混合の十分性や重み付き選択の効果は結論せず、段階Bは保留する。
+
+## 8. Stage A 120 replica diagnostic（2026-09-26）
+
+**120 replicaの固定順序診断は正常終了し、事前規定の判定は`p`: 支持、`d`: 不支持となった。**
+The 120-replica fixed-selection diagnostic supports `p` and rejects `d` under
+its predeclared criteria. This permits planning the `p`-based Stage B candidate;
+weighted-selection performance and sufficient mixing remain untested.
+
+### 条件と検証
+
+- source: `4a21b6415d6169410ba66a19fa6536d9cb3800f4`。§7のpilotから数値sourceは変更していない。
+- square 4×4、P/P、入力`t=-1`（エネルギー単位`|t|=1`）、`U=8`、`mu=4`、
+  `beta=24`、`dtau=0.0125`、`Ltr=1920`。相互作用は`U n_up n_down`、grand canonicalで粒子数は固定しない。
+- 120 replica（ID 0–119）、base seed `1032491301596221733`。各replicaでwarmup 10,000、
+  測定50,000 sweep、100 bins。`stab=4`、`sweep_order=alternating`、`green_rebuild=combine`、
+  `global_update=site`、`global_interval=10`、固定順序のsite選択。
+- 120 MPI ranks × 1 OpenMP thread、Intel 2023.2 / Intel MPI 2021.10.0 / MKL。
+  solver exit 0、stderr 0 bytes、実測solver walltime 1829.66秒。
+- serial・OpenMP・MPI・hybridの全suiteが合格。短い3 caseの整合性検査とserial/MPI診断のbyte一致も合格。
+- 診断12,000行・測定12,000 binsについて期待120 replica、ID・seed・完全性を確認。
+  各指標80,000試行/replica、合計9,600,000試行。bin別の試行数・受理数とも一致した。
+- MPI binary SHA-256: `ec450cd2a9705014c3fb42c21ffd2495c1966dc300af6e94d30e7ea919f24d41`。
+- input SHA-256: `9ebb75cda4402aa3429f2d1e9fb95eab890a4a1931ae575428ffda10d1529301`。
+- diagnostic TSV SHA-256: `c16a0428cb6de5b16b13b6cde02763e909f1acd7572daf6dd5c4e70516e99899`。
+- 解析script SHA-256: `b373fa7d70384fa1f19675e0432a5812d12b8ddc6620cce5091785adbe9cca7b`（pilotと同じ）。
+
+### 事前規定による判定
+
+指標の定義、四分位集合、連続性補正、最低件数、支持・不支持の閾値は§7と同じで、変更していない。
+両指標とも全体・上下四分位の和集合で受理63件、受理を含む31 replicaであり、30件・8 replicaのgateを通過した。
+同じ63反転を両指標で集計しており、126件の独立な受理ではない。
+replica bootstrapはseed 20260925で10,000 drawsを実行し、空drawは両指標とも0だった。
+
+| 指標 | 下側bins | 下側A / C | 上側bins | 上側A / C | 補正R | bootstrap 95%区間 | 判定 |
+| --- | --- | ---: | --- | ---: | ---: | --- | --- |
+| p | 0–2 | 2916577 / 0 | 8–49 | 2539525 / 63 | 145.85611882 | [99.27275081, 196.87927066] | 支持 |
+| d | 0–20 | 2510384 / 43 | 24–49 | 2725621 / 20 | 0.43404955 | [0.26251312, 0.67120642] | 不支持 |
+
+pの下側受理は0で、raw ratioはnull。上表は事前規定の連続性補正による比である。
+四分位集合の空binは固定prefix/suffix規則に従って含める。
+pは`R >= 3`かつ95%区間下限`> 1`、dは95%区間上限`< 2`の基準をそれぞれ満たした。
+この条件でpを用いた段階Bの計画へ進む根拠が得られた。段階Bの実装・効果検証は未実施であり、
+受理率の偏りから混合の十分性を結論しない。
+
+### baselineとの照合と範囲
+
+同じ120 seedsの診断なしbaseline（source `c422af0`）と、12,000測定binsのseed・試行数・受理数が全一致した。
+`bins.tsv`全体もbyte一致し、双方のSHA-256は
+`bb6fb157408ea5517c0757e62ce91a95997f6f54a802ab9004a7fd36c3d65b1e`である。
+これは保存されたbin集計の一致であり、個々の提案や全Markov chainの同一性を証明するものではない。
+pilot 12 replicaは今回のseed集合の部分集合なので、合算して132の独立replicaとは扱わない。
+
+数値・全histogram・provenanceは[機械可読の検証記録](docs/validation/global-site-diag-120-2026-09-26.json)にも保存した。
