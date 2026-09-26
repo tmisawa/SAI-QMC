@@ -3,7 +3,7 @@
 ---
 date: 2026-09-26
 datetime: 2026-09-26 16:16 JST
-model: OpenAI GPT-6 Codex
+model: OpenAI gpt-5.6-sol (Codex)
 summary: |
   Clarified that fixed site order describes the default global-site selection mode.
   The polarized mode continues to make n weighted attempts and may repeat a site.
