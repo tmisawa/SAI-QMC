@@ -106,6 +106,37 @@ int main(void)
     CHECK(att == batt);
     CHECK(acc == bacc);
 
+    /* Stage B: polarized selection through Params keeps n attempts per pass,
+       runs to completion, and its trajectory differs from the fixed order */
+    ReplicaResult e;
+    strcpy(p.global_site_select, "polarized");
+    p.global_site_power = 2.0;
+    if (run(&p, &e) != 0) {
+        CHECK(0 && "polarized replica run failed");
+        replica_result_free(&a);
+        replica_result_free(&b);
+        replica_result_free(&d);
+        TEST_END();
+    }
+    CHECK(e.status == 0);
+    CHECK(e.site_diag != NULL);
+    unsigned long long eatt = 0ULL, eacc = 0ULL, eatt_bins = 0ULL;
+    int differs = 0;
+    for (int bi = 0; bi < e.nbin; bi++) {
+        CHECK(e.bins[bi].global_attempts == b.bins[bi].global_attempts);
+        eatt_bins += e.bins[bi].global_attempts;
+        differs |= e.bins[bi].sum_sign_Ehub != d.bins[bi].sum_sign_Ehub;
+    }
+    for (int k = 0; k < GLOBAL_SITE_DIAG_NBIN; k++) {
+        eatt += e.site_diag->attempts[0][k];
+        eacc += e.site_diag->accepted[0][k];
+    }
+    CHECK(eatt == eatt_bins);
+    CHECK(eacc <= eatt);
+    CHECK(differs);                       /* two draws per attempt change the stream */
+    strcpy(p.global_site_select, "fixed");
+    replica_result_free(&e);
+
     /* interval longer than the run: no pass at all */
     p.global_site_diag_file[0] = '\0';
     p.global_interval = 1000;

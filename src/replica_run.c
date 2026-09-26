@@ -182,6 +182,18 @@ int dqmc_run_replica(const Params *p, const Lattice *L, int beta_index,
 
     profiler_phase_set(prof, PROF_PHASE_WARMUP);
     const int use_global = (strcmp(p->global_update, "site") == 0);
+    if (use_global && strcmp(p->global_site_select, "polarized") == 0 &&
+        dqmc_set_global_site_select(&D, 1, p->global_site_power) != 0) {
+        fprintf(stderr,
+                "ERROR: failed to enable polarized site selection "
+                "(replica=%d seed=%llu alpha=%.17g)\n",
+                replica_id, seed, p->global_site_power);
+        dqmc_free(&D);
+        field_free(&f);
+        model_free(&m);
+        profiler_set_current(old_prof);
+        return 1;
+    }
     unsigned long long global_sweep = 0ULL; /* counts warmup + measurement */
 #ifdef AFQMC_TEST_HOOKS
     const char *fail_env = getenv("AFQMC_TEST_GLOBAL_FAIL_AT"); /* test hook only */
