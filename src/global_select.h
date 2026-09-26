@@ -9,6 +9,19 @@
 int global_site_indicators(const int *m, const int *bipart, int n, int L,
                            double *p, double *d);
 
+/* Stage B (spec 3.1). p_0 = tanh(lambda) when lambda > 0, else 1.0 (U = 0). */
+double global_site_weight_scale(double lambda);
+/* w[i] = pow(p[i]/p0, alpha) + 1/n, cum[i] = sum_{j<=i} w[j]. Returns 1 on bad
+   arguments (NULL, n <= 0, p0 <= 0, alpha < 0 or non-finite), non-finite output,
+   a cumulative increment that is not strictly positive, or a relative weight
+   w[i]/cum[n-1] below DBL_EPSILON, or a site interval with no reachable 53-bit
+   RNG grid point after target multiplication. Callers treat 1 as a numerical failure. */
+int global_site_weights_p(const double *p, int n, double p0, double alpha,
+                          double *w, double *cum);
+/* Smallest i with cum[i] >= u * cum[n-1] (u in [0,1)); n-1 if none. Returns -1
+   on NULL cum, n <= 0, or cum[n-1] <= 0 or non-finite. */
+int global_site_select_index(const double *cum, int n, double u);
+
 /* Histogram of attempts/acceptances of site world-line flips (spec 3.3).
    Row 0: p in [0,1], 50 bins of width 0.02. Row 1: d in [-1,1], 50 bins of 0.04. */
 typedef struct {
