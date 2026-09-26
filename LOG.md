@@ -1,6 +1,26 @@
 # LOG
 
 ---
+date: 2026-09-26
+datetime: 2026-09-26 11:55 JST
+model: OpenAI GPT-6 (Codex)
+summary: |
+  Record the Stage A 4x4 diagnostic pilot in VALIDATION.md. Execution and
+  integrity checks passed; both indicators remain undetermined because the
+  predeclared acceptance-count gates were not met.
+---
+
+## 2026-09-26: Record the Stage A diagnostic pilot result
+
+- Added the 12-replica conditions, source and artifact checksums, count checks,
+  fixed quartile rules, and numerical results to [VALIDATION.md](VALIDATION.md).
+- The pilot produced 8 accepted flips in 4 replicas, below the required 30
+  accepts and 8 accepting replicas. No bootstrap draws were executed, and
+  Stage B remains pending further diagnostic evidence.
+- Clarified that quartile ranges include empty histogram bins. Numerical code
+  and pilot data are unchanged; this update documents the completed run.
+
+---
 date: 2026-09-25
 datetime: 2026-09-25 22:38 JST
 model: |

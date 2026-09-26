@@ -1,8 +1,9 @@
 ---
-date: 2026-09-22
-datetime: 2026-09-22 10:03 JST
+date: 2026-09-26
+datetime: 2026-09-26 11:55 JST
 model: OpenAI GPT-6 (Codex; revision), Codex GPT-5 (original)
 summary: |
+  Stage Aの4×4・12 replica診断pilotは正常終了。受理8件・4 replicaで両指標とも判定不能。
   半充填ハバード模型の E(T) を grand-canonical ED/TPQ と比較する検証手順。
   アンサンブル整合・dtau→0 外挿・規約変換・符号/粒子数チェック・2D の ED サイズ制約をまとめる。
   Global HS update の実装検査、4×2 clusterの初回84 runと追加検証を記録した。
@@ -288,3 +289,65 @@ macOS/Accelerate/Open MPIで`make test`、`test_omp`、`test_mpi`、`test_hybrid
 `.git`を持たないsource snapshotでも`make test`が合格した。
 `/dev/full`検査はmacOSでSKIPのまま。今回slow/sanitizerと長い4×2科学的計算は再実行していない。
 旧検証のsource/binary checksumと数値結果は、その実行時点の記録として維持する。
+
+## 7. Stage A site-flip diagnostic pilot（2026-09-26）
+
+**実行と整合性検査は合格。指標`p`・`d`の仮説判定はともに判定不能。**
+The 12-replica pilot completed normally, but both indicators remain undetermined
+because the predeclared acceptance-count gates were not met. This result does
+not justify starting Stage B weighted site selection.
+
+### 条件とprovenance
+
+- source: `9dd1a34425140ecf04528fb3cb404263624079e4`。
+- square 4×4（16 sites）、P/P、入力`t=-1.0`、`U=8`、`beta=24`、`dtau=0.0125`、`Ltr=1920`。
+  エネルギー単位は`|t|=1`。相互作用は`U n_up n_down`、`mu=U/2=4`のgrand-canonical ensembleで、粒子数は固定しない。
+- `global_update=site`、`global_interval=10`、固定順序のsite選択。
+  各replicaで`nwarm=10000`、`nmeas=50000`、`nbin=100`、`stab=4`、
+  `sweep_order=alternating`、`green_rebuild=combine`。
+- `nrep=12`、replica ID 0–11、base seed `1032491301596221733`。
+  `parallel=omp`、8 threads、macOS / Apple clang 16 / Accelerate / libomp。
+  `global_site_diag_file=site_diag.tsv`と`replica_bin_file=bins.tsv`を併用した。
+- 実行期間は2026-09-25 23:01:25–2026-09-26 00:00:14 JST。
+  solverと実行wrapperの終了コードはともに0、solver walltimeは3528.27秒。stderrは計時出力のみ。
+- binary SHA-256: `595c273c7e588564a86a11bdc6c1b99dc282b8f8c02b2d718a2a61e6ccddce52`。
+- input SHA-256: `4f46d46bf213fcbbb8983d5afc333805954c75fe75fce3133d3e3ab85291be56`。
+- diagnostic TSV SHA-256: `5cf02837a92f8dfe46db7e9c7fbb964bcd5450436b77f459705305d3c8c8c282`。
+- 解析script SHA-256: `b373fa7d70384fa1f19675e0432a5812d12b8ddc6620cce5091785adbe9cca7b`。
+
+診断は測定期間のみを集計する。1,200行（12 replica × 100行）について、replica ID・seed・
+行数を検査した。`p`と`d`は各80,000試行/replica、合計各960,000試行で、replica別の試行数・受理数は
+`bins.tsv`と一致した。binary・inputの実行前後checksumは不変で、保存した37ファイルのmanifest検証も通過した。
+
+### 事前規定の解析と結果
+
+HS場を`s_li`、副格子符号を`epsilon_i`、`m_i = sum_l s_li`、`M = sum_i epsilon_i m_i`として、提案直前の
+`p_i = |m_i|/Ltr`、`d_i = -epsilon_i m_i sign(M)/Ltr`を用いる（`sign(0)=+1`）。
+`d_i > 0`は多数派のstaggeredパターンと逆向きの偏極を表す。
+`p`の[0,1]と`d`の[−1,1]を各50 binsに分け、端点1はbin 49へ含める。
+
+下側・上側の四分位集合は、全replicaを合わせた試行数の25%に達する最短prefix・suffixを
+bin単位で選ぶ。集合はreplica bootstrap中も固定し、重なれば判定不能とする。
+`A`を試行数、`C`を受理数として、比は連続性補正を入れた
+`R = ((C_top + 0.5)/(A_top + 1)) / ((C_bottom + 0.5)/(A_bottom + 1))`とする。
+
+bootstrap前に全体と四分位集合の和集合のそれぞれで、受理30件以上かつ受理のあるreplica 8本以上を要求する。
+bootstrapはreplica単位でseed 20260925・10,000 drawsを指定する。
+上側または下側の試行数が0のdrawを空drawとし、全drawの5%を超えれば判定不能とする。
+95%区間を得られた場合は`R >= 3`かつ区間下限`> 1`で支持、区間上限`< 2`で不支持、残りは判定不能とする。
+
+| 指標 | 下側bins | 下側A / C | 上側bins | 上側A / C | 補正R | 95%区間 | 判定・理由 |
+| --- | --- | ---: | --- | ---: | ---: | --- | --- |
+| p | 0–2 | 291222 / 0 | 8–49 | 256442 / 8 | 19.30561957 | null | undetermined / insufficient_events |
+| d | 0–20 | 253376 / 4 | 24–49 | 273406 / 4 | 0.92673926 | null | undetermined / insufficient_events |
+
+両指標とも全体・四分位集合の和集合で受理8件、受理のあるreplicaは4本（ID 1・4・6・10、各2件）だった。
+同じ8件の反転を両指標で集計しており、16件の独立な受理ではない。
+最低件数gateを満たさず、実際のbootstrap drawは0回。比は記述値にとどまり、どちらの指標も支持・不支持とは扱わない。
+
+四分位集合には空binも含まれる。`p`の試行はbin 18まであり、bin 17は34試行、bin 18は1試行、
+bins 19–49は0試行である。受理はすべてbins 11–16にあるが、試行の末尾とは異なる。
+上側をbins 8–49と表示するのは上記の固定suffix規則によるもので、空binによって件数や比は変わらない。
+
+次の診断候補は同じ条件・固定順序の120 replicaであり、結果は未取得。
+このpilotから混合の十分性や重み付き選択の効果は結論せず、段階Bは保留する。
