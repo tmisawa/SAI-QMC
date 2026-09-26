@@ -31,6 +31,8 @@ typedef struct {
     int global_interval;
     char replica_bin_file[256];
     char global_site_diag_file[256];
+    char global_site_select[16];   /* fixed | polarized (spec 4) */
+    double global_site_power;      /* alpha >= 0, finite; default 2 */
 
     char szz_q[256];
     char szz_file[256];
