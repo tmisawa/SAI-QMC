@@ -5,7 +5,7 @@ root="$(cd "$(dirname "$0")/.." && pwd)"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 MPIRUN="${MPIRUN:-mpirun}"
-write_input() { # parallel nrep
+write_input() { # parallel nrep select
   cat > "$tmp/input.in" <<EOF
 lattice=square
 Lx=2
@@ -32,31 +32,40 @@ global_update=site
 global_interval=5
 replica_bin_file=bins.tsv
 global_site_diag_file=site_diag.tsv
+global_site_select=$3
+global_site_power=2
 EOF
 }
 data() { grep -v '^#' "$1"; }
 fail=0
+for select in fixed polarized; do
 for nrep in 5 2; do   # 5: uneven split over 3 ranks; 2: nrep < nranks
-  write_input serial "$nrep"; (cd "$tmp" && "$root/dqmc" input.in > out.serial)
+  write_input serial "$nrep" "$select"; (cd "$tmp" && "$root/dqmc" input.in > out.serial)
   data "$tmp/bins.tsv" > "$tmp/bins.serial"; data "$tmp/site_diag.tsv" > "$tmp/diag.serial"
   data "$tmp/out.serial" > "$tmp/row.serial"
-  write_input omp "$nrep"; (cd "$tmp" && OMP_NUM_THREADS=2 "$root/dqmc_omp" input.in > out.omp)
-  data "$tmp/bins.tsv" | cmp -s - "$tmp/bins.serial" || { echo "FAIL bins omp nrep=$nrep"; fail=1; }
-  data "$tmp/site_diag.tsv" | cmp -s - "$tmp/diag.serial" || { echo "FAIL diag omp nrep=$nrep"; fail=1; }
-  write_input mpi "$nrep"; (cd "$tmp" && "$MPIRUN" -n 3 "$root/dqmc_mpi" input.in > out.mpi)
+  write_input omp "$nrep" "$select"; (cd "$tmp" && OMP_NUM_THREADS=2 "$root/dqmc_omp" input.in > out.omp)
+  data "$tmp/bins.tsv" | cmp -s - "$tmp/bins.serial" || { echo "FAIL bins omp nrep=$nrep select=$select"; fail=1; }
+  data "$tmp/site_diag.tsv" | cmp -s - "$tmp/diag.serial" || { echo "FAIL diag omp nrep=$nrep select=$select"; fail=1; }
+  write_input mpi "$nrep" "$select"; (cd "$tmp" && "$MPIRUN" -n 3 "$root/dqmc_mpi" input.in > out.mpi)
   cp "$tmp/bins.tsv" "$tmp/bins.mpi.full"
   cp "$tmp/site_diag.tsv" "$tmp/diag.mpi.full"
-  write_input hybrid "$nrep"; (cd "$tmp" && OMP_NUM_THREADS=2 "$MPIRUN" -n 3 "$root/dqmc_hybrid" input.in > out.hybrid)
+  write_input hybrid "$nrep" "$select"; (cd "$tmp" && OMP_NUM_THREADS=2 "$MPIRUN" -n 3 "$root/dqmc_hybrid" input.in > out.hybrid)
   for mode in omp mpi hybrid; do
     data "$tmp/out.$mode" > "$tmp/row.$mode"
-    cmp -s "$tmp/row.serial" "$tmp/row.$mode" || { echo "FAIL stdout row $mode nrep=$nrep"; fail=1; }
+    cmp -s "$tmp/row.serial" "$tmp/row.$mode" || { echo "FAIL stdout row $mode nrep=$nrep select=$select"; fail=1; }
   done
-  data "$tmp/bins.mpi.full" | cmp -s - "$tmp/bins.serial" || { echo "FAIL bins mpi nrep=$nrep"; fail=1; }
-  data "$tmp/bins.tsv" | cmp -s - "$tmp/bins.serial" || { echo "FAIL bins hybrid nrep=$nrep"; fail=1; }
-  data "$tmp/diag.mpi.full" | cmp -s - "$tmp/diag.serial" || { echo "FAIL diag mpi nrep=$nrep"; fail=1; }
-  data "$tmp/site_diag.tsv" | cmp -s - "$tmp/diag.serial" || { echo "FAIL diag hybrid nrep=$nrep"; fail=1; }
-  grep -q 'parallel=mpi .*nranks=3' "$tmp/out.mpi" || { echo "FAIL mpi header"; fail=1; }
-  grep -q 'parallel=hybrid .*nranks=3' "$tmp/out.hybrid" || { echo "FAIL hybrid header"; fail=1; }
+  data "$tmp/bins.mpi.full" | cmp -s - "$tmp/bins.serial" || { echo "FAIL bins mpi nrep=$nrep select=$select"; fail=1; }
+  data "$tmp/bins.tsv" | cmp -s - "$tmp/bins.serial" || { echo "FAIL bins hybrid nrep=$nrep select=$select"; fail=1; }
+  data "$tmp/diag.mpi.full" | cmp -s - "$tmp/diag.serial" || { echo "FAIL diag mpi nrep=$nrep select=$select"; fail=1; }
+  data "$tmp/site_diag.tsv" | cmp -s - "$tmp/diag.serial" || { echo "FAIL diag hybrid nrep=$nrep select=$select"; fail=1; }
+  grep -q 'parallel=mpi .*nranks=3' "$tmp/out.mpi" || { echo "FAIL mpi header select=$select"; fail=1; }
+  grep -q 'parallel=hybrid .*nranks=3' "$tmp/out.hybrid" || { echo "FAIL hybrid header select=$select"; fail=1; }
+  if [ "$select" = polarized ]; then
+    grep -q 'global_site_select=polarized global_site_power=2' "$tmp/out.serial" || { echo "FAIL polarized header nrep=$nrep"; fail=1; }
+  else
+    grep -q 'global_site_select' "$tmp/out.serial" && { echo "FAIL fixed header names the selection nrep=$nrep"; fail=1; }
+  fi
+done
 done
 # Record each rank's exit before returning success to the launcher, so the first
 # failed rank cannot cause mpirun to kill the remaining ranks before observation.
@@ -100,18 +109,20 @@ PY
 }
 for mode in mpi hybrid; do
   bin="$root/build/test-hooks/dqmc_$mode"
-  write_input "$mode" 5
+  write_input "$mode" 5 fixed
   sed -i.bak 's#^replica_bin_file=.*#replica_bin_file=/nonexistent_dir/bins.tsv#' "$tmp/input.in"
   expect_fail "open ($mode)" env OMP_NUM_THREADS=2 "$MPIRUN" -n 3 sh "$tmp/rank_exit.sh" "$bin" input.in
-  write_input "$mode" 5
+  write_input "$mode" 5 fixed
   sed -i.bak 's#^global_site_diag_file=.*#global_site_diag_file=/nonexistent_dir/site_diag.tsv#' "$tmp/input.in"
   expect_fail "diag open ($mode)" env OMP_NUM_THREADS=2 "$MPIRUN" -n 3 sh "$tmp/rank_exit.sh" "$bin" input.in
-  write_input "$mode" 5
+  write_input "$mode" 5 fixed
   expect_fail "write ($mode)" env OMP_NUM_THREADS=2 AFQMC_TEST_BIN_WRITE_FAIL=1 "$MPIRUN" -n 3 sh "$tmp/rank_exit.sh" "$bin" input.in
   expect_fail "close ($mode)" env OMP_NUM_THREADS=2 AFQMC_TEST_BIN_CLOSE_FAIL=1 "$MPIRUN" -n 3 sh "$tmp/rank_exit.sh" "$bin" input.in
   expect_fail "diag write ($mode)" env OMP_NUM_THREADS=2 AFQMC_TEST_DIAG_WRITE_FAIL=1 "$MPIRUN" -n 3 sh "$tmp/rank_exit.sh" "$bin" input.in
   expect_fail "diag close ($mode)" env OMP_NUM_THREADS=2 AFQMC_TEST_DIAG_CLOSE_FAIL=1 "$MPIRUN" -n 3 sh "$tmp/rank_exit.sh" "$bin" input.in
   expect_fail "numerical ($mode)" env OMP_NUM_THREADS=2 AFQMC_TEST_GLOBAL_FAIL_AT=15 "$MPIRUN" -n 3 sh "$tmp/rank_exit.sh" "$bin" input.in
+  write_input "$mode" 5 polarized
+  expect_fail "numerical polarized ($mode)" env OMP_NUM_THREADS=2 AFQMC_TEST_GLOBAL_FAIL_AT=15 "$MPIRUN" -n 3 sh "$tmp/rank_exit.sh" "$bin" input.in
 done
 for mode in serial omp mpi hybrid; do
   bin="$root/dqmc"
