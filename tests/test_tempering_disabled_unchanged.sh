@@ -23,11 +23,11 @@ run_one() { # binary input extra outdir; success cases must exit 0
   fi
 }
 for name in chain square; do
-  # field_random is re-added by Task 5b together with the field_init key.
-  for variant in omitted none global select bins alternating diag drift udvscale centered profile; do
+  for variant in omitted none field_random global select bins alternating diag drift udvscale centered profile; do
     case "$variant" in
       omitted)      extra='' ;;
       none)         extra='tempering=none\ntempering_interval=3\n' ;;
+      field_random) extra='field_init=random\n' ;;
       global)       extra='global_update=site\nglobal_interval=5\nreplica_bin_file=bins.tsv\n' ;;
       select)       extra='global_update=site\nglobal_interval=5\nglobal_site_select=polarized\nreplica_bin_file=bins.tsv\n' ;;
       bins)         extra='replica_bin_file=bins.tsv\n' ;;
@@ -40,7 +40,7 @@ for name in chain square; do
     esac
     # the baseline does not know the new keys: run it without them
     base_extra="$extra"
-    case "$variant" in none) base_extra='' ;; esac
+    case "$variant" in none|field_random) base_extra='' ;; esac
     run_one "$work/base/dqmc" "$fix/$name.in" "$base_extra" "$work/b/$name-$variant"
     run_one "$root/dqmc" "$fix/$name.in" "$extra" "$work/c/$name-$variant"
     # same set of files

@@ -23,6 +23,12 @@ int main(void)
     CHECK(strcmp(p.tempering, "none") == 0 && p.tempering_ltr == 0 &&
           p.tempering_interval == 1 && p.tempering_file[0] == '\0' &&
           p.dtau_given == 1);
+    CHECK(strcmp(p.field_init, "random") == 0); /* default (D10) */
+
+    CHECK(read_text("dtau=0.1\nbeta_list=1\nfield_init=uniform\n", &p) == 0);
+    CHECK(strcmp(p.field_init, "uniform") == 0);
+
+    CHECK(read_text("dtau=0.1\nbeta_list=1\nfield_init=staggered\n", &p) != 0);
 
     CHECK(read_text("beta_list=1,1.5,2\ntempering=dtau_ladder\ntempering_ltr=40\n"
                     "tempering_interval=2\ntempering_file=pt.tsv\n", &p) == 0);

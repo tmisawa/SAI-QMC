@@ -22,6 +22,13 @@ void field_init(Field *f, int n, int L, double U, double dtau, Rng *r)
     }
 }
 
+void field_set_uniform(Field *f, signed char value)
+{
+    for (int k = 0; k < f->L * f->n; k++) {
+        f->s[k] = value;
+    }
+}
+
 void field_free(Field *f)
 {
     free(f->s);

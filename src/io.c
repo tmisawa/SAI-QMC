@@ -107,6 +107,8 @@ static void defaults(Params *p)
     p->tempering_file[0] = '\0';
     p->dtau_given = 0;
 
+    strcpy(p->field_init, "random");
+
     strcpy(p->szz_q, "none");
     strcpy(p->szz_file, "szz.dat");
     strcpy(p->sperp_q, "none");
@@ -173,7 +175,8 @@ static int is_strict_string_key(const char *key)
            strcmp(key, "tempering") == 0 ||
            strcmp(key, "tempering_ltr") == 0 ||
            strcmp(key, "tempering_interval") == 0 ||
-           strcmp(key, "tempering_file") == 0;
+           strcmp(key, "tempering_file") == 0 ||
+           strcmp(key, "field_init") == 0;
 }
 
 int params_read(Params *p, const char *path)
@@ -364,6 +367,11 @@ int params_read(Params *p, const char *path)
             }
         } else if (strcmp(key, "tempering_file") == 0) {
             memcpy(p->tempering_file, val, strlen(val) + 1); /* val < 256 by the strict parse */
+        } else if (strcmp(key, "field_init") == 0) {
+            if (strlen(val) >= sizeof p->field_init) {
+                FAIL("ERROR: field_init must be random or uniform (got %s)\n", val);
+            }
+            strcpy(p->field_init, val);
         } else if (strcmp(key, "szz_q") == 0) {
             memcpy(p->szz_q, val, strlen(val) + 1);
         } else if (strcmp(key, "szz_file") == 0) {
@@ -538,6 +546,13 @@ int params_read(Params *p, const char *path)
         fprintf(stderr,
                 "ERROR: global_site_select must be fixed or polarized (got %s)\n",
                 p->global_site_select);
+        return 1;
+    }
+
+    if (strcmp(p->field_init, "random") != 0 &&
+        strcmp(p->field_init, "uniform") != 0) {
+        fprintf(stderr, "ERROR: field_init must be random or uniform (got %s)\n",
+                p->field_init);
         return 1;
     }
 

@@ -121,6 +121,9 @@ int replica_chain_init(ReplicaChain *c, const Params *p, const Lattice *L,
     field_init(&c->f, L->n, Ltr, p->U, dtau, &c->r);
     PROF_END(prof, PROF_FIELD_INIT, t_field_init);
     c->have_field = 1;
+    if (strcmp(p->field_init, "uniform") == 0) {
+        field_set_uniform(&c->f, 1);
+    }
 
     const DqmcSweepMode sweep_mode =
         (p->sweep_order[0] == 'a') ? DQMC_SWEEP_ALTERNATING

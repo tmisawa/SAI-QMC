@@ -1242,6 +1242,9 @@ int main(int argc, char **argv)
                                                      p.global_site_select, p.global_site_power);
             }
         }
+        if (strcmp(p.field_init, "random") != 0) {
+            setup_failed |= scalar_output_printf(scalar_fp, " field_init=%s", p.field_init);
+        }
         setup_failed |= scalar_output_printf(scalar_fp, "\n");
         if (strcmp(p.global_update, "site") == 0) {
             setup_failed |= scalar_output_printf(scalar_fp, "# T  E_hub dE_hub  E_gc dE_gc  E_ph dE_ph  ntot dN  doublon dD  sign  acceptance dAcceptance  global_acceptance global_attempts\n");
