@@ -1107,6 +1107,24 @@ int dqmc_global_site_step(Dqmc *D, int i, double u, double *logw, int *sign,
     return 0;
 }
 
+/* Rebuilds Gu/Gd/sign at l=0 from the current field (end of a global move). */
+static int dqmc_rebuild_at_zero(Dqmc *D)
+{
+    const int rcu = green_from_scratch(&D->Gu, 0);
+    const int rcd = D->use_ph ? 0 : green_from_scratch(&D->Gd, 0);
+    if (rcu != 0 || rcd != 0 || D->Gu.det_sign == 0 ||
+        (!D->use_ph && D->Gd.det_sign == 0)) {
+        return 1;
+    }
+    if (D->use_ph) {
+        dqmc_map_ph_down(D);
+        D->sign = 1.0;
+    } else {
+        D->sign = (double)(D->Gu.det_sign * D->Gd.det_sign);
+    }
+    return 0;
+}
+
 int dqmc_global_site_pass(Dqmc *D)
 {
     if (D == NULL || D->status) {
@@ -1164,22 +1182,39 @@ int dqmc_global_site_pass(Dqmc *D)
         }
     }
     if (rc == 0) {
-        const int rcu = green_from_scratch(&D->Gu, 0);
-        const int rcd = D->use_ph ? 0 : green_from_scratch(&D->Gd, 0);
-        if (rcu != 0 || rcd != 0 || D->Gu.det_sign == 0 ||
-            (!D->use_ph && D->Gd.det_sign == 0)) {
-            rc = 1;
-        } else if (D->use_ph) {
-            dqmc_map_ph_down(D);
-            D->sign = 1.0;
-        } else {
-            D->sign = (double)(D->Gu.det_sign * D->Gd.det_sign);
-        }
+        rc = dqmc_rebuild_at_zero(D);
     }
     dqmc_invalidate_carried(D);
     if (rc != 0) {
         D->status = 1;
     }
     PROF_END(D->prof, PROF_DQMC_GLOBAL, t_global);
+    return rc;
+}
+
+int dqmc_log_weight_of(Dqmc *D, const signed char *s, double *logw, int *sign)
+{
+    if (D == NULL || D->f == NULL || s == NULL || logw == NULL || sign == NULL) {
+        return 1;
+    }
+    signed char *own = D->f->s;
+    /* green_logdet_full only reads the field; the pointer is restored below */
+    D->f->s = (signed char *)s;
+    const int rc = dqmc_log_weight(D, logw, sign);
+    D->f->s = own;
+    return rc;
+}
+
+int dqmc_replace_field(Dqmc *D, const signed char *s)
+{
+    if (D == NULL || D->f == NULL || s == NULL || D->status) {
+        return 1;
+    }
+    memcpy(D->f->s, s, (size_t)D->L * (size_t)D->n);
+    const int rc = dqmc_rebuild_at_zero(D);
+    dqmc_invalidate_carried(D);
+    if (rc != 0) {
+        D->status = 1;
+    }
     return rc;
 }

@@ -148,4 +148,13 @@ int dqmc_global_site_step(Dqmc *D, int i, double u, double *logw, int *sign,
    invalid. Returns nonzero and sets D->status on numerical failure. */
 int dqmc_global_site_pass(Dqmc *D);
 
+/* log|W| and sign(W) of configuration s (D->L * D->n entries, layout
+   s[l*n+i]) under D's own model and lambda (parallel tempering cross-weight).
+   D->f->s, the Green functions and D->status are unchanged. */
+int dqmc_log_weight_of(Dqmc *D, const signed char *s, double *logw, int *sign);
+/* Copies s into D->f->s and rebuilds Gu/Gd/sign at l=0 exactly as the end of
+   dqmc_global_site_pass; carried stacks become invalid. Returns nonzero and
+   sets D->status on numerical failure. Does not draw random numbers. */
+int dqmc_replace_field(Dqmc *D, const signed char *s);
+
 #endif
