@@ -26,17 +26,24 @@ int replica_bin_write(FILE *fp, const ReplicaBinView *v,
                 "# Szz/Sperp: N^-1 sum_ij exp[-iq.(ri-rj)] <..>; Q is the "
                 "staggered momentum, 0 is q=0; nan = q not measured\n"
                 "# lattice=%s Lx=%d Ly=%d n=%d pbc=%d U=%.17g dtau=%.17g "
-                "nwarm=%d nmeas=%d nbin=%d global_update=%s global_interval=%d\n"
+                "nwarm=%d nmeas=%d nbin=%d global_update=%s global_interval=%d\n",
+                m->lattice, m->Lx, m->Ly, m->nsite, m->pbc, m->U, m->dtau,
+                m->nwarm, m->nmeas, m->nbin, m->global_update,
+                m->global_interval);
+        if (m->tempering) {
+            fprintf(fp,
+                    "# tempering=dtau_ladder tempering_ltr=%d: dtau of each row = "
+                    "beta_effective / Ltr; the dtau field above is not used\n",
+                    m->tempering_ltr);
+        }
+        fprintf(fp,
                 "# szz_Q_index=%d szz_0_index=%d sperp_Q_index=%d\n"
                 "# columns: beta_index\tbeta_requested\tbeta_effective\tLtr\t"
                 "replica_id\tseed\tbin_id\tsweep_begin\tsweep_end\tcount\t"
                 "sum_sign\tsum_sign_Ehub\tsum_sign_D\tlocal_accepted\t"
                 "local_attempts\tglobal_accepted\tglobal_attempts\t"
                 "sum_sign_Szz_Q\tsum_sign_Sperp_Q\tsum_sign_Szz_0\n",
-                m->lattice, m->Lx, m->Ly, m->nsite, m->pbc, m->U, m->dtau,
-                m->nwarm, m->nmeas, m->nbin, m->global_update,
-                m->global_interval, m->szz_Q_index, m->szz_0_index,
-                m->sperp_Q_index);
+                m->szz_Q_index, m->szz_0_index, m->sperp_Q_index);
     }
     const int per = m->nmeas / m->nbin;
     for (int r = 0; r < v->nrep; r++) {

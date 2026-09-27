@@ -263,6 +263,16 @@ int dqmc_run_ladder(const Params *p, const Lattice *L, double mu, int ladder_id,
         goto done;
     }
     have_ladder = 1;
+#ifdef AFQMC_TEST_HOOKS
+    {
+        const char *fail_ladder = getenv("AFQMC_TEST_TEMPERING_FAIL_LADDER");
+        if (fail_ladder != NULL && fail_ladder[0] != '\0' &&
+            atoi(fail_ladder) == ladder_id) {
+            fprintf(stderr, "TEST_TEMPERING_FAIL ladder=%d\n", ladder_id);
+            goto done;
+        }
+    }
+#endif
 
     const unsigned long long interval = (unsigned long long)p->tempering_interval;
     double t0 = now_seconds();

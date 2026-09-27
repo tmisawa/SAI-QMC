@@ -106,7 +106,7 @@ test_szz_parallel: dqmc dqmc_omp dqmc_mpi dqmc_hybrid
 test_sperp_parallel: dqmc dqmc_omp dqmc_mpi dqmc_hybrid
 	@printf "%-35s " tests/test_sperp_parallel.sh; sh tests/test_sperp_parallel.sh
 
-test: $(TESTBIN) test_szz test_sperp test_scalar test_dat test_global_disabled test_global_output test_global_hook_isolation
+test: $(TESTBIN) test_szz test_sperp test_scalar test_dat test_global_disabled test_global_output test_global_hook_isolation test_tempering_output
 	@fail=0; for t in $(TESTBIN); do printf "%-28s " $$t; ./$$t || fail=1; done; \
 	  if [ $$fail -ne 0 ]; then echo "SOME TESTS FAILED"; exit 1; fi; echo "ALL TESTS PASSED"
 
@@ -122,7 +122,7 @@ test_mpi: $(TESTBIN_MPI)
 	@fail=0; for t in $(TESTBIN_MPI); do printf "%-32s " $$t; $(MPIRUN) -np 1 ./$$t || fail=1; done; \
 	  if [ $$fail -ne 0 ]; then echo "SOME MPI TESTS FAILED"; exit 1; fi; echo "ALL MPI TESTS PASSED"
 
-test_hybrid: $(TESTBIN_HYBRID) test_szz_parallel test_sperp_parallel test_scalar_parallel test_dat_parallel test_global_parallel
+test_hybrid: $(TESTBIN_HYBRID) test_szz_parallel test_sperp_parallel test_scalar_parallel test_dat_parallel test_global_parallel test_tempering_parallel test_tempering_mpi_failure
 	@fail=0; for t in $(TESTBIN_HYBRID); do printf "%-35s " $$t; $(MPIRUN) -np 1 ./$$t || fail=1; done; \
 	  if [ $$fail -ne 0 ]; then echo "SOME HYBRID TESTS FAILED"; exit 1; fi; echo "ALL HYBRID TESTS PASSED"
 
@@ -141,6 +141,17 @@ test_tempering_default: dqmc
 	@printf "%-40s " tests/test_tempering_disabled_unchanged.sh; sh tests/test_tempering_disabled_unchanged.sh
 
 .PHONY: test_tempering_default
+
+test_tempering_output: dqmc
+	@printf "%-40s " tests/test_tempering_output.sh; sh tests/test_tempering_output.sh
+
+test_tempering_parallel: dqmc dqmc_omp dqmc_mpi dqmc_hybrid
+	@printf "%-40s " tests/test_tempering_parallel.sh; sh tests/test_tempering_parallel.sh
+
+test_tempering_mpi_failure: $(HOOK_DIR)/dqmc_mpi
+	@printf "%-40s " tests/test_tempering_mpi_failure.sh; MPIRUN="$(MPIRUN)" sh tests/test_tempering_mpi_failure.sh
+
+.PHONY: test_tempering_output test_tempering_parallel test_tempering_mpi_failure
 
 test_global_output: dqmc $(HOOK_DIR)/dqmc
 	@printf "%-28s " tests/test_global_output.sh; sh tests/test_global_output.sh

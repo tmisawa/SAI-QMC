@@ -22,6 +22,8 @@ typedef struct {
     const char *global_update;
     int global_interval;
     int szz_Q_index, szz_0_index, sperp_Q_index; /* -1: not measured */
+    int tempering;       /* 1: tempering=dtau_ladder; dtau is NAN, per-row dtau = beta_effective / Ltr */
+    int tempering_ltr;
 } ReplicaBinMeta;
 
 /* Writes the header comment (only when write_header != 0) and one row per
