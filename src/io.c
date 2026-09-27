@@ -101,6 +101,12 @@ static void defaults(Params *p)
     strcpy(p->global_site_select, "fixed");
     p->global_site_power = 2.0;
 
+    strcpy(p->tempering, "none");
+    p->tempering_ltr = 0;
+    p->tempering_interval = 1;
+    p->tempering_file[0] = '\0';
+    p->dtau_given = 0;
+
     strcpy(p->szz_q, "none");
     strcpy(p->szz_file, "szz.dat");
     strcpy(p->sperp_q, "none");
@@ -163,7 +169,11 @@ static int is_strict_string_key(const char *key)
            strcmp(key, "replica_bin_file") == 0 ||
            strcmp(key, "global_site_diag_file") == 0 ||
            strcmp(key, "global_site_select") == 0 ||
-           strcmp(key, "global_site_power") == 0;
+           strcmp(key, "global_site_power") == 0 ||
+           strcmp(key, "tempering") == 0 ||
+           strcmp(key, "tempering_ltr") == 0 ||
+           strcmp(key, "tempering_interval") == 0 ||
+           strcmp(key, "tempering_file") == 0;
 }
 
 int params_read(Params *p, const char *path)
@@ -255,6 +265,7 @@ int params_read(Params *p, const char *path)
             if (parse_double_value(val, &p->dtau)) {
                 FAIL("ERROR: dtau must be numeric (got %s)\n", val);
             }
+            p->dtau_given = 1;
         } else if (strcmp(key, "nwarm") == 0) {
             if (parse_int_value(val, &p->nwarm)) {
                 FAIL("ERROR: nwarm must be integer (got %s)\n", val);
@@ -335,6 +346,24 @@ int params_read(Params *p, const char *path)
                 !isfinite(p->global_site_power) || p->global_site_power < 0.0) {
                 FAIL("ERROR: global_site_power must be a finite number >= 0 (got %s)\n", val);
             }
+        } else if (strcmp(key, "tempering") == 0) {
+            if (strlen(val) >= sizeof p->tempering) {
+                FAIL("ERROR: tempering must be none or dtau_ladder (got %s)\n", val);
+            }
+            strcpy(p->tempering, val);
+        } else if (strcmp(key, "tempering_ltr") == 0) {
+            if (parse_int_value(val, &p->tempering_ltr) || p->tempering_ltr < 0) {
+                FAIL("ERROR: tempering_ltr must be a non-negative integer (got %s)\n",
+                     val);
+            }
+        } else if (strcmp(key, "tempering_interval") == 0) {
+            if (parse_int_value(val, &p->tempering_interval) ||
+                p->tempering_interval <= 0) {
+                FAIL("ERROR: tempering_interval must be a positive integer (got %s)\n",
+                     val);
+            }
+        } else if (strcmp(key, "tempering_file") == 0) {
+            memcpy(p->tempering_file, val, strlen(val) + 1); /* val < 256 by the strict parse */
         } else if (strcmp(key, "szz_q") == 0) {
             memcpy(p->szz_q, val, strlen(val) + 1);
         } else if (strcmp(key, "szz_file") == 0) {
@@ -392,7 +421,7 @@ int params_read(Params *p, const char *path)
         fprintf(stderr, "ERROR: U must be >= 0\n");
         return 1;
     }
-    if (p->dtau <= 0.0) {
+    if (strcmp(p->tempering, "dtau_ladder") != 0 && p->dtau <= 0.0) {
         fprintf(stderr, "ERROR: dtau must be > 0\n");
         return 1;
     }
@@ -421,6 +450,76 @@ int params_read(Params *p, const char *path)
         fprintf(stderr, "ERROR: global_update must be none or site (got %s)\n",
                 p->global_update);
         return 1;
+    }
+    if (strcmp(p->tempering, "none") != 0 &&
+        strcmp(p->tempering, "dtau_ladder") != 0) {
+        fprintf(stderr, "ERROR: tempering must be none or dtau_ladder (got %s)\n",
+                p->tempering);
+        return 1;
+    }
+    if (strcmp(p->tempering, "none") == 0) {
+        if (p->tempering_ltr != 0 || p->tempering_file[0] != '\0') {
+            fprintf(stderr,
+                    "ERROR: tempering_ltr and tempering_file require "
+                    "tempering=dtau_ladder\n");
+            return 1;
+        }
+    } else {
+        if (p->tempering_ltr <= 0) {
+            fprintf(stderr,
+                    "ERROR: tempering=dtau_ladder requires tempering_ltr > 0\n");
+            return 1;
+        }
+        if (p->dtau_given) {
+            fprintf(stderr,
+                    "ERROR: dtau must not be given with tempering=dtau_ladder "
+                    "(dtau_k = beta_k / tempering_ltr)\n");
+            return 1;
+        }
+        if (p->nbeta < 2) {
+            fprintf(stderr,
+                    "ERROR: tempering=dtau_ladder needs at least two beta "
+                    "values\n");
+            return 1;
+        }
+        for (int i = 1; i < p->nbeta; i++) {
+            if (p->beta_list[i] <= p->beta_list[i - 1]) {
+                fprintf(stderr,
+                        "ERROR: tempering=dtau_ladder needs strictly "
+                        "increasing beta_list\n");
+                return 1;
+            }
+        }
+        if (p->stab_drift_file[0] != '\0') {
+            fprintf(stderr,
+                    "ERROR: stab_drift_file is not supported with "
+                    "tempering=dtau_ladder\n");
+            return 1;
+        }
+        if (p->udv_scale_file[0] != '\0') {
+            fprintf(stderr,
+                    "ERROR: udv_scale_file is not supported with "
+                    "tempering=dtau_ladder\n");
+            return 1;
+        }
+        if (p->udv_centered_file[0] != '\0') {
+            fprintf(stderr,
+                    "ERROR: udv_centered_file is not supported with "
+                    "tempering=dtau_ladder\n");
+            return 1;
+        }
+        if (p->global_site_diag_file[0] != '\0') {
+            fprintf(stderr,
+                    "ERROR: global_site_diag_file is not supported with "
+                    "tempering=dtau_ladder\n");
+            return 1;
+        }
+        if (p->profile != 0) {
+            fprintf(stderr,
+                    "ERROR: profile is not supported with "
+                    "tempering=dtau_ladder\n");
+            return 1;
+        }
     }
     if (p->global_site_diag_file[0] != '\0' &&
         strcmp(p->global_update, "site") != 0) {

@@ -34,6 +34,12 @@ typedef struct {
     char global_site_select[16];   /* fixed | polarized (spec 4) */
     double global_site_power;      /* alpha >= 0, finite; default 2 */
 
+    char tempering[16];            /* none | dtau_ladder */
+    int tempering_ltr;             /* fixed time slices of every slot */
+    int tempering_interval;        /* sweeps between exchange rounds */
+    char tempering_file[256];
+    int dtau_given;                /* 1 when the input sets dtau */
+
     char szz_q[256];
     char szz_file[256];
     char sperp_q[256];
