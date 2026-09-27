@@ -258,6 +258,97 @@ staggered mismatch `d`による選択は実装していません。Stage Aの診
 [docs/validation/global-hs-4x2-2026-09-21.json](docs/validation/global-hs-4x2-2026-09-21.json)に記録しています。
 site反転の受理率は低温で急速に下がるため、任意のサイズ・温度で混合を保証するものではありません。
 
+## Δτラダー並列テンパリング
+
+局所flipだけの更新（前節の大域site更新を含む）でも緩和が遅い計算には、
+並列テンパリング（PT）が使えます。PTは`beta_list`の各値に対応する`nbeta`個の
+slotからなるladderを1本走らせ、全slotで共通の時間slice数を共有するため、
+各slotは自分の時間刻み`dtau_k = beta_k / tempering_ltr`を持ちます。
+一定間隔で、隣接する2 slotのHubbard–Stratonovich配置を交換する提案を行います。
+
+| key | 値 | 既定 | 意味 |
+| --- | --- | --- | --- |
+| `tempering` | `none` / `dtau_ladder` | `none` | `dtau_ladder`でΔτラダー並列テンパリングを有効化する |
+| `tempering_ltr` | 非負整数 | `0` | 全slotが共有する時間slice数。`tempering=dtau_ladder`では`> 0`が必須（`dtau_k = beta_k / tempering_ltr`）。`tempering=none`では`0`のままにする |
+| `tempering_interval` | 正の整数 | `1` | 交換roundを行うsweep間隔（warmup中も含む）。`tempering=none`でも検証されるが効果はない |
+| `tempering_file` | path | 空 | 交換統計を書くTSV（任意）。`tempering=dtau_ladder`でのみ使用可。空のままでもPTは実行できる |
+| `field_init` | `random` / `uniform` | `random` | 初期Hubbard–Stratonovich場の族。PTの有無にかかわらず使える |
+
+```text
+tempering=dtau_ladder
+tempering_ltr=200
+tempering_interval=1
+beta_list=4,5,6.666666666666667,10
+tempering_file=pt.tsv
+```
+
+`tempering=dtau_ladder`では`dtau`を指定できません（各slot自身の
+`dtau_k = beta_k / tempering_ltr`が代わりに使われます）。`beta_list`は
+2個以上の値を昇順（strictly increasing）で指定する必要があり、
+`stab_drift_file`・`udv_scale_file`・`udv_centered_file`・
+`global_site_diag_file`・`profile=1`は拒否されます。全slotがすでに
+sign-freeでparticle-hole対称な模型（半充填・二部格子）である必要があります。
+`global_update=site`はPTと併用できます。
+
+隣接するslot `a`、`b`の交換提案では、両slotそれぞれの配置と相手の配置を
+比較します。`log W_k(C) = 2 log|det(1+B^k_up(C))| - lambda_k * sum(s)`
+（`lambda_k = acosh(exp(dtau_k * U / 2))`）を用い、
+`log R = log W_a(C_b) + log W_b(C_a) - log W_a(C_a) - log W_b(C_b)`に対して
+`min(1, exp(log R))`の確率で受理します。専用の交換用乱数streamから、
+1回の試行につき必ず1つの乱数を引きます（`log R >= 0`でも引きます）。
+試行する隣接pairは交換roundごとに`(0,1),(2,3),...`と`(1,2),(3,4),...`を
+交互に切り替え、warmup中も交換を行います。`log R`が非有限になった場合や、
+受理後の配置再構築が失敗した場合は、棄却としてではなく、そのladderの
+数値的失敗として終了します（非zero終了）。
+
+各ladderのslotと交換は、そのladderの実行中を通じて1つのMPI rank・1つの
+OpenMP threadの中で逐次実行され、ladder自体は通常のreplicaと同じ規則で
+rank・threadに分配されます。同じseedなら`serial`・`omp`・`mpi`・`hybrid`の
+結果は一致します。slot `k`の観測量は、通常のreplicaの出力と同じ場所に
+`beta_index=k`、`replica_id`をladder idとして書かれます。統計単位は
+slotではなくladderです。PTはTrotter誤差を変えません。各slotは自分の
+`dtau_k`を保持し、配置を交換しても統計誤差と時間刻み誤差は混ざりません。
+
+PT時は、標準出力の先頭行と`szz_file`・`sperp_file`・
+`spin_consistency_file`のheaderで、数値の代わりに`dtau=ladder`と表示します。
+標準出力の先頭行には`tempering=dtau_ladder tempering_ltr=... tempering_interval=...`
+（`tempering_file`を指定した場合は`tempering_file=...`も）が追加されます。
+`replica_bin_file`には`# tempering=dtau_ladder tempering_ltr=...`という
+header行が1行追加されます。通常の単一`dtau=`欄は使われないため、各行自身の
+`Ltr`と`beta_effective`列から`dtau_k = beta_effective / Ltr`を求めます。
+標準出力の最後の行は`# tempering solver_elapsed_seconds=... nranks=...`で、
+プロセス開始から出力を閉じる直前までのsolver自身のwall時間です
+（schedulerのjob時間や、ladder間の総和ではありません）。
+
+`tempering_file`は自己記述的なTSVで（`# tempering=...`header、slotごとの
+`# slot=k beta=... dtau=... lambda=...`行、`# columns:`の列定義を含む）、
+5種類の行を持ちます。
+
+| kind | 意味 |
+| --- | --- |
+| `pair` | binごとの、隣接pairの交換試行数・受理数（`bin=-1`はwarmup全体の合計） |
+| `slot` | binごと・slotごとに、そのslotをbin終了時に占めているwalkerと、そのbinの各sample時点でslotの占有walkerが最後に訪れた端がhot（slot 0）・cold（最終slot）のどちらだったかを積算した回数 |
+| `walker` | walkerごとに、測定区間内で完了したhot→cold→hotの往復回数と、実行終了時に占めていたslot |
+| `ladder` | ladderごとに1行。交換用乱数streamのseedと、そのladderが失敗したかどうか |
+| `cost` | ladderごとの4種類のworker秒（warmup、測定sweep、測定交換、測定observable計算） |
+
+`cost`行は1つのladder自身のworker時間であり、jobのwall時間やnode-hourでは
+ありません。複数のladderを同時に走らせている場合、`cost`行を単純に足し合わせて
+実際のwall時間を推定してはいけません。往復は、測定区間の内部で完全に
+hot slot→最も冷たいslot→hot slotの順に完了した場合だけを数えます。
+
+`field_init=uniform`は、通常の各site乱数draw（実行され、その後捨てられるため
+乱数streamは`field_init=random`と同一のまま）の後に、全Hubbard–Stratonovich場を
+`+1`に上書きします。PTの有無にかかわらず使え、初期配置だけを変えます。
+
+PT実装の検証（cross-weight検査、厳密列挙samplingテスト、PT前baselineとの
+byte同一性、`serial`/`omp`/`mpi`/`hybrid`の一致、MPI失敗経路のテスト、独立chainと
+厳密対角化に対する有限サイズ正当性検証）は[VALIDATION.md](VALIDATION.md)に
+記録しています。PTは1つのladderのslotを複数のMPI rankへ分配せず、
+`beta_list`の温度配置を交換受理率などから自動最適化する機能もなく、
+上記の診断fileやprofilerにも対応していません。本計算を行う前に
+[既知の制約](docs/limitations.md)を確認してください。
+
 ## 検証と制約
 
 ```sh

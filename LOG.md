@@ -1,6 +1,66 @@
 # LOG
 
 ---
+date: 2026-09-27
+datetime: 2026-09-27 22:47 JST
+model: |
+  Claude Opus 5.5 (Claude Code; plan, coordination, and Tasks 5-7
+  implementation); Claude Sonnet 5 (Tasks 1, 3, 4, 5b, 8, 9 implementation);
+  Claude Haiku 4.5 (Task 2 implementation); Claude Sonnet 5 and Claude
+  Opus 5.5 (reviews)
+summary: |
+  Documented the new tempering=dtau_ladder parallel-tempering (PT) feature:
+  input keys and usage in README.md/README_ja.md, PT-specific limitations
+  in docs/limitations.md, and the implementation-correctness validation
+  (cross-weight check, exact-enumeration sampling test with a negative
+  control, byte identity against the pre-PT baseline, serial/omp/mpi/hybrid
+  agreement, MPI failure-path tests, and an L6 chain U=4
+  PT-vs-independent-chain screen) in a new VALIDATION.md section. Also adds
+  the corresponding dataset to data/README.md. No source code changed.
+---
+
+## 2026-09-27: Document the dtau-ladder parallel tempering (PT)
+
+- Added the `tempering`, `tempering_ltr`, `tempering_interval`,
+  `tempering_file`, and `field_init` input keys to the English and Japanese
+  reference tables, plus a new PT usage section describing the exchange
+  rule, the output conventions (`beta_index`/`replica_id` mapping, the
+  `dtau=ladder` headers, the `replica_bin_file` PT header line, the
+  `tempering_file` row kinds, and the `solver_elapsed_seconds` line), and
+  its caveats.
+- Added a "Parallel tempering" section to `docs/limitations.md`: PT is
+  validated only for sign-free, particle-hole-symmetric half-filled
+  bipartite models; one ladder always runs on a single MPI rank/OpenMP
+  thread for its whole lifetime (no rank-distributed slots); the
+  diagnostic files and the profiler rejected together with PT have no
+  PT-specific meaning; there is no feedback-optimized placement of the
+  `beta_list` temperatures.
+- Added VALIDATION.md Sec. 9, recording: the cross-weight check against an
+  independent log-determinant implementation; the exact-enumeration
+  sampling test (p=0.3503/0.9012/0.1786) and its negative control
+  (p~1.9e-6/7.1e-62/3.4e-123, rc=1); byte identity of every
+  `tempering=none`/unspecified run against the pre-PT baseline commit
+  `3215eee` across 12 variants and 2 fixtures; `serial`/`omp`/`mpi`/`hybrid`
+  agreement and the 4 MPI failure-path cases; and an `L=6` chain, `U=4`
+  PT-vs-independent-chain screen (16/16 `|z|<3`, max `|z|=1.808`), with the
+  reference `dtau^2` check (8/8 rows within 3 SE) reported as a consistency
+  reference, not as proof of a Trotter-error origin.
+- Recorded, as a dated fact, that the older `make test_global_default`
+  regression cannot run in this repository because its baseline commit
+  `463dc75` is absent here; this is pre-existing and unrelated to this
+  change. The new `3215eee`-based `make test_tempering_default` is the
+  test that actually covers the byte-identity guarantee for this change.
+- Added the `tempering_L6_U4_ed_20260927/` dataset to `data/README.md` and
+  corrected its "not new calculations" sentence: unlike the two pre-existing
+  historical datasets, this one was computed with this branch's own source.
+- Model-attribution correction: the Git commit trailers for Tasks 1-3 name
+  Claude Opus 5.5, but the actual implementers were Claude Sonnet 5
+  (Task 1), Claude Haiku 4.5 (Task 2), and Claude Sonnet 5 (Task 3), as
+  listed in this entry's `model` field above. This LOG entry is the
+  accurate record of who did the work; the commit history itself is not
+  being rewritten.
+
+---
 date: 2026-09-26
 datetime: 2026-09-26 16:16 JST
 model: OpenAI gpt-5.6-sol (Codex)

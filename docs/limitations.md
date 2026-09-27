@@ -59,6 +59,25 @@ The corresponding analysis summaries, including failed checks, are under
 An old diagnostic suggestion to run with `nbin=1` is incompatible with the
 current input requirement `nbin>=2` and should not be used as a runnable example.
 
+## Parallel tempering
+
+The optional `tempering=dtau_ladder` mode is validated only within the scope
+above: every slot must already be a sign-free, particle-hole-symmetric model
+at half filling on a bipartite lattice, and the same finite-`dtau` Trotter
+bias applies independently to each slot's own `dtau_k`. Exchanging
+configurations between slots does not reduce or otherwise change that bias.
+
+A ladder's slots and exchanges all run on one MPI rank and one OpenMP thread
+for the ladder's entire lifetime; the current implementation does not
+distribute a single ladder's slots across ranks or threads, so a ladder's
+per-rank/per-thread cost scales with its own number of slots. The
+diagnostic and profiling files rejected together with PT (`stab_drift_file`,
+`udv_scale_file`, `udv_centered_file`, `global_site_diag_file`, `profile=1`)
+have not been given a per-slot, per-ladder meaning; using them requires
+`tempering=none`. The `beta_list` temperature ladder is fixed by the input
+file; there is no feedback-optimized, or otherwise automatic, placement of
+temperatures based on observed exchange acceptance rates.
+
 ## Distribution details
 
 Spin structure factors currently require built-in chain/square geometry.

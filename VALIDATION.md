@@ -1,8 +1,11 @@
 ---
-date: 2026-09-26
-datetime: 2026-09-26 12:58 JST
-model: OpenAI GPT-6 (Codex; revision), Codex GPT-5 (original)
+date: 2026-09-27
+datetime: 2026-09-27 22:34 JST
+model: OpenAI GPT-6 (Codex; revision), Codex GPT-5 (original), Claude Sonnet 5 (Anthropic; 2026-09-27 addition)
 summary: |
+  Delta tau-ladder並列テンパリング（PT）の実装検証: cross-weight直接検査、厳密列挙χ²と負の対照、
+  3215eeeとのbyte同一性、serial/OpenMP/MPI/hybrid一致、MPI失敗経路、L6 chain U=4のPT対独立chain
+  screen（16/16、最大|z|=1.808）はすべて合格。PTがTrotter誤差を解消したとは主張しない。
   120 replicaの追加診断は正常終了し、63受理・31 replicaでp支持、d不支持。段階Bの効果は未検証。
   Stage Aの4×4・12 replica診断pilotは正常終了。受理8件・4 replicaで両指標とも判定不能。
   半充填ハバード模型の E(T) を grand-canonical ED/TPQ と比較する検証手順。
@@ -405,3 +408,132 @@ pは`R >= 3`かつ95%区間下限`> 1`、dは95%区間上限`< 2`の基準をそ
 pilot 12 replicaは今回のseed集合の部分集合なので、合算して132の独立replicaとは扱わない。
 
 数値・全histogram・provenanceは[機械可読の検証記録](docs/validation/global-site-diag-120-2026-09-26.json)にも保存した。
+
+## 9. Δτ-ladder parallel tempering（2026-09-27〜）
+
+**cross-weight検査・厳密列挙χ²・3215eeeとのbyte同一性・serial/OpenMP/MPI/hybrid一致・
+MPI失敗経路・L6 chain U=4でのPT対独立chain検証は、いずれも合格。**
+This section records the correctness validation of the new `tempering=dtau_ladder`
+parallel-tempering (PT) machinery: an independent cross-weight check, an
+exact-enumeration stationarity/sampling test (with a negative control that is
+required to fail), byte-identity of every `tempering=none`/unspecified run
+against the pre-PT baseline, agreement across `serial`/`omp`/`mpi`/`hybrid`,
+MPI failure-path handling, and a finite-size (`L=6` chain, `U=4`) check of PT
+slots against independent non-PT chains at the same `(beta, dtau)`. This is a
+correctness check of the implementation, not a scientific validation of any
+physical result computed with PT, and it does not show that PT reduces or
+removes Trotter error — every slot keeps its own `dtau_k`.
+
+### cross-weightの直接行列式検査
+
+`dqmc_log_weight_of`（他slotの配置での対数weight）と`dqmc_replace_field`
+（配置の入替とGreen関数の再構築）を`src/dqmc.c`に追加し、独立実装との一致を
+検査した。比較対象は、`green_build_B`/`green_logdet_full`と経路を共有しない
+（`green_build_B`出力とnaive `B`構成の1点anchor checkを除く）、`expK`・`s`・
+`lambda`から直接組み立てたnaive Gaussian消去法によるlog-determinantである。
+交換比の恒等式`logR = logW_a(C_b) + logW_b(C_a) - logW_a(C_a) - logW_b(C_b)`と
+その反対称性、`NULL`・失敗状態guardを確認した。`dqmc_global_site_pass`末尾の
+再構築処理を専用関数として抽出した変更は、既存の条件・呼び出し順を保ったままの
+機械的な抽出であり、`make test`の既存`test_dqmc_global*`/`test_global_output`が
+回帰なしを確認した（rc=0、`ALL TESTS PASSED`）。
+
+### 厳密列挙χ²（sampling p値）と負の対照
+
+3-slot ladder（`TemperingLadder`、`tempering_ladder_try_pair`/`_round`）を、
+既知の定常分布を持つ厳密列挙oracleでp値検定した
+（`tests/test_tempering_sampling.c`、200 trial、帰無仮説`p >= 1e-3`）。
+
+| slot | p値 |
+| ---: | ---: |
+| 0 | 0.3503 |
+| 1 | 0.9012 |
+| 2 | 0.1786 |
+
+3 slotとも`p >= 1e-3`で合格（rc=0）。
+
+負の対照として、交換比の式から`- logw_b_cb`項を落とした変異を、実際のworktree・
+binaryとは独立なscratch treeにのみ適用し、同じsamplingテストを実行した。
+
+| slot | p値（負の対照） |
+| ---: | ---: |
+| 0 | 1.9e-6 |
+| 1 | 7.1e-62 |
+| 2 | 3.4e-123 |
+
+3 slotとも`p < 1e-3`で棄却され、`rc=1`。実際のworktreeの交換比の実装は
+変更されておらず、正しい式（`... - logw_a_ca - logw_b_cb`を含む）のままである
+ことをテスト後に確認した。この負の対照は、samplingテストが誤った交換比の式を
+検出できることを示す。
+
+### 3215eeeとのbyte同一性（`tempering`未指定・`tempering=none`）
+
+`tests/test_tempering_disabled_unchanged.sh`（`make test_tempering_default`）は、
+このPT開発の起点commit `3215eee700b9b6359242e228e515cf83a5a53732`を同じ
+toolchainで別途buildし、`chain`・`square`の2 fixture × 12 variantで出力を
+比較する。variant一覧（`omitted`/`none`/`field_random`/`global`/`select`/
+`bins`/`alternating`/`diag`/`drift`/`udvscale`/`centered`/`profile`、合計
+24比較）は`tests/test_tempering_disabled_unchanged.sh`を正本とする。`profile`
+variantだけは実行時間の列を除いた空白区切りの列（schema・呼出し回数）を比較し、
+他の全variantは生成された全fileを完全byte一致で比較する。24比較すべてが合格した。
+
+**2026-09-27の事実記録**: 旧`make test_global_default`（比較先commit
+`463dc75`）は、このrepositoryでは実行できない。`463dc75`はSAI-QMCの
+object storeに存在せず、この欠落は今回の変更と無関係な既存の状態である
+（`463dc75`が存在しないrepositoryでは、tempering実装の前後を問わず同じ理由で
+常に失敗する）。本変更のbyte同一性保証は、新設した`3215eee`ベースの
+`make test_tempering_default`が担う。
+
+### serial/OpenMP/MPI/hybrid一致とMPI失敗経路
+
+`tests/test_tempering_parallel.sh`は`nrep=4`のPT runを`serial`・`omp`
+（2 threads）・`mpi`（`-n 2`）・`hybrid`（`-n 2` × 2 threads）の4形態で実行し、
+`bins.tsv`全体、`pt.tsv`（`cost`行を除く）、およびstdoutの`#`で始まらない行を
+比較して一致を確認した（`solver_elapsed_seconds`行と先頭行は形態ごとに異なる
+ため`#`行を除外して比較する）。mpiの`solver_elapsed_seconds`行が`nranks=2`で
+終わることも確認した。
+
+`tests/test_tempering_mpi_failure.sh`は4ケースで異常系を検査した。
+
+| case | 条件 | 結果 |
+| --- | --- | --- |
+| 1 | `-n 2`、`nrep=3`、rank 1のみladder 2を失敗させるhook | 両rank exit 1、rank 0のstderrがladder 2を明示、`pt.tsv`のladder 2行が`failed=1`、他のladderは`0` |
+| 2 | `-n 4`、`nrep=2`（rank 2・3はladderを持たない） | 全rank exit 0、`pair`行20行 |
+| 3 | `-n 2`、`tempering_file=no_such_dir/pt.tsv`（開けないpath） | 両rank exit 1 |
+| 4 | `-n 2`、`nrep=3`、`tempering_file`省略 | 両rank exit 0、`pt.tsv`は生成されない |
+
+全ケースで各rankの終了codeを直接回収して判定した。`make test`・`test_omp`・
+`test_mpi`・`test_hybrid`はいずれもrc=0で`ALL ... TESTS PASSED`。
+
+### L6 chain、U=4: PTスロット対独立chainの検証
+
+periodic `Lx=6`、`U=4`、`mu=U/2=2`（半充填）のHubbard chainで、PT
+（`tempering_ltr=200`、4 slot、`beta_list=4,5,6.666666666666667,10`、
+`dtau_k=beta_k/200`）の各slotを、同じ`(beta_k,dtau_k)`を`dtau`で明示した
+独立（非PT）chainと比較した。両方とも`nrep=16`、`nwarm=2000`、`nmeas=50000`、
+`nbin=100`。`E/N`、`D`、`M^2=N*Szz(q=0)`、`Szz(Q)`（`Q`はstaggered/AF波数）の
+4観測量について、16本のreplicaにわたる平均・SEを求め、
+`z=(PT平均-独立平均)/sqrt(PT_SE^2+独立_SE^2)`で比較した。
+
+| slot | beta | T | z(E/N) | z(D) | z(M²) | z(Szz(Q)) |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 0 | 4 | 0.25 | -0.43 | 0.92 | 0.87 | 0.66 |
+| 1 | 5 | 0.20 | -0.54 | 0.75 | -0.87 | -0.11 |
+| 2 | 6.666667 | 0.15 | 1.81 | -0.42 | 0.70 | -0.04 |
+| 3 | 10 | 0.10 | 1.12 | -0.68 | -0.14 | 0.33 |
+
+16比較すべて`|z| < 3`（最大`|z| = 1.808`、slot 2の`E/N`）。詳細な平均・SE・
+生データ・再現手順は[data/tempering_L6_U4_ed_20260927/README.md](data/tempering_L6_U4_ed_20260927/README.md)
+に記録する。
+
+参考として、`E/N`と`D`について、PTおよび独立chainとgrand-canonical EDとの
+差を、既存の3点`dtau`外挿表（別のbeta格子から補間した`slope(T)*dtau_k^2`の
+予測）と比較した。PTと独立chainのED差がともに予測から3 SE以内に収まった行は
+8/8（4 slot × `E/N`・`D`の2観測量）。**これはTrotter誤差の起源を証明する
+ものではなく、別のbeta格子から補間した3点勾配を使った参考の整合性checkであり、
+この run自身の`dtau -> 0`外挿でもない。**
+
+上記の`|z| < 3`という基準は、各行が自分自身の統計誤差の範囲内でPTと独立chainが
+整合することを示すものであり、両者が同じ精度に達したことを意味しない
+（`PT SE`と独立`SE`は行によって最大で2倍近く異なる）。ED差は参考情報であり、
+Trotter誤差への自動的な帰属ではない。この検証全体は実装の正しさについての
+限定的な確認であり、ここで到達した統計量を超えた一般的な証明ではない。

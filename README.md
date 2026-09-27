@@ -279,6 +279,107 @@ and [docs/validation/global-hs-4x2-2026-09-21.json](docs/validation/global-hs-4x
 The acceptance rate of the site flip decreases rapidly at low temperature, so the
 update does not guarantee mixing for arbitrary sizes and temperatures.
 
+## Δτ-ladder parallel tempering
+
+Runs that decorrelate slowly under local flips (and even the global site
+update above) can use parallel tempering (PT) instead: a ladder of `nbeta`
+slots, one per `beta_list` value, sharing one fixed number of time slices so
+that each slot keeps its own time step `dtau_k = beta_k / tempering_ltr`,
+with periodic proposals to exchange the Hubbard-Stratonovich configuration
+of two neighboring slots.
+
+| key | values | default | meaning |
+| --- | --- | --- | --- |
+| `tempering` | `none` / `dtau_ladder` | `none` | `dtau_ladder` enables the Δτ-ladder parallel-tempering mode |
+| `tempering_ltr` | non-negative integer | `0` | time slices shared by every slot; required `> 0` with `tempering=dtau_ladder` (`dtau_k = beta_k / tempering_ltr`); must stay `0` with `tempering=none` |
+| `tempering_interval` | positive integer | `1` | sweeps between exchange rounds, including during warmup; validated even when `tempering=none`, where it has no effect |
+| `tempering_file` | path | empty | optional TSV of per-ladder exchange statistics; only usable with `tempering=dtau_ladder`; PT runs without it when left empty |
+| `field_init` | `random` / `uniform` | `random` | initial Hubbard-Stratonovich field family; usable with or without PT |
+
+```text
+tempering=dtau_ladder
+tempering_ltr=200
+tempering_interval=1
+beta_list=4,5,6.666666666666667,10
+tempering_file=pt.tsv
+```
+
+With `tempering=dtau_ladder`, `dtau` must not be given (each slot's own
+`dtau_k = beta_k / tempering_ltr` is used instead), `beta_list` needs at
+least two strictly increasing values, and `stab_drift_file`,
+`udv_scale_file`, `udv_centered_file`, `global_site_diag_file`, and
+`profile=1` are rejected. Every slot must already be a sign-free,
+particle-hole-symmetric model (half filling, bipartite lattice);
+`global_update=site` may be combined with PT.
+
+An exchange attempt between neighboring slots `a` and `b` compares each
+slot's own configuration against the other's: with
+`log W_k(C) = 2 log|det(1+B^k_up(C))| - lambda_k * sum(s)` and
+`lambda_k = acosh(exp(dtau_k * U / 2))`, the move accepts with probability
+`min(1, exp(log R))` for
+`log R = log W_a(C_b) + log W_b(C_a) - log W_a(C_a) - log W_b(C_b)`, drawing
+exactly one number from a dedicated exchange random stream per attempt
+(even when `log R >= 0`). Attempted neighbor pairs alternate between
+`(0,1),(2,3),...` and `(1,2),(3,4),...` from one exchange round to the next,
+including during warmup. A non-finite `log R`, or a failed configuration
+rebuild after an accepted exchange, ends the ladder as a numerical failure
+(nonzero exit) rather than a silent rejection.
+
+Each ladder's slots and exchanges run, for the ladder's whole lifetime, on
+one MPI rank and one OpenMP thread; ladders are distributed across
+ranks/threads the same way ordinary replicas are. Given the same seed,
+`serial`/`omp`/`mpi`/`hybrid` builds give identical results. Slot `k`'s
+observables are written wherever a replica's would be, with `beta_index=k`
+and `replica_id` set to the ladder id: the ladder, not the slot, is the
+statistical unit. PT does not change the Trotter error — every slot keeps
+its own `dtau_k`, and exchanging configurations does not mix statistical
+error with time-step error.
+
+Under PT, the first stdout line, and the `szz_file`/`sperp_file`/
+`spin_consistency_file` headers, report `dtau=ladder` in place of a numeric
+value, and the stdout line also gains
+`tempering=dtau_ladder tempering_ltr=... tempering_interval=...` (plus
+`tempering_file=...` when set). A `replica_bin_file` gains one extra header
+line, `# tempering=dtau_ladder tempering_ltr=...`, because its usual single
+`dtau=` field is unused; each row's own `Ltr` and `beta_effective` columns
+give that row's `dtau_k = beta_effective / Ltr`. The scalar output's last
+line is `# tempering solver_elapsed_seconds=... nranks=...`: the solver's
+own wall time (from process start to just before closing outputs), not a
+scheduler job time or a sum over ladders.
+
+`tempering_file` is a self-documenting TSV (a `# tempering=...` header, one
+`# slot=k beta=... dtau=... lambda=...` line per slot, and a `# columns:`
+legend), with rows of five kinds:
+
+| kind | meaning |
+| --- | --- |
+| `pair` | attempts/accepted exchanges for one neighboring pair, per bin (`bin=-1` is the warmup total) |
+| `slot` | per bin, per slot: which walker occupies that slot at the bin's end, and, summed over the bin's samples, how many times the slot's occupant had last visited the hot (slot 0) versus the cold (last slot) end |
+| `walker` | per walker: completed hot->cold->hot round trips within the measurement window, and the walker's final slot |
+| `ladder` | one row per ladder: the exchange random stream's seed, and whether the ladder failed |
+| `cost` | four worker-second timings per ladder (warmup, measurement sweeps, measurement exchanges, measurement observable calls) |
+
+`cost` rows report one ladder's own worker time, not job wall time or
+node-hours: with several ladders running at once, their `cost` rows must
+not simply be added together to estimate the wall time actually spent. A
+round trip counts a walker only once it completes hot slot -> coldest slot
+-> hot slot again, entirely inside the current measurement window.
+
+`field_init=uniform` sets every Hubbard-Stratonovich field to `+1` after the
+usual per-site random draws (which are made and then discarded, so the
+random stream is identical to `field_init=random`); it works with or
+without PT and only changes the starting configuration.
+
+Validation of the PT implementation — cross-weight checks, an
+exact-enumeration sampling test, byte-identity against the pre-PT baseline,
+`serial`/`omp`/`mpi`/`hybrid` agreement, MPI failure-path tests, and a
+finite-size correctness check against independent chains and exact
+diagonalization — is recorded in [VALIDATION.md](VALIDATION.md). PT does
+not distribute one ladder's slots across MPI ranks, has no
+feedback-optimized placement of the `beta_list` temperatures, and does not
+support the diagnostic files or profiler listed above; read
+[known limitations](docs/limitations.md) before production use.
+
 ## Validation and limits
 
 ```sh
