@@ -195,8 +195,40 @@ static double now_seconds(void)
     return (double)ts.tv_sec + 1e-9 * (double)ts.tv_nsec;
 }
 
-static void report_exchange_failure(const TemperingLadder *T, ReplicaChain *c,
-                                    int ladder_id, unsigned long long sweep)
+/* One slot's numerical breakdown, in the form of the warmup and measurement
+   lines of dqmc_run_replica with the slot and ladder added. bin < 0 selects
+   the warmup form. */
+static void report_slot_breakdown(const ReplicaChain *c, int k, int ladder_id,
+                                  int bin, int meas)
+{
+    const Params *p = c->p;
+    const char *reason =
+        linalg_failure_reason_string(replica_chain_failure_reason(c));
+    if (bin < 0) {
+        fprintf(stderr,
+                "ERROR: dqmc warmup numerical breakdown "
+                "(slot=%d ladder=%d beta_index=%d beta=%.17g T=%.17g "
+                "replica=%d seed=%llu U=%g dtau=%g Ltr=%d stab=%d "
+                "sweep_count=%llu status=%d failure_reason=%s)\n",
+                k, ladder_id, k, c->beta, c->T, ladder_id, c->seed, p->U,
+                c->dtau, c->Ltr, p->stab_interval, c->D.sweep_count,
+                c->D.status, reason);
+    } else {
+        fprintf(stderr,
+                "ERROR: dqmc measurement numerical breakdown "
+                "(slot=%d ladder=%d beta_index=%d beta=%.17g T=%.17g "
+                "replica=%d seed=%llu U=%g dtau=%g Ltr=%d stab=%d "
+                "sweep_count=%llu bin=%d meas=%d status=%d "
+                "failure_reason=%s)\n",
+                k, ladder_id, k, c->beta, c->T, ladder_id, c->seed, p->U,
+                c->dtau, c->Ltr, p->stab_interval, c->D.sweep_count, bin,
+                meas, c->D.status, reason);
+    }
+}
+
+static void report_exchange_failure(const TemperingLadder *T,
+                                    const ReplicaChain *c, int ladder_id,
+                                    unsigned long long sweep)
 {
     const int k = T->fail_pair;
     const int sa = (k >= 0 && k < T->nslot) ? c[k].D.status : -1;
@@ -206,6 +238,75 @@ static void report_exchange_failure(const TemperingLadder *T, ReplicaChain *c,
             "sweep=%llu slot_status=%d,%d)\n",
             ladder_id, k, T->round, sweep, sa, sb);
 }
+
+/* The exchange round after ladder sweep `sweep` (bin < 0: warmup). A slot
+   whose own sweep or global pass has already failed is reported as that
+   slot's breakdown and the round is not attempted, whether or not the round
+   would include that slot. Only a failure of the round itself with every
+   slot intact (a weight evaluation, a non-finite log R, or the rebuild after
+   an accepted exchange) is reported as an exchange failure. */
+static int exchange_round(TemperingLadder *T, const ReplicaChain *c,
+                          int ladder_id, unsigned long long sweep, int bin,
+                          int meas)
+{
+    int slot_failed = 0;
+    for (int k = 0; k < T->nslot; k++) {
+        if (c[k].D.status != 0) {
+            report_slot_breakdown(&c[k], k, ladder_id, bin, meas);
+            slot_failed = 1;
+        }
+    }
+    if (slot_failed) {
+        return 1;
+    }
+    if (tempering_ladder_round(T) != 0) {
+        report_exchange_failure(T, c, ladder_id, sweep);
+        return 1;
+    }
+    return 0;
+}
+
+#ifdef AFQMC_TEST_HOOKS
+/* Failure injection for tests (hook builds only), after the slot sweeps of
+   ladder sweep s (warmup included) and before that sweep's exchange round:
+   AFQMC_TEST_TEMPERING_SLOT_FAIL_AT=s with AFQMC_TEST_TEMPERING_SLOT_FAIL_SLOT=k
+   marks slot k as failed, as its own failed sweep or global pass would;
+   AFQMC_TEST_TEMPERING_EXCHANGE_FAIL_AT=s makes the round's weight
+   evaluations fail while every slot stays intact. */
+typedef struct {
+    unsigned long long slot_fail_at, exchange_fail_at;
+    int slot_fail_slot;
+} TemperingTestHooks;
+
+static void tempering_test_hooks_read(TemperingTestHooks *h)
+{
+    const char *at = getenv("AFQMC_TEST_TEMPERING_SLOT_FAIL_AT");
+    const char *slot = getenv("AFQMC_TEST_TEMPERING_SLOT_FAIL_SLOT");
+    const char *xat = getenv("AFQMC_TEST_TEMPERING_EXCHANGE_FAIL_AT");
+    h->slot_fail_at = (at != NULL) ? strtoull(at, NULL, 10) : 0ULL;
+    h->slot_fail_slot = (slot != NULL) ? atoi(slot) : 0;
+    h->exchange_fail_at = (xat != NULL) ? strtoull(xat, NULL, 10) : 0ULL;
+}
+
+static void tempering_test_hooks_apply(const TemperingTestHooks *h,
+                                       ReplicaChain *c, int nslot,
+                                       int ladder_id, unsigned long long s)
+{
+    if (h->slot_fail_at != 0ULL && s == h->slot_fail_at &&
+        h->slot_fail_slot >= 0 && h->slot_fail_slot < nslot) {
+        c[h->slot_fail_slot].D.status = 1;
+        fprintf(stderr, "TEST_TEMPERING_SLOT_FAIL ladder=%d slot=%d sweep=%llu\n",
+                ladder_id, h->slot_fail_slot, s);
+    }
+    if (h->exchange_fail_at != 0ULL && s == h->exchange_fail_at) {
+        for (int k = 0; k < nslot; k++) {
+            c[k].D.Gu.work.failed = 1;   /* sticky: log-det evaluations fail */
+        }
+        fprintf(stderr, "TEST_TEMPERING_EXCHANGE_FAIL ladder=%d sweep=%llu\n",
+                ladder_id, s);
+    }
+}
+#endif
 
 int dqmc_run_ladder(const Params *p, const Lattice *L, double mu, int ladder_id,
                     const StructureFactorPlan *szz_plan,
@@ -272,6 +373,8 @@ int dqmc_run_ladder(const Params *p, const Lattice *L, double mu, int ladder_id,
             goto done;
         }
     }
+    TemperingTestHooks hooks;
+    tempering_test_hooks_read(&hooks);
 #endif
 
     const unsigned long long interval = (unsigned long long)p->tempering_interval;
@@ -281,8 +384,11 @@ int dqmc_run_ladder(const Params *p, const Lattice *L, double mu, int ladder_id,
             (void)replica_chain_step(&c[k]);
         }
         const unsigned long long s = (unsigned long long)w + 1ULL;
-        if (s % interval == 0ULL && tempering_ladder_round(&T) != 0) {
-            report_exchange_failure(&T, c, ladder_id, s);
+#ifdef AFQMC_TEST_HOOKS
+        tempering_test_hooks_apply(&hooks, c, nslot, ladder_id, s);
+#endif
+        if (s % interval == 0ULL &&
+            exchange_round(&T, c, ladder_id, s, -1, 0) != 0) {
             out->sec_warmup += now_seconds() - t0;
             goto done;
         }
@@ -291,16 +397,7 @@ int dqmc_run_ladder(const Params *p, const Lattice *L, double mu, int ladder_id,
 
     for (int k = 0; k < nslot; k++) {
         if (c[k].D.status != 0 || !replica_chain_state_is_finite(&c[k])) {
-            fprintf(stderr,
-                    "ERROR: dqmc warmup numerical breakdown "
-                    "(slot=%d ladder=%d beta_index=%d beta=%.17g T=%.17g "
-                    "replica=%d seed=%llu U=%g dtau=%g Ltr=%d stab=%d "
-                    "sweep_count=%llu status=%d failure_reason=%s)\n",
-                    k, ladder_id, k, c[k].beta, c[k].T, ladder_id, c[k].seed,
-                    p->U, c[k].dtau, Ltr, p->stab_interval,
-                    c[k].D.sweep_count, c[k].D.status,
-                    linalg_failure_reason_string(
-                        replica_chain_failure_reason(&c[k])));
+            report_slot_breakdown(&c[k], k, ladder_id, -1, 0);
             goto done;
         }
     }
@@ -348,9 +445,11 @@ int dqmc_run_ladder(const Params *p, const Lattice *L, double mu, int ladder_id,
             const unsigned long long s = (unsigned long long)p->nwarm +
                                          (unsigned long long)bi * (unsigned long long)per +
                                          (unsigned long long)kk + 1ULL;
+#ifdef AFQMC_TEST_HOOKS
+            tempering_test_hooks_apply(&hooks, c, nslot, ladder_id, s);
+#endif
             if (s % interval == 0ULL) {
-                if (tempering_ladder_round(&T) != 0) {
-                    report_exchange_failure(&T, c, ladder_id, s);
+                if (exchange_round(&T, c, ladder_id, s, bi, kk) != 0) {
                     out->sec_meas_exchange += now_seconds() - t1;
                     goto done;
                 }
