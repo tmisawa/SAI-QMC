@@ -1,6 +1,65 @@
 # LOG
 
 ---
+date: 2026-09-28
+datetime: 2026-09-28 01:48 JST
+model: Claude Opus 5.5 (Claude Code)
+summary: |
+  Follow-up fixes for the dtau-ladder parallel tempering: a slot whose own
+  sweep or global pass failed is now reported as that slot's numerical
+  breakdown instead of as an exchange failure; a hook-based
+  failure-message test and a slow exact-enumeration regression of the
+  integrated ladder driver under the production option sets were added;
+  the field_init=uniform double-precision bound, the whole-run failure
+  semantics, and the two-slot exchange interval are documented; identifiers
+  not defined in this repository were replaced by self-contained wording.
+---
+
+## 2026-09-28: Tempering follow-up fixes (failure reporting, driver regression, documented limits)
+
+- `src/tempering_run.c`: before every exchange round the ladder driver
+  checks all slots. A slot whose own sweep or global pass has failed is
+  reported with the per-slot `dqmc warmup numerical breakdown` or
+  `dqmc measurement numerical breakdown` line (slot, ladder, beta, dtau,
+  sweep_count, status, failure_reason), and the round is not attempted.
+  Before, the round's pre-flight status check reported it as
+  `tempering exchange failed (... slot_status=1,0)`, one sweep late when
+  the failed slot was not in the round. Failures of the round itself with
+  every slot intact are still exchange failures. Successful runs are
+  unchanged (`make test_tempering_default` OK).
+- New `tests/test_tempering_failure_messages.sh` (`make test`) injects a
+  measurement-phase global-pass failure, a warmup slot failure, and a
+  genuine exchange failure through hook-build-only environment variables,
+  and checks each message, the nonzero exit, header-only scalar output, an
+  empty bin file, and `failed=1` in `tempering_file`; production binaries
+  ignore the hooks. Before the fix the first two cases failed.
+- New `tests/test_tempering_driver_exact_slow.c` (`make test_slow`) runs
+  `dqmc_run_ladder` for three option sets (forward without global update;
+  alternating with site global update every 3 sweeps and `stab=2 < Ltr`;
+  alternating with polarized global update every 2 sweeps and
+  `tempering_interval=3`), 800 ladders each, against exact finite-`dtau`
+  enumeration: all 18 E/D comparisons within `|z| < 4` (max 1.89), about
+  1 min per case.
+- Documented in README.md, README_ja.md, docs/limitations.md, and
+  VALIDATION.md: the `field_init=uniform` scale `exp(Ltr*lambda + beta*w)`
+  and its double-precision failure at initialization (U=8, dtau=0.0125,
+  4x4: beta=24 starts with 1.6 e-folds of margin; beta=24.5, 25, 26 fail
+  in `dqmc_init`; measured boundary between Ltr=1927 and 1928); that one
+  failed ladder fails the whole run and leaves only `tempering_file`; and
+  that two slots attempt their pair only every second round. VALIDATION.md
+  also corrects the sampling-test size (4000 ladders x 150 cycles, not
+  "200 trial").
+- Comments, the 2026-09-27 LOG entry, and the L6 dataset README now state
+  the rules and work items themselves instead of identifiers that are not
+  defined in this repository; object files are unchanged.
+- Verification: `make test` rc=0, `make test_tempering_default` OK,
+  `make test_slow` rc=0,
+  `OMPI_CC=cc OMP_NUM_THREADS=2 make test_mpi test_hybrid` rc=0, and
+  `python3 scripts/verify_reference_data.py` PASS.
+  `make test_global_default` still cannot run here (baseline `463dc75`
+  absent), as recorded on 2026-09-27.
+
+---
 date: 2026-09-27
 datetime: 2026-09-27 22:47 JST
 model: |
