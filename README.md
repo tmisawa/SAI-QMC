@@ -292,7 +292,7 @@ of two neighboring slots.
 | --- | --- | --- | --- |
 | `tempering` | `none` / `dtau_ladder` | `none` | `dtau_ladder` enables the Δτ-ladder parallel-tempering mode |
 | `tempering_ltr` | non-negative integer | `0` | time slices shared by every slot; required `> 0` with `tempering=dtau_ladder` (`dtau_k = beta_k / tempering_ltr`); must stay `0` with `tempering=none` |
-| `tempering_interval` | positive integer | `1` | sweeps between exchange rounds, including during warmup; validated even when `tempering=none`, where it has no effect |
+| `tempering_interval` | positive integer | `1` | sweeps between exchange rounds, including during warmup; with exactly two slots only every second round has a pair to try, so the pair is attempted once per `2*tempering_interval` sweeps; validated even when `tempering=none`, where it has no effect |
 | `tempering_file` | path | empty | optional TSV of per-ladder exchange statistics; only usable with `tempering=dtau_ladder`; PT runs without it when left empty |
 | `field_init` | `random` / `uniform` | `random` | initial Hubbard-Stratonovich field family; usable with or without PT |
 
@@ -321,9 +321,28 @@ slot's own configuration against the other's: with
 exactly one number from a dedicated exchange random stream per attempt
 (even when `log R >= 0`). Attempted neighbor pairs alternate between
 `(0,1),(2,3),...` and `(1,2),(3,4),...` from one exchange round to the next,
-including during warmup. A non-finite `log R`, or a failed configuration
-rebuild after an accepted exchange, ends the ladder as a numerical failure
-(nonzero exit) rather than a silent rejection.
+including during warmup. With exactly two slots the `(1,2),...` rounds
+contain no pair, so the single pair `(0,1)` is attempted only in every second
+round, that is, once per `2*tempering_interval` sweeps.
+
+A non-finite `log R`, a failed weight evaluation, or a failed configuration
+rebuild after an accepted exchange ends the ladder as a numerical failure
+(`tempering exchange failed`) rather than a silent rejection. A numerical
+breakdown in a slot's own sweep or global update also ends the ladder, but
+it is reported as that slot's `dqmc warmup numerical breakdown` or
+`dqmc measurement numerical breakdown` line (with `slot=` and `ladder=`),
+not as an exchange failure; no exchange round is attempted once a slot has
+failed.
+
+One failed ladder fails the whole run. The other ladders still run to
+completion; then the process exits nonzero (on every MPI rank) and stderr
+names each failed ladder (`tempering ladder r failed`). No observables are
+written for any ladder: the scalar output (stdout or `output_file`) keeps
+only its header lines, without temperature rows or the final
+`solver_elapsed_seconds` line; `replica_bin_file` is left empty; and
+`szz_file`, `sperp_file`, `spin_consistency_file`, and `replica_log` keep
+only their headers. Only `tempering_file`, when set, is written in full,
+with `failed=1` in each failed ladder's `ladder` row.
 
 Slot `k` of ladder `r` seeds its own Monte Carlo chain with
 `replica_seed(seed, k, r)`, the same rule an ordinary replica uses; the
@@ -376,11 +395,30 @@ usual per-site random draws (which are made and then discarded, so the
 random stream is identical to `field_init=random`); it works with or
 without PT and only changes the starting configuration.
 
+The all-`+1` field is also the configuration of largest numerical scale.
+For it, the up-spin product `B_{L-1}...B_0` has largest scale about
+`exp(Ltr*lambda + beta*w)`, with `lambda = acosh(exp(dtau*U/2))` and `w` the
+largest eigenvalue of the hopping matrix (`4|t|` on the periodic square
+lattice, `2|t|` on the periodic chain). Once this exponent passes the
+double-precision limit `ln(DBL_MAX) ≈ 709.78` by a margin of order one (in
+the 4x4 example below the run still started at 710.8 and failed from 711.2
+on), the run fails at initialization, before any sweep:
+`udv_lmul_work non-finite matrix at stage=qr_raw`, then `dqmc_init failed`,
+and a nonzero exit. For example, on the periodic 4x4 square lattice with
+`U=8` and `dtau=0.0125`, `beta=24` (`Ltr=1920`) gives an exponent of 708.2,
+about 1.6 e-folds below the limit, and starts normally, while `beta=24.5`,
+`25`, and `26` at the same `dtau` fail at initialization. Under PT the
+coldest slot (largest `beta_k` and `dtau_k`) sets the bound. Inputs are not
+checked against this bound in advance; the failure is immediate and
+explicit. `field_init=random` starts far below this scale.
+
 Validation of the PT implementation — cross-weight checks, an
-exact-enumeration sampling test, byte-identity against the pre-PT baseline,
-`serial`/`omp`/`mpi`/`hybrid` agreement, MPI failure-path tests, and a
-finite-size correctness check against independent chains and exact
-diagonalization — is recorded in [VALIDATION.md](VALIDATION.md). PT does
+exact-enumeration sampling test, an exact-enumeration regression of the
+integrated ladder driver with the production option sets, byte-identity
+against the pre-PT baseline, `serial`/`omp`/`mpi`/`hybrid` agreement,
+failure-path and failure-message tests, and a finite-size correctness check
+against independent chains and exact diagonalization — is recorded in
+[VALIDATION.md](VALIDATION.md). PT does
 not distribute one ladder's slots across MPI ranks, has no
 feedback-optimized placement of the `beta_list` temperatures, and does not
 support the diagnostic files or profiler listed above; read

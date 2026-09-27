@@ -78,6 +78,31 @@ have not been given a per-slot, per-ladder meaning; using them requires
 file; there is no feedback-optimized, or otherwise automatic, placement of
 temperatures based on observed exchange acceptance rates.
 
+One failed ladder fails the whole run: the other ladders still run to
+completion, but the run exits nonzero and writes no observables for any
+ladder; only `tempering_file` is written in full, with `failed=1` in each
+failed ladder's row. A failure late in a long run therefore loses the
+observables of every ladder in that run. With exactly two slots, only every
+second exchange round has a pair to try, so the effective exchange interval
+is `2*tempering_interval` sweeps.
+
+`field_init=uniform` (available with or without PT) starts from the all-`+1`
+field, the configuration of largest numerical scale. Its up-spin product
+`B_{L-1}...B_0` has largest scale about `exp(Ltr*lambda + beta*w)`, with
+`lambda = acosh(exp(dtau*U/2))` and `w` the largest eigenvalue of the
+hopping matrix (`4|t|` on the periodic square lattice, `2|t|` on the
+periodic chain). When
+this exponent passes the double-precision limit `ln(DBL_MAX) ≈ 709.78` by a
+margin of order one (1.0 to 1.4 in the measured 4x4 case), the run fails at
+initialization, before any sweep
+(`udv_lmul_work non-finite matrix at stage=qr_raw`, then `dqmc_init failed`,
+nonzero exit). On the periodic 4x4 square lattice at `U=8` and
+`dtau=0.0125`, `beta=24` (`Ltr=1920`, exponent 708.2) keeps about 1.6
+e-folds of margin, while `beta=24.5`, `25`, and `26` fail at initialization.
+Under PT the coldest slot (largest `beta_k` and `dtau_k`) sets the bound.
+Inputs are not checked against this bound in advance; check it before using
+`field_init=uniform` at low temperature or large `Ltr`.
+
 ## Distribution details
 
 Spin structure factors currently require built-in chain/square geometry.

@@ -1,11 +1,13 @@
 ---
-date: 2026-09-27
-datetime: 2026-09-27 22:34 JST
-model: OpenAI GPT-6 (Codex; revision), Codex GPT-5 (original), Claude Sonnet 5 (Anthropic; 2026-09-27 addition)
+date: 2026-09-28
+datetime: 2026-09-28 01:43 JST
+model: OpenAI GPT-6 (Codex; revision), Codex GPT-5 (original), Claude Sonnet 5 (Anthropic; 2026-09-27 addition), Claude Opus 5.5 (Anthropic; 2026-09-28 addition)
 summary: |
   Delta tau-ladder並列テンパリング（PT）の実装検証: cross-weight直接検査、厳密列挙χ²と負の対照、
   3215eeeとのbyte同一性、serial/OpenMP/MPI/hybrid一致、MPI失敗経路、L6 chain U=4のPT対独立chain
   screen（16/16、最大|z|=1.808）はすべて合格。PTがTrotter誤差を解消したとは主張しない。
+  09-28: 統合ladder driverの厳密列挙回帰（3選択肢組×3 slot×E/D、18比較で最大|z|=1.89）と
+  slot破綻/交換失敗のmessage検査を追加し、field_init=uniformの倍精度上限を実測で記録した。
   120 replicaの追加診断は正常終了し、63受理・31 replicaでp支持、d不支持。段階Bの効果は未検証。
   Stage Aの4×4・12 replica診断pilotは正常終了。受理8件・4 replicaで両指標とも判定不能。
   半充填ハバード模型の E(T) を grand-canonical ED/TPQ と比較する検証手順。
@@ -411,15 +413,20 @@ pilot 12 replicaは今回のseed集合の部分集合なので、合算して132
 
 ## 9. Δτ-ladder parallel tempering（2026-09-27〜）
 
-**cross-weight検査・厳密列挙χ²・3215eeeとのbyte同一性・serial/OpenMP/MPI/hybrid一致・
-MPI失敗経路・L6 chain U=4でのPT対独立chain検証は、いずれも合格。**
+**cross-weight検査・厳密列挙χ²・統合ladder driverの厳密列挙回帰・3215eeeとのbyte同一性・
+serial/OpenMP/MPI/hybrid一致・MPI失敗経路・失敗messageの区別・L6 chain U=4でのPT対独立chain
+検証は、いずれも合格。`field_init=uniform`の倍精度上限を実測で記録した。**
 This section records the correctness validation of the new `tempering=dtau_ladder`
 parallel-tempering (PT) machinery: an independent cross-weight check, an
 exact-enumeration stationarity/sampling test (with a negative control that is
-required to fail), byte-identity of every `tempering=none`/unspecified run
-against the pre-PT baseline, agreement across `serial`/`omp`/`mpi`/`hybrid`,
-MPI failure-path handling, and a finite-size (`L=6` chain, `U=4`) check of PT
-slots against independent non-PT chains at the same `(beta, dtau)`. This is a
+required to fail), an exact-enumeration regression of the integrated ladder
+driver under the production option sets, byte-identity of every
+`tempering=none`/unspecified run against the pre-PT baseline, agreement across
+`serial`/`omp`/`mpi`/`hybrid`, MPI failure-path handling, the distinction
+between slot breakdowns and exchange failures in the error messages, and a
+finite-size (`L=6` chain, `U=4`) check of PT slots against independent non-PT
+chains at the same `(beta, dtau)`. It also records the measured
+double-precision bound of `field_init=uniform`. This is a
 correctness check of the implementation, not a scientific validation of any
 physical result computed with PT, and it does not show that PT reduces or
 removes Trotter error — every slot keeps its own `dtau_k`.
@@ -441,7 +448,12 @@ removes Trotter error — every slot keeps its own `dtau_k`.
 
 3-slot ladder（`TemperingLadder`、`tempering_ladder_try_pair`/`_round`）を、
 既知の定常分布を持つ厳密列挙oracleでp値検定した
-（`tests/test_tempering_sampling.c`、200 trial、帰無仮説`p >= 1e-3`）。
+（`tests/test_tempering_sampling.c`。2-site chain、`Ltr=4`で256配置。独立な
+ladder 4000本をそれぞれ150 cycle（1 cycle = 各slotの1 sweepと交換round 1回）
+進め、最終配置をslotごとに1 sampleとしてχ²検定する。合格基準は各slotで
+`p >= 1e-3`）。2026-09-28訂正: 以前の版はこの規模を「200 trial」と記していたが、
+200は`tests/test_tempering_ladder.c`で受理と棄却の両方を得るまで試行を繰り返す
+上限であり、このsamplingテストの規模ではない。
 
 | slot | p値 |
 | ---: | ---: |
@@ -464,6 +476,54 @@ binaryとは独立なscratch treeにのみ適用し、同じsamplingテストを
 変更されておらず、正しい式（`... - logw_a_ca - logw_b_cb`を含む）のままである
 ことをテスト後に確認した。この負の対照は、samplingテストが誤った交換比の式を
 検出できることを示す。
+
+### 統合ladder driverの厳密列挙回帰（`make test_slow`、2026-09-28）
+
+上のsamplingテストは`TemperingLadder`を直接駆動する。本番の選択肢の組を通した
+統合driver `dqmc_run_ladder`（slotごとのsweep、大域更新、交換round、測定、carried
+stackの再利用）は、`tests/test_tempering_driver_exact_slow.c`が検査する。系は開放端
+2-site chain、`U=4`、3 slot（`beta=0.4, 0.8, 1.2`）、`tempering_ltr=4`
+（`dtau_k=beta_k/4`）で、slotごとの配置は`2^8=256`通り。各slotの`E`と`D`の
+有限`dtau`厳密値は、`dqmc_log_weight`（直接行列式との一致は
+`test_dqmc_tempering_weight`で検査済み）のweightと`l=0`のGreen関数から全列挙で
+求める。比較する選択肢の組は次の3つ（共通: `nwarm=200`、`nmeas=3000`、`nbin=3`、
+`stab=2`）。
+
+| case | sweep | 大域更新 | `tempering_interval` |
+| --- | --- | --- | ---: |
+| (a) | forward | なし | 1 |
+| (b) | alternating | `global_update=site`、3 sweepごと（`stab=2 < Ltr`なので、棄却された交換の後はcarried stackを再利用し、受理された交換と大域passの後は無効化して再構築する） | 1 |
+| (c) | alternating | `global_site_select=polarized`、2 sweepごと | 3 |
+
+各caseで固定seed（`20260928`）から独立ladder 800本を走らせ、ladderごとの平均の
+平均を、ladder間のばらつきから求めたSE（自由度799）で厳密値と比較する。判定は
+18比較（3 case × 3 slot × `E`・`D`）すべてで`|z| < 4`。正しい実装が1比較で
+これを超える確率は約6.3e-5（正規分布の裾。自由度799ではStudent-t補正は無視できる）
+なので、18比較全体の誤警報確率はBonferroni上界で約1.2e-3である。あわせて、
+測定区間のpairごとの交換試行数が交換roundの規則（`tempering_interval` sweepごと、
+round番号の偶奇でpairを交互に選ぶ）から計算した値と全ladderで一致すること、交換が
+受理と棄却の両方を含むこと、大域更新が(b)(c)で実行され(a)で実行されないことも
+検査する。
+
+結果（rc=0、`ALL SLOW TESTS PASSED`）: 18比較すべて`|z| < 4`、最大`|z| = 1.89`
+（(b) slot 2の`D`）。交換受理率は3 caseとも0.750。
+
+| case | slot | beta | E（SE） | 厳密E | z(E) | D（SE） | 厳密D | z(D) |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| (a) | 0 | 0.4 | 0.910160(234) | 0.910131 | +0.12 | 0.158994(35) | 0.158970 | +0.70 |
+| (a) | 1 | 0.8 | 0.220023(264) | 0.219844 | +0.68 | 0.101780(41) | 0.101749 | +0.75 |
+| (a) | 2 | 1.2 | -0.204557(426) | -0.204910 | +0.83 | 0.070690(40) | 0.070710 | -0.49 |
+| (b) | 0 | 0.4 | 0.910177(238) | 0.910131 | +0.19 | 0.158961(36) | 0.158970 | -0.25 |
+| (b) | 1 | 0.8 | 0.219810(256) | 0.219844 | -0.13 | 0.101727(39) | 0.101749 | -0.58 |
+| (b) | 2 | 1.2 | -0.204709(414) | -0.204910 | +0.49 | 0.070789(41) | 0.070710 | +1.89 |
+| (c) | 0 | 0.4 | 0.910024(254) | 0.910131 | -0.42 | 0.158974(38) | 0.158970 | +0.12 |
+| (c) | 1 | 0.8 | 0.220187(292) | 0.219844 | +1.17 | 0.101758(41) | 0.101749 | +0.21 |
+| (c) | 2 | 1.2 | -0.204916(437) | -0.204910 | -0.01 | 0.070752(45) | 0.070710 | +0.95 |
+
+括弧内は末尾桁のSE（例: `0.910160(234)`は`0.910160 ± 0.000234`）。所要CPU時間は
+case (a)・(b)・(c)でそれぞれ50.2・66.2・60.7秒（負荷の高い共有machineで計測。
+`make test_slow`全体は5分33秒）。この検査が対象とするのは小さな系での統合driverの
+定常分布であり、大きな系での混合の速さや、PTによるTrotter誤差の変化は対象外である。
 
 ### 3215eeeとのbyte同一性（`tempering`未指定・`tempering=none`）
 
@@ -504,6 +564,37 @@ object storeに存在せず、この欠落は今回の変更と無関係な既�
 全ケースで各rankの終了codeを直接回収して判定した。`make test`・`test_omp`・
 `test_mpi`・`test_hybrid`はいずれもrc=0で`ALL ... TESTS PASSED`。
 
+### slot破綻と交換失敗の報告の区別（2026-09-28）
+
+交換roundの前に、ladder driverは全slotの状態を確認する。slot自身のsweepまたは
+大域passですでに失敗したslotは、そのslotの`dqmc warmup numerical breakdown`・
+`dqmc measurement numerical breakdown`行（`slot=`、`ladder=`、`beta`、`dtau`、
+`sweep_count`、`failure_reason`を含む）として報告し、roundは試行しない。全slotが
+健全なままround自体が失敗した場合（weight評価、非有限の`log R`、受理後の再構築）
+だけを`tempering exchange failed`として報告する。以前の実装では、roundの事前
+status検査がslotの破綻を`tempering exchange failed (... slot_status=1,0)`として
+報告し、破綻したslotがそのroundのpairに含まれないときは1 sweep遅れて報告していた。
+成功するrunの出力は変わらない（`make test_tempering_default`はOK）。
+
+`tests/test_tempering_failure_messages.sh`（`make test`に含む）は、hook付きbuild
+（`AFQMC_TEST_HOOKS`）で失敗を注入してstderrを検査する（3 slot、`tempering_ltr=20`、
+`tempering_interval=1`、`nwarm=4`、`nmeas=8`、`nbin=2`、`global_update=site`、
+`global_interval=1`）。修正前のbinaryでは測定・warmupの2 caseが不合格（下表の
+「修正前」）、修正後は3 caseとも合格した。
+
+| case | 注入 | 修正後のmessage（合格条件） | 修正前のmessage |
+| --- | --- | --- | --- |
+| 測定 | slot 1の大域passをsweep 6（測定の2 sweep目）で失敗させる（既存の`AFQMC_TEST_GLOBAL_FAIL_AT=6`・`AFQMC_TEST_GLOBAL_FAIL_BETA=1`）。round 5はpair (1,2)を試行する | `dqmc measurement numerical breakdown (slot=1 ladder=0 beta_index=1 ... sweep_count=6 bin=0 meas=1 status=1 ...)` | `tempering exchange failed (ladder=0 pair=1 round=5 sweep=6 slot_status=1,0)` |
+| warmup | sweep 2の後にslot 0をfailed状態にする（`AFQMC_TEST_TEMPERING_SLOT_FAIL_AT=2`・`_SLOT=0`）。round 1はslot 0を含まない | `dqmc warmup numerical breakdown (slot=0 ladder=0 beta_index=0 ... sweep_count=2 status=1 ...)` | sweep 3で`tempering exchange failed (ladder=0 pair=0 round=2 sweep=3 slot_status=1,0)` |
+| 交換 | 全slotを健全に保ったまま、sweep 3後のroundのlog-det評価を失敗させる（`AFQMC_TEST_TEMPERING_EXCHANGE_FAIL_AT=3`） | `tempering exchange failed (ladder=0 pair=0 round=2 sweep=3 slot_status=0,0)`、breakdown行なし | 同じ |
+
+3 caseとも、非zero終了、`tempering ladder 0 failed`、スカラー出力がheader行のみ、
+`replica_bin_file`が空、`tempering_file`の`ladder`行が`failed=1`であることも
+検査する（1本のladderの失敗でrun全体が失敗し、`tempering_file`だけが完全に
+書かれる）。production binaryはこれらのhookを無視し、hookを設定しても
+`bins.tsv`、`tempering_file`（`cost`行を除く）、stdout（`solver_elapsed_seconds`
+行を除く）、stderrは変わらない。
+
 ### L6 chain、U=4: PTスロット対独立chainの検証
 
 periodic `Lx=6`、`U=4`、`mu=U/2=2`（半充填）のHubbard chainで、PT
@@ -537,3 +628,44 @@ periodic `Lx=6`、`U=4`、`mu=U/2=2`（半充填）のHubbard chainで、PT
 （`PT SE`と独立`SE`は行によって最大で2倍近く異なる）。ED差は参考情報であり、
 Trotter誤差への自動的な帰属ではない。この検証全体は実装の正しさについての
 限定的な確認であり、ここで到達した統計量を超えた一般的な証明ではない。
+
+### `field_init=uniform`の倍精度上限（2026-09-28）
+
+半充填（`mu=U/2`）では`expK`の`+dtau*mu`と`expv`の`-dtau*U/2`が相殺し、
+上向きスピンの`B_l = exp(-dtau*T) exp(lambda*s_l)`となる（`T`はホッピング行列）。
+全`+1`の場では`exp(lambda*s_l)`が単位行列の定数倍なので、積は
+`B_{L-1}...B_0 = exp(Ltr*lambda) exp(-beta*T)`で、最大スケールは
+`exp(Ltr*lambda + beta*w)`（`w`は`-T`の最大固有値。二部格子では`T`の最大固有値に
+等しく、周期境界4x4正方格子で`4|t|`）。この全`+1`の場が最大スケールの配置であり、
+指数が倍精度の上限`ln(DBL_MAX) = 709.78`付近に達すると、`dqmc_init`の最初の
+Green関数構築で`udv_lmul_work non-finite matrix at stage=qr_raw ... value=-inf`、
+続いて`dqmc_init failed`が出て、sweepを1回も行わずに非zeroで終了する。コードに
+事前の棄却規則は加えていない（失敗は初期化時に即座かつ明示的に起こる）。
+
+周期境界4x4正方格子、`t=-1`、`U=8`、`dtau=0.0125`（`lambda=0.318869`）、
+非PT（`nwarm=0`、`nmeas=2`または`4`、`sweep_order=alternating`、`stab=4`、
+`global_update=site`）での実測:
+
+| beta | Ltr | 指数`Ltr*lambda+4*beta` | `ln(DBL_MAX)`との差 | 結果 |
+| ---: | ---: | ---: | ---: | --- |
+| 24 | 1920 | 708.23 | -1.55 | 正常に開始・終了 |
+| 24.05 | 1924 | 709.70 | -0.08 | 正常に開始・終了 |
+| 24.0625 | 1925 | 710.07 | +0.29 | 正常に開始・終了 |
+| 24.075 | 1926 | 710.44 | +0.66 | 正常に開始・終了 |
+| 24.0875 | 1927 | 710.81 | +1.03 | 正常に開始・終了 |
+| 24.1 | 1928 | 711.18 | +1.40 | 初期化で失敗 |
+| 24.5 | 1960 | 722.98 | +13.20 | 初期化で失敗 |
+| 25 | 2000 | 737.74 | +27.96 | 初期化で失敗 |
+| 26 | 2080 | 767.25 | +57.47 | 初期化で失敗 |
+
+`Ltr=1932`〜`1956`（4刻み）もすべて初期化で失敗した。観測された境界は
+`Ltr=1927`と`1928`の間で、式の指数が`ln(DBL_MAX)`を越える点（`Ltr≈1924.2`）より
+1.0〜1.4 e-fold上にある。失敗するのは行列要素の段階なので、境界は式から
+lattice依存のO(1) e-foldずれうる。PTでも同じで、`beta_list=20,24.5`、
+`tempering_ltr=1960`では最も低温のslot（`dtau=0.0125`）の初期化が同じmessageで
+失敗し、`tempering ladder 0 failed`で終了した（0.05秒）。一方、
+`beta_list=16,17.6,19.2,20.8,22.4,24`、`tempering_ltr=1920`（最低温slotは
+`beta=24`、`dtau=0.0125`、指数708.23）では、6 slotとも初期化され、10 sweepの
+短い実行が正常に終了した。この設定の余裕は`ln(DBL_MAX)`まで約1.6 e-foldしかない。
+`field_init=random`の初期配置は、各siteの時間方向の和がほぼ0なので、このスケール
+より十分小さい。

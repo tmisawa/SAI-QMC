@@ -10,7 +10,8 @@
  * test_dqmc_tempering_weight). Three driver option sets are compared:
  *   (a) forward sweeps, no global update, an exchange round every sweep;
  *   (b) alternating sweeps with global_update=site every 3 sweeps and
- *       stab=2 < Ltr, so carried stacks are reused between exchanges;
+ *       stab=2 < Ltr, so the carried stacks are reused after a rejected
+ *       exchange and rebuilt after an accepted one or a global pass;
  *   (c) alternating sweeps with the polarized global update every 2 sweeps
  *       and tempering_interval=3.
  * Each case runs NLADDER independent ladders from one fixed seed. The mean of

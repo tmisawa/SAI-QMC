@@ -270,7 +270,7 @@ slotからなるladderを1本走らせ、全slotで共通の時間slice数を共
 | --- | --- | --- | --- |
 | `tempering` | `none` / `dtau_ladder` | `none` | `dtau_ladder`でΔτラダー並列テンパリングを有効化する |
 | `tempering_ltr` | 非負整数 | `0` | 全slotが共有する時間slice数。`tempering=dtau_ladder`では`> 0`が必須（`dtau_k = beta_k / tempering_ltr`）。`tempering=none`では`0`のままにする |
-| `tempering_interval` | 正の整数 | `1` | 交換roundを行うsweep間隔（warmup中も含む）。`tempering=none`でも検証されるが効果はない |
+| `tempering_interval` | 正の整数 | `1` | 交換roundを行うsweep間隔（warmup中も含む）。slotがちょうど2個のときは試行するpairがあるroundが2回に1回なので、そのpairの試行は`2*tempering_interval` sweepに1回になる。`tempering=none`でも検証されるが効果はない |
 | `tempering_file` | path | 空 | 交換統計を書くTSV（任意）。`tempering=dtau_ladder`でのみ使用可。空のままでもPTは実行できる |
 | `field_init` | `random` / `uniform` | `random` | 初期Hubbard–Stratonovich場の族。PTの有無にかかわらず使える |
 
@@ -297,9 +297,26 @@ sign-freeでparticle-hole対称な模型（半充填・二部格子）である�
 `min(1, exp(log R))`の確率で受理します。専用の交換用乱数streamから、
 1回の試行につき必ず1つの乱数を引きます（`log R >= 0`でも引きます）。
 試行する隣接pairは交換roundごとに`(0,1),(2,3),...`と`(1,2),(3,4),...`を
-交互に切り替え、warmup中も交換を行います。`log R`が非有限になった場合や、
-受理後の配置再構築が失敗した場合は、棄却としてではなく、そのladderの
-数値的失敗として終了します（非zero終了）。
+交互に切り替え、warmup中も交換を行います。slotがちょうど2個の場合、
+`(1,2),...`側のroundには試行するpairがないため、唯一のpair `(0,1)`は
+2 roundに1回、すなわち`2*tempering_interval` sweepに1回だけ試行されます。
+
+`log R`が非有限になった場合、weight評価が失敗した場合、受理後の配置再構築が
+失敗した場合は、棄却としてではなく、そのladderの数値的失敗
+（`tempering exchange failed`）として終了します。slot自身のsweepまたは
+大域更新で数値破綻が起きた場合もladderは終了しますが、交換失敗としてではなく、
+そのslotの`dqmc warmup numerical breakdown`または
+`dqmc measurement numerical breakdown`行（`slot=`と`ladder=`を含む）として
+報告されます。slotが破綻した後は交換roundを試行しません。
+
+1本のladderが失敗すると、run全体が失敗します。他のladderは最後まで実行され、
+その後プロセスは（MPIでは全rankで）非zeroで終了し、stderrに失敗した各ladderを
+`tempering ladder r failed`として示します。どのladderの観測量も書かれません。
+スカラー出力（標準出力または`output_file`）はheader行だけで、温度ごとの行も
+最後の`solver_elapsed_seconds`行もありません。`replica_bin_file`は空のままで、
+`szz_file`・`sperp_file`・`spin_consistency_file`・`replica_log`はheaderだけです。
+完全に書かれるのは（指定した場合の）`tempering_file`だけで、失敗したladderの
+`ladder`行は`failed=1`になります。
 
 slot `k`（ladder `r`）自身のMonte Carlo chainは、通常のreplicaと同じ規則で
 `replica_seed(seed, k, r)`をseedとします。専用の交換用乱数streamはその代わりに
@@ -347,10 +364,28 @@ hot slot→最も冷たいslot→hot slotの順に完了した場合だけを数
 乱数streamは`field_init=random`と同一のまま）の後に、全Hubbard–Stratonovich場を
 `+1`に上書きします。PTの有無にかかわらず使え、初期配置だけを変えます。
 
-PT実装の検証（cross-weight検査、厳密列挙samplingテスト、PT前baselineとの
-byte同一性、`serial`/`omp`/`mpi`/`hybrid`の一致、MPI失敗経路のテスト、独立chainと
-厳密対角化に対する有限サイズ正当性検証）は[VALIDATION.md](VALIDATION.md)に
-記録しています。PTは1つのladderのslotを複数のMPI rankへ分配せず、
+全`+1`の場は、数値的なスケールが最大の配置でもあります。この場では、
+上向きスピンの積`B_{L-1}...B_0`の最大スケールがおよそ
+`exp(Ltr*lambda + beta*w)`になります（`lambda = acosh(exp(dtau*U/2))`、
+`w`はホッピング行列の最大固有値で、周期境界の正方格子では`4|t|`、
+周期境界のchainでは`2|t|`）。
+この指数が倍精度の上限`ln(DBL_MAX) ≈ 709.78`をO(1)程度超えると（下の4x4の例では
+710.8では開始でき、711.2以上で失敗）、sweepを1回も行わないうちに初期化で失敗します。
+stderrには`udv_lmul_work non-finite matrix at stage=qr_raw`に続いて
+`dqmc_init failed`が出て、非zeroで終了します。例として、周期境界の4x4正方格子、
+`U=8`、`dtau=0.0125`では、`beta=24`（`Ltr=1920`）の指数は708.2で上限より
+約1.6 e-fold小さく、正常に開始します。同じ`dtau`の`beta=24.5`・`25`・`26`は
+初期化で失敗します。PTでは最も低温のslot（`beta_k`と`dtau_k`が最大）が
+この上限を決めます。入力をこの上限と事前に照合する検査はなく、失敗は即座に
+明示的に起こります。`field_init=random`はこのスケールより十分小さい配置から
+始まります。
+
+PT実装の検証（cross-weight検査、厳密列挙samplingテスト、本番用の選択肢の組を
+使った統合ladder driverの厳密列挙回帰、PT前baselineとのbyte同一性、
+`serial`/`omp`/`mpi`/`hybrid`の一致、失敗経路と失敗メッセージのテスト、
+独立chainと厳密対角化に対する有限サイズ正当性検証）は
+[VALIDATION.md](VALIDATION.md)に記録しています。
+PTは1つのladderのslotを複数のMPI rankへ分配せず、
 `beta_list`の温度配置を交換受理率などから自動最適化する機能もなく、
 上記の診断fileやprofilerにも対応していません。本計算を行う前に
 [既知の制約](docs/limitations.md)を確認してください。
