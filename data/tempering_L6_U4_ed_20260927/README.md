@@ -240,14 +240,15 @@ All 16 achieved SEs meet their targets.
 
 ## On the nmeas=20000 pass
 
-All five inputs were first run once at `nmeas=20000` (the value stated in
-the original task brief). That pass's own screen already showed 16/16
+All five inputs were first run once at `nmeas=20000` (the run length
+chosen before any data were taken). That pass's own screen already showed 16/16
 `|z| < 3` with max `|z| = 1.326` — never an indication of a PT correctness
 problem. But its achieved `E/N` SE exceeded the `5e-4` precision target in 6
 of the 16 relevant rows (PT slots 0, 1, 3; independent slots 1, 2, 3), while
 `D`'s SE met target everywhere. Per this validation's own precision-target
-rule (increase `nmeas` and rerun if the target is not met — this rule comes
-from the task brief/plan, not from the analysis script), `nmeas` was raised
+rule, fixed before the runs (if any achieved SE misses its target above,
+raise `nmeas` for all runs and rerun; the rule is applied by hand and is not
+implemented in the analysis script), `nmeas` was raised
 to 50000 (2.5x) in all five input files, reusing the same seeds, and all
 five runs were redone; that `nmeas=50000` pass is the one described
 everywhere else in this file.

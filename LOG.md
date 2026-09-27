@@ -4,10 +4,14 @@
 date: 2026-09-27
 datetime: 2026-09-27 22:47 JST
 model: |
-  Claude Opus 5.5 (Claude Code; plan, coordination, and Tasks 5-7
-  implementation); Claude Sonnet 5 (Tasks 1, 3, 4, 5b, 8, 9 implementation);
-  Claude Haiku 4.5 (Task 2 implementation); Claude Sonnet 5 and Claude
-  Opus 5.5 (reviews)
+  Claude Opus 5.5 (Claude Code; design, coordination, and implementation of
+  the ReplicaChain extraction, the ladder driver, and the main.c
+  integration with tempering_file); Claude Sonnet 5 (implementation of the
+  cross-weight and field replacement, the ladder exchange round with its
+  exact-enumeration sampling test, the input keys, field_init, the L6
+  ED/independent-chain validation, and the documentation); Claude Haiku 4.5
+  (implementation of the exchange ratio, acceptance rule, pair schedule, and
+  walker statistics); Claude Sonnet 5 and Claude Opus 5.5 (reviews)
 summary: |
   Documented the new tempering=dtau_ladder parallel-tempering (PT) feature:
   input keys and usage in README.md/README_ja.md, PT-specific limitations
@@ -53,12 +57,14 @@ summary: |
 - Added the `tempering_L6_U4_ed_20260927/` dataset to `data/README.md` and
   corrected its "not new calculations" sentence: unlike the two pre-existing
   historical datasets, this one was computed with this branch's own source.
-- Model-attribution correction: the Git commit trailers for Tasks 1-3 name
-  Claude Opus 5.5, but the actual implementers were Claude Sonnet 5
-  (Task 1), Claude Haiku 4.5 (Task 2), and Claude Sonnet 5 (Task 3), as
-  listed in this entry's `model` field above. This LOG entry is the
-  accurate record of who did the work; the commit history itself is not
-  being rewritten.
+- Model-attribution correction: the Git commit trailers of the first three
+  tempering commits (the cross-weight and field replacement; the exchange
+  ratio, acceptance rule, pair schedule, and walker statistics; and the
+  ladder exchange round with its exact-enumeration sampling test) name
+  Claude Opus 5.5, but their actual implementers were Claude Sonnet 5,
+  Claude Haiku 4.5, and Claude Sonnet 5, respectively, as listed in this
+  entry's `model` field above. This LOG entry is the accurate record of who
+  did the work; the commit history itself is not being rewritten.
 
 ---
 date: 2026-09-26

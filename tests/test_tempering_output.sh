@@ -63,7 +63,7 @@ mkdir -p "$work/nf"; grep -v '^tempering_file=' "$work/input.in" > "$work/nf/inp
 [ ! -e "$work/nf/pt.tsv" ] || { echo "FAIL no tempering_file wrote pt.tsv"; fail=1; }
 grep -q ' tempering_file=' "$work/nf/stdout.txt" && { echo "FAIL no tempering_file header"; fail=1; }
 cmp -s "$work/nf/bins.tsv" "$work/bins.tsv" || { echo "FAIL no tempering_file bins differ"; fail=1; }
-# non-PT run with field_init=uniform (Task 5b)
+# non-PT run with field_init=uniform: runs and reports the family in the header
 mkdir -p "$work/fu"
 printf 'lattice=chain\nLx=4\npbc=1\nt=-1.0\nU=4\ndtau=0.05\nbeta_list=1\nnwarm=10\nnmeas=20\nnbin=2\nstab=4\nnrep=1\nseed=1\nfield_init=uniform\n' > "$work/fu/input.in"
 (cd "$work/fu" && "$root/dqmc" input.in > stdout.txt 2> err.txt) || { echo "FAIL field_init run"; fail=1; }

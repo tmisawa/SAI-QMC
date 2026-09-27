@@ -40,7 +40,7 @@ typedef struct {
     char tempering_file[256];
     int dtau_given;                /* 1 when the input sets dtau */
 
-    char field_init[16];           /* random | uniform (D10); default random */
+    char field_init[16];           /* initial HS field: random (default) | uniform (all +1) */
 
     char szz_q[256];
     char szz_file[256];

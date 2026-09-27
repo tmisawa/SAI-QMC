@@ -976,7 +976,8 @@ static int run_tempering_ladders(const Params *p, const Lattice *L, double mu,
     const int write_file = p->tempering_file[0] != '\0';
     memset(st, 0, sizeof *st);
 
-    /* seeds of every slot chain and every exchange Rng must be distinct (D6) */
+    /* seeds of every slot chain, replica_seed(seed, k, r), and of every
+       exchange Rng, replica_seed(seed, nbeta, r), must be distinct */
     int seed_failed = 0;
     {
         const size_t nseed = (size_t)(K + 1) * (size_t)nrep;
@@ -1011,8 +1012,9 @@ static int run_tempering_ladders(const Params *p, const Lattice *L, double mu,
     }
     const int local = st->local;
 
-    /* 4-1: every local array, including the pack and gather buffers, is
-       allocated and agreed on before any ladder runs */
+    /* every local array, including the pack and gather buffers, is
+       allocated and agreed on before any ladder runs, so an allocation
+       failure cannot discard finished ladders */
     TemperingLadderOut *outs = NULL;
     uint64_t *ibuf = NULL, *all_i = NULL;
     double *fbuf = NULL, *all_f = NULL;
@@ -1196,7 +1198,8 @@ cleanup:
 
 int main(int argc, char **argv)
 {
-    /* solver_elapsed_seconds (tempering only) is measured from here (D7) */
+    /* solver_elapsed_seconds (tempering only): the solver's own monotonic
+       wall time from here to just before the outputs are closed */
     const double solver_t0 = tempering_monotonic_seconds();
     MpiEnv mpi_env;
     mpi_env.enabled = 0;
@@ -1512,7 +1515,8 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    /* under tempering each beta has its own dtau: headers show "ladder" (D5) */
+    /* under tempering each beta has its own dtau = beta / tempering_ltr, so
+       headers show "ladder" instead of one value */
     char dtau_label[64];
     char dtau_label17[64];
     if (use_pt) {

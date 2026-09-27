@@ -23,7 +23,7 @@ int main(void)
     CHECK(strcmp(p.tempering, "none") == 0 && p.tempering_ltr == 0 &&
           p.tempering_interval == 1 && p.tempering_file[0] == '\0' &&
           p.dtau_given == 1);
-    CHECK(strcmp(p.field_init, "random") == 0); /* default (D10) */
+    CHECK(strcmp(p.field_init, "random") == 0); /* field_init defaults to random */
 
     CHECK(read_text("dtau=0.1\nbeta_list=1\nfield_init=uniform\n", &p) == 0);
     CHECK(strcmp(p.field_init, "uniform") == 0);
