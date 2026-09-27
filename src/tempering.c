@@ -112,3 +112,88 @@ void tempering_stats_sample(TemperingStats *st)
         }
     }
 }
+
+int tempering_ladder_init(TemperingLadder *T, Dqmc **slots, int nslot,
+                          unsigned long long seed)
+{
+    memset(T, 0, sizeof *T);
+    T->fail_pair = -1;
+    if (slots == NULL || nslot < 2) {
+        return 1;
+    }
+    for (int k = 0; k < nslot; k++) {
+        if (slots[k] == NULL || slots[k]->status || !slots[k]->use_ph ||
+            slots[k]->n != slots[0]->n || slots[k]->L != slots[0]->L) {
+            return 1;
+        }
+    }
+    if (tempering_stats_alloc(&T->stats, nslot) != 0) {
+        return 1;
+    }
+    T->tmp = malloc((size_t)slots[0]->L * (size_t)slots[0]->n);
+    if (T->tmp == NULL) {
+        tempering_stats_free(&T->stats);
+        return 1;
+    }
+    T->nslot = nslot;
+    T->slots = slots;
+    T->seed = seed;
+    rng_seed(&T->rng, seed);
+    tempering_stats_update_ends(&T->stats);
+    return 0;
+}
+
+void tempering_ladder_free(TemperingLadder *T)
+{
+    free(T->tmp);
+    tempering_stats_free(&T->stats);
+    memset(T, 0, sizeof *T);
+    T->fail_pair = -1;
+}
+
+int tempering_ladder_try_pair(TemperingLadder *T, int k, int *accepted)
+{
+    *accepted = 0;
+    Dqmc *a = T->slots[k], *b = T->slots[k + 1];
+    const double u = rng_double(&T->rng);   /* always exactly one draw */
+    double waa, wbb, wab, wba;
+    int sg;
+    if (a->status || b->status ||
+        dqmc_log_weight(a, &waa, &sg) != 0 ||
+        dqmc_log_weight(b, &wbb, &sg) != 0 ||
+        dqmc_log_weight_of(a, b->f->s, &wab, &sg) != 0 ||
+        dqmc_log_weight_of(b, a->f->s, &wba, &sg) != 0) {
+        T->fail_pair = k;
+        return 1;
+    }
+    const int acc = tempering_accept(tempering_log_ratio(waa, wbb, wab, wba), u);
+    if (acc < 0) {
+        T->fail_pair = k;
+        return 1;
+    }
+    if (acc) {
+        const size_t len = (size_t)a->L * (size_t)a->n;
+        memcpy(T->tmp, a->f->s, len);
+        if (dqmc_replace_field(a, b->f->s) != 0 ||
+            dqmc_replace_field(b, T->tmp) != 0) {
+            T->fail_pair = k;
+            return 1;
+        }
+    }
+    tempering_stats_record(&T->stats, k, acc);
+    *accepted = acc;
+    return 0;
+}
+
+int tempering_ladder_round(TemperingLadder *T)
+{
+    for (int k = tempering_first_pair(T->round); k + 1 < T->nslot; k += 2) {
+        int acc = 0;
+        if (tempering_ladder_try_pair(T, k, &acc) != 0) {
+            return 1;
+        }
+    }
+    tempering_stats_update_ends(&T->stats);
+    T->round++;
+    return 0;
+}

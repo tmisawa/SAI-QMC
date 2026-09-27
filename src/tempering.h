@@ -1,6 +1,9 @@
 #ifndef TEMPERING_H
 #define TEMPERING_H
 
+#include "dqmc.h"
+#include "rng.h"
+
 typedef struct {
     int nslot;
     unsigned long long *attempts;  /* [nslot-1], pair (k,k+1) */
@@ -26,5 +29,22 @@ int tempering_first_pair(unsigned long long round);         /* 0 for even rounds
 void tempering_stats_record(TemperingStats *st, int k, int accepted); /* swaps walker_at[k],[k+1] on accept */
 void tempering_stats_update_ends(TemperingStats *st);       /* after a round: end visits, round trips */
 void tempering_stats_sample(TemperingStats *st);            /* add one n_up/n_down sample per slot */
+
+typedef struct {
+    int nslot;
+    Dqmc **slots;              /* borrowed, slot 0 = hottest (smallest beta) */
+    Rng rng;                   /* exchange RNG, independent of every slot RNG */
+    unsigned long long seed;
+    unsigned long long round;  /* completed exchange rounds */
+    TemperingStats stats;
+    signed char *tmp;          /* L*n scratch */
+    int fail_pair;             /* pair of the last failure, -1 if none */
+} TemperingLadder;
+
+int tempering_ladder_init(TemperingLadder *T, Dqmc **slots, int nslot,
+                          unsigned long long seed);   /* checks equal n, L and use_ph on every slot */
+void tempering_ladder_free(TemperingLadder *T);
+int tempering_ladder_try_pair(TemperingLadder *T, int k, int *accepted); /* one draw from T->rng */
+int tempering_ladder_round(TemperingLadder *T);       /* even/odd pairs, then update_ends, round++ */
 
 #endif
