@@ -137,6 +137,11 @@ test_global_default: dqmc
 
 .PHONY: test_global_default
 
+test_tempering_default: dqmc
+	@printf "%-40s " tests/test_tempering_disabled_unchanged.sh; sh tests/test_tempering_disabled_unchanged.sh
+
+.PHONY: test_tempering_default
+
 test_global_output: dqmc $(HOOK_DIR)/dqmc
 	@printf "%-28s " tests/test_global_output.sh; sh tests/test_global_output.sh
 
