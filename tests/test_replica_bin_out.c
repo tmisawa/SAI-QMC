@@ -63,8 +63,8 @@ int main(void)
         headers++;
     }
     CHECK(headers == 1);
-    free(text);
     CHECK(strstr(text, "# tempering=") == NULL);   /* non-tempering header unchanged */
+    free(text);
 
     /* tempering: one extra header line right after the lattice line */
     ReplicaBinMeta mt = m;

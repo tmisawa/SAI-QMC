@@ -57,6 +57,12 @@ done
 mkdir -p "$work/nw"; cp "$work/input.in" "$work/nw/input.in"
 sed -i.bak 's#^tempering_file=.*#tempering_file=no_such_dir/pt.tsv#' "$work/nw/input.in"
 if (cd "$work/nw" && "$root/dqmc" input.in > /dev/null 2> err.txt); then echo "FAIL unwritable accepted"; fail=1; fi
+# tempering_file is optional: without it the run succeeds and writes no tempering file
+mkdir -p "$work/nf"; grep -v '^tempering_file=' "$work/input.in" > "$work/nf/input.in"
+(cd "$work/nf" && "$root/dqmc" input.in > stdout.txt 2> err.txt) || { echo "FAIL no tempering_file run"; cat "$work/nf/err.txt"; fail=1; }
+[ ! -e "$work/nf/pt.tsv" ] || { echo "FAIL no tempering_file wrote pt.tsv"; fail=1; }
+grep -q ' tempering_file=' "$work/nf/stdout.txt" && { echo "FAIL no tempering_file header"; fail=1; }
+cmp -s "$work/nf/bins.tsv" "$work/bins.tsv" || { echo "FAIL no tempering_file bins differ"; fail=1; }
 # non-PT run with field_init=uniform (Task 5b)
 mkdir -p "$work/fu"
 printf 'lattice=chain\nLx=4\npbc=1\nt=-1.0\nU=4\ndtau=0.05\nbeta_list=1\nnwarm=10\nnmeas=20\nnbin=2\nstab=4\nnrep=1\nseed=1\nfield_init=uniform\n' > "$work/fu/input.in"

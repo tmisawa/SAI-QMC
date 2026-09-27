@@ -79,5 +79,14 @@ if ! (cd "$tmp" && limit "$MPIRUN" -n 2 sh "$tmp/rank_exit.sh" "$bin" input.in >
   echo "FAIL case3 launcher/timeout"; fail=1
 fi
 [ "$(codes 2)" = "1 1 " ] || { echo "FAIL case3 rank exits: $(codes 2)"; fail=1; }
+# (4) no tempering_file: all ranks succeed and nothing is written
+write_input 3 pt.tsv
+sed -i.bak '/^tempering_file=/d' "$tmp/input.in"
+rm -f "$tmp"/rank.* "$tmp/pt.tsv"
+if ! (cd "$tmp" && limit "$MPIRUN" -n 2 sh "$tmp/rank_exit.sh" "$bin" input.in > /dev/null 2>&1); then
+  echo "FAIL case4 launcher/timeout"; fail=1
+fi
+[ "$(codes 2)" = "0 0 " ] || { echo "FAIL case4 rank exits: $(codes 2)"; fail=1; }
+[ ! -e "$tmp/pt.tsv" ] || { echo "FAIL case4 wrote pt.tsv"; fail=1; }
 [ "$fail" -eq 0 ] && echo OK
 exit "$fail"

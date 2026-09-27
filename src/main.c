@@ -971,26 +971,29 @@ static int run_tempering_ladders(const Params *p, const Lattice *L, double mu,
     const int nrep = p->nrep;
     const int root = mpi_is_root(env);
     const int use_mpi = parallel_uses_mpi(p->parallel) && env->enabled;
+    /* identical on every rank (same input), so skipping the file keeps the
+       agreement points below symmetric */
+    const int write_file = p->tempering_file[0] != '\0';
     memset(st, 0, sizeof *st);
 
     /* seeds of every slot chain and every exchange Rng must be distinct (D6) */
     int seed_failed = 0;
     {
         const size_t nseed = (size_t)(K + 1) * (size_t)nrep;
-        unsigned long long *all = nseed <= (size_t)INT_MAX
-                                      ? malloc(nseed * sizeof *all) : NULL;
-        if (all == NULL) {
+        unsigned long long *seeds = nseed <= (size_t)INT_MAX
+                                        ? malloc(nseed * sizeof *seeds) : NULL;
+        if (seeds == NULL) {
             seed_failed = 1;
         } else {
             size_t i = 0;
             for (int k = 0; k <= K; k++) {
                 for (int r = 0; r < nrep; r++) {
-                    all[i++] = replica_seed(p->seed, k, r);
+                    seeds[i++] = replica_seed(p->seed, k, r);
                 }
             }
-            seed_failed = replica_check_seed_unique(all, (int)nseed) != 0;
+            seed_failed = replica_check_seed_unique(seeds, (int)nseed) != 0;
         }
-        free(all);
+        free(seeds);
     }
     if (mpi_any_failed(env, seed_failed)) {
         if (root) {
@@ -1007,7 +1010,15 @@ static int run_tempering_ladders(const Params *p, const Lattice *L, double mu,
         st->local = nrep;
     }
     const int local = st->local;
+
+    /* 4-1: every local array, including the pack and gather buffers, is
+       allocated and agreed on before any ladder runs */
     TemperingLadderOut *outs = NULL;
+    uint64_t *ibuf = NULL, *all_i = NULL;
+    double *fbuf = NULL, *all_f = NULL;
+    int *cnt_i = NULL, *dsp_i = NULL, *cnt_f = NULL, *dsp_f = NULL;
+    const int wu = tempering_ladder_out_width_u64(K, p->nbin);
+    const int wf = tempering_ladder_out_width_f64();
     int alloc_failed = 0;
     if (local > 0) {
         st->results = calloc((size_t)local * (size_t)K, sizeof *st->results);
@@ -1020,18 +1031,46 @@ static int run_tempering_ladders(const Params *p, const Lattice *L, double mu,
             }
         }
     }
+    if (use_mpi) {
+        alloc_failed |= wu <= 0;
+        cnt_i = calloc((size_t)env->nranks, sizeof(int));
+        dsp_i = calloc((size_t)env->nranks, sizeof(int));
+        cnt_f = calloc((size_t)env->nranks, sizeof(int));
+        dsp_f = calloc((size_t)env->nranks, sizeof(int));
+        alloc_failed |= cnt_i == NULL || dsp_i == NULL || cnt_f == NULL ||
+                        dsp_f == NULL;
+        if (!alloc_failed && local > 0) {
+            ibuf = malloc((size_t)local * (size_t)wu * sizeof *ibuf);
+            fbuf = malloc((size_t)local * (size_t)wf * sizeof *fbuf);
+            alloc_failed |= ibuf == NULL || fbuf == NULL;
+        }
+        if (!alloc_failed && root) {
+            all_i = malloc((size_t)nrep * (size_t)wu * sizeof *all_i);
+            all_f = malloc((size_t)nrep * (size_t)wf * sizeof *all_f);
+            alloc_failed |= all_i == NULL || all_f == NULL;
+        }
+        if (!alloc_failed) {
+            alloc_failed =
+                replica_mpi_gatherv_layout(nrep, 1, env->nranks, wu, cnt_i,
+                                           dsp_i) != 0 ||
+                replica_mpi_gatherv_layout(nrep, 1, env->nranks, wf, cnt_f,
+                                           dsp_f) != 0;
+        }
+    }
+    int failed_out = 0;
+    FILE *fp = NULL;
+    TemperingLadderOut *all = NULL;
+    int nall = 0;
     if (mpi_any_failed(env, alloc_failed)) {
         if (root) {
             fprintf(stderr, "ERROR: failed to allocate tempering arrays\n");
         }
-        tempering_outs_free(outs, local);
-        tempering_state_free(st, K);
-        return 1;
+        failed_out = 1;
+        goto cleanup;
     }
 
-    FILE *fp = NULL;
     int open_failed = 0;
-    if (root) {
+    if (root && write_file) {
         fp = fopen(p->tempering_file, "w");
         if (fp == NULL) {
             fprintf(stderr, "ERROR: cannot open tempering_file %s\n",
@@ -1040,12 +1079,8 @@ static int run_tempering_ladders(const Params *p, const Lattice *L, double mu,
         }
     }
     if (mpi_any_failed(env, open_failed)) {
-        if (fp != NULL) {
-            fclose(fp);
-        }
-        tempering_outs_free(outs, local);
-        tempering_state_free(st, K);
-        return 1;
+        failed_out = 1;
+        goto cleanup;
     }
 
     const int use_openmp = strcmp(p->parallel, "omp") == 0 ||
@@ -1068,77 +1103,37 @@ static int run_tempering_ladders(const Params *p, const Lattice *L, double mu,
         }
     }
 
-    /* collect every ladder's statistics on the root rank */
+    /* collect every ladder's statistics on the root rank (always, so that
+       root can name failed ladders even without tempering_file) */
     int root_failed = 0;
-    TemperingLadderOut *all = NULL;
-    int nall = 0;
 #ifdef AFQMC_USE_MPI
     if (use_mpi) {
-        const int wu = tempering_ladder_out_width_u64(K, p->nbin);
-        const int wf = tempering_ladder_out_width_f64();
-        uint64_t *ibuf = NULL, *all_i = NULL;
-        double *fbuf = NULL, *all_f = NULL;
-        int *cnt_i = calloc((size_t)env->nranks, sizeof(int));
-        int *dsp_i = calloc((size_t)env->nranks, sizeof(int));
-        int *cnt_f = calloc((size_t)env->nranks, sizeof(int));
-        int *dsp_f = calloc((size_t)env->nranks, sizeof(int));
-        int gather_failed = wu <= 0 || cnt_i == NULL || dsp_i == NULL ||
-                            cnt_f == NULL || dsp_f == NULL;
-        if (!gather_failed && local > 0) {
-            ibuf = malloc((size_t)local * (size_t)wu * sizeof *ibuf);
-            fbuf = malloc((size_t)local * (size_t)wf * sizeof *fbuf);
-            gather_failed = ibuf == NULL || fbuf == NULL;
+        for (int r = 0; r < local; r++) {
+            tempering_ladder_out_pack(&outs[r], ibuf + (size_t)r * (size_t)wu,
+                                      fbuf + (size_t)r * (size_t)wf);
         }
-        if (!gather_failed && root) {
-            all_i = malloc((size_t)nrep * (size_t)wu * sizeof *all_i);
-            all_f = malloc((size_t)nrep * (size_t)wf * sizeof *all_f);
-            gather_failed = all_i == NULL || all_f == NULL;
-        }
-        if (!gather_failed) {
-            gather_failed =
-                replica_mpi_gatherv_layout(nrep, 1, env->nranks, wu, cnt_i,
-                                           dsp_i) != 0 ||
-                replica_mpi_gatherv_layout(nrep, 1, env->nranks, wf, cnt_f,
-                                           dsp_f) != 0;
-        }
-        if (mpi_any_failed(env, gather_failed)) {
-            root_failed = 1;
-        } else {
-            for (int r = 0; r < local; r++) {
-                tempering_ladder_out_pack(&outs[r], ibuf + (size_t)r * (size_t)wu,
-                                          fbuf + (size_t)r * (size_t)wf);
-            }
-            MPI_Gatherv(ibuf, local * wu, MPI_UINT64_T, all_i, cnt_i, dsp_i,
-                        MPI_UINT64_T, 0, MPI_COMM_WORLD);
-            MPI_Gatherv(fbuf, local * wf, MPI_DOUBLE, all_f, cnt_f, dsp_f,
-                        MPI_DOUBLE, 0, MPI_COMM_WORLD);
-            if (root) {
-                all = calloc((size_t)nrep, sizeof *all);
-                root_failed = all == NULL;
-                for (int r = 0; !root_failed && r < nrep; r++) {
-                    if (tempering_ladder_out_alloc(&all[r], K, p->nbin) != 0 ||
-                        tempering_ladder_out_unpack(
-                            all_i + (size_t)r * (size_t)wu,
-                            all_f + (size_t)r * (size_t)wf, K, p->nbin,
-                            &all[r]) != 0 ||
-                        all[r].ladder_id != r) {
-                        fprintf(stderr,
-                                "ERROR: invalid gathered tempering statistics for ladder %d\n",
-                                r);
-                        root_failed = 1;
-                    }
+        MPI_Gatherv(ibuf, local * wu, MPI_UINT64_T, all_i, cnt_i, dsp_i,
+                    MPI_UINT64_T, 0, MPI_COMM_WORLD);
+        MPI_Gatherv(fbuf, local * wf, MPI_DOUBLE, all_f, cnt_f, dsp_f,
+                    MPI_DOUBLE, 0, MPI_COMM_WORLD);
+        if (root) {
+            all = calloc((size_t)nrep, sizeof *all);
+            root_failed = all == NULL;
+            nall = all != NULL ? nrep : 0;
+            for (int r = 0; !root_failed && r < nrep; r++) {
+                if (tempering_ladder_out_alloc(&all[r], K, p->nbin) != 0 ||
+                    tempering_ladder_out_unpack(
+                        all_i + (size_t)r * (size_t)wu,
+                        all_f + (size_t)r * (size_t)wf, K, p->nbin,
+                        &all[r]) != 0 ||
+                    all[r].ladder_id != r) {
+                    fprintf(stderr,
+                            "ERROR: invalid gathered tempering statistics for ladder %d\n",
+                            r);
+                    root_failed = 1;
                 }
-                nall = nrep;
             }
         }
-        free(ibuf);
-        free(fbuf);
-        free(all_i);
-        free(all_f);
-        free(cnt_i);
-        free(dsp_i);
-        free(cnt_f);
-        free(dsp_f);
     } else
 #endif
     {
@@ -1147,18 +1142,19 @@ static int run_tempering_ladders(const Params *p, const Lattice *L, double mu,
     }
 
     if (root) {
-        if (!root_failed &&
-            tempering_out_write(fp, p, all, nall) != 0) {
-            fprintf(stderr, "ERROR: failed to write tempering_file %s\n",
-                    p->tempering_file);
-            root_failed = 1;
+        if (fp != NULL) {
+            if (!root_failed && tempering_out_write(fp, p, all, nall) != 0) {
+                fprintf(stderr, "ERROR: failed to write tempering_file %s\n",
+                        p->tempering_file);
+                root_failed = 1;
+            }
+            if (fclose(fp) != 0) {
+                fprintf(stderr, "ERROR: failed to close tempering_file %s\n",
+                        p->tempering_file);
+                root_failed = 1;
+            }
+            fp = NULL;
         }
-        if (fclose(fp) != 0) {
-            fprintf(stderr, "ERROR: failed to close tempering_file %s\n",
-                    p->tempering_file);
-            root_failed = 1;
-        }
-        fp = NULL;
         for (int r = 0; r < nall; r++) {
             if (all[r].failed) {
                 fprintf(stderr, "ERROR: tempering ladder %d failed\n",
@@ -1166,10 +1162,6 @@ static int run_tempering_ladders(const Params *p, const Lattice *L, double mu,
             }
         }
     }
-    if (all != outs) {
-        tempering_outs_free(all, nall);
-    }
-    tempering_outs_free(outs, local);
 
     int any_ladder_failed = 0;
     for (int r = 0; r < local; r++) {
@@ -1177,7 +1169,25 @@ static int run_tempering_ladders(const Params *p, const Lattice *L, double mu,
     }
     const int write_failed = mpi_any_failed(env, root_failed);
     const int ladder_failed = mpi_any_failed(env, any_ladder_failed);
-    if (write_failed || ladder_failed) {
+    failed_out = write_failed || ladder_failed;
+
+cleanup:
+    if (fp != NULL) {
+        fclose(fp);
+    }
+    if (all != outs) {
+        tempering_outs_free(all, nall);
+    }
+    tempering_outs_free(outs, local);
+    free(ibuf);
+    free(fbuf);
+    free(all_i);
+    free(all_f);
+    free(cnt_i);
+    free(dsp_i);
+    free(cnt_f);
+    free(dsp_f);
+    if (failed_out) {
         tempering_state_free(st, K);
         return 1;
     }
