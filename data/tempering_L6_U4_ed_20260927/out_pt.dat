@@ -1,0 +1,7 @@
+# lattice=chain n=6 U=4 mu=2 dtau=ladder bipartite=1 green_rebuild=combine parallel=omp nrep=16 bins=1600 szz_file=data/tempering_L6_U4_ed_20260927/szz_pt.tsv szz_nq=6 sperp_file=data/tempering_L6_U4_ed_20260927/sperp_pt.tsv sperp_nq=6 tempering=dtau_ladder tempering_ltr=200 tempering_interval=1 tempering_file=data/tempering_L6_U4_ed_20260927/pt.tsv
+# T  E_hub dE_hub  E_gc dE_gc  E_ph dE_ph  ntot dN  doublon dD  sign  acceptance dAcceptance
+0.25 -3.4691483 0.00215 -15.469148 0.00215 -9.4691483 0.00215 6 0 0.10658348 5.6e-05 1 0.80454809 3.6e-05
+0.2 -3.5967071 0.00215 -15.596707 0.00215 -9.5967071 0.00215 6 0 0.1087142 5.6e-05 1 0.7849635 3.49e-05
+0.15 -3.6576766 0.0021 -15.657677 0.0021 -9.6576766 0.0021 6 0 0.11018212 5.6e-05 1 0.75595227 3.5e-05
+0.1 -3.6910244 0.00218 -15.691024 0.00218 -9.6910244 0.00218 6 0 0.11041199 5.6e-05 1 0.70782141 3.55e-05
+# tempering solver_elapsed_seconds=385.518 nranks=1

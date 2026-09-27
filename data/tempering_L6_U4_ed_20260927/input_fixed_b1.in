@@ -1,0 +1,17 @@
+lattice=chain
+Lx=6
+bc=periodic
+U=4
+dtau=0.02
+beta_list=4
+nwarm=2000
+nmeas=50000
+nbin=100
+parallel=omp
+nrep=16
+seed=270927101
+replica_bin_file=data/tempering_L6_U4_ed_20260927/bins_fixed_b1.tsv
+szz_q=all
+szz_file=data/tempering_L6_U4_ed_20260927/szz_fixed_b1.tsv
+sperp_q=all
+sperp_file=data/tempering_L6_U4_ed_20260927/sperp_fixed_b1.tsv
