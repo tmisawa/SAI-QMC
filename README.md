@@ -325,6 +325,12 @@ including during warmup. A non-finite `log R`, or a failed configuration
 rebuild after an accepted exchange, ends the ladder as a numerical failure
 (nonzero exit) rather than a silent rejection.
 
+Slot `k` of ladder `r` seeds its own Monte Carlo chain with
+`replica_seed(seed, k, r)`, the same rule an ordinary replica uses; the
+dedicated exchange random stream instead uses `replica_seed(seed, nbeta, r)`
+(index `nbeta` is never used as a slot index), and `tempering_file`'s
+`ladder` row records that value as `swap_seed`.
+
 Each ladder's slots and exchanges run, for the ladder's whole lifetime, on
 one MPI rank and one OpenMP thread; ladders are distributed across
 ranks/threads the same way ordinary replicas are. Given the same seed,

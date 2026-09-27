@@ -301,6 +301,12 @@ sign-freeでparticle-hole対称な模型（半充填・二部格子）である�
 受理後の配置再構築が失敗した場合は、棄却としてではなく、そのladderの
 数値的失敗として終了します（非zero終了）。
 
+slot `k`（ladder `r`）自身のMonte Carlo chainは、通常のreplicaと同じ規則で
+`replica_seed(seed, k, r)`をseedとします。専用の交換用乱数streamはその代わりに
+`replica_seed(seed, nbeta, r)`を使います（`nbeta`はどのslotの番号としても
+使われません）。`tempering_file`の`ladder`行は、この値を`swap_seed`として
+記録します。
+
 各ladderのslotと交換は、そのladderの実行中を通じて1つのMPI rank・1つの
 OpenMP threadの中で逐次実行され、ladder自体は通常のreplicaと同じ規則で
 rank・threadに分配されます。同じseedなら`serial`・`omp`・`mpi`・`hybrid`の
