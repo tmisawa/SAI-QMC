@@ -2,6 +2,61 @@
 
 ---
 date: 2026-09-28
+datetime: 2026-09-28 20:05 JST
+model: Claude Sonnet 5 (Claude Code)
+summary: |
+  Fixed the CHECK_CLOSE test helper: it used to silently pass whenever an
+  operand was NaN or Inf-minus-Inf, because a comparison against NaN is
+  always false. The close-comparison predicate now lives in a small
+  test_close() helper that requires both operands and the tolerance to be
+  finite (and the tolerance non-negative); CHECK_CLOSE uses it and prints
+  an explicit non-finite message when it rejects. Added a self-test with
+  the non-finite/negative-tolerance negative controls and re-ran every
+  test suite.
+---
+
+## 2026-09-28: CHECK_CLOSE now rejects non-finite operands and tolerances
+
+- `tests/test_util.h`: `CHECK_CLOSE(a, b, tol)` failed only when
+  `fabs(a - b) > tol`. Any comparison against NaN is false, and
+  `INFINITY - INFINITY` is NaN, so `CHECK_CLOSE(NAN, 1.0, 1e-12)` and
+  `CHECK_CLOSE(INFINITY, INFINITY, 1e-12)` both passed silently. This file
+  was added in the repository's first commit ("Initial import of SAI-QMC
+  0.1") and had not been touched since (`git log --follow -- tests/test_util.h`
+  shows one commit; `git diff` against that commit is empty up to the
+  parent of this change). Added
+  `static inline int test_close(double a, double b, double tol)`, returning
+  1 only when `a`, `b`, and `tol` are all finite, `tol >= 0`, and
+  `fabs(a - b) <= tol`; `CHECK_CLOSE` now calls it and prints an explicit
+  "non-finite" message for the rejected non-finite/negative-tolerance
+  cases, keeping the previous `|a - b| = ... > tol` message for ordinary
+  finite failures.
+- New `tests/test_check_close.c` (picked up by the Makefile's `tests/test_*.c`
+  wildcard) calls `test_close()` directly, not through `CHECK_CLOSE`'s own
+  failing path, and checks that `(NAN, 1, 1e-12)`, `(1, NAN, 1e-12)`,
+  `(INFINITY, INFINITY, 1e-12)`, `(-INFINITY, -INFINITY, 1e-12)`,
+  `(1, 1, NAN)`, and `(1, 1, -1)` all return 0, and that `(1, 1, 0)` and
+  `(1, 1 + 1e-13, 1e-12)` return 1. Before the header change, this file did
+  not build (`test_close` undeclared); after it, it builds and passes.
+- `tests/test_udv_logdet.c:136`: reworded the comment on the explicit
+  `isfinite(la) && isfinite(lr)` check, which is now redundant with
+  `CHECK_CLOSE` below it (kept for a clearer, standalone signal); the old
+  comment ("CHECK_CLOSE does not catch NaN") is no longer accurate.
+- Test-only change; nothing under `src/` touched. Checked (`grep`) the
+  roughly 230 other `CHECK_CLOSE` call sites across the test suite for one
+  that compares an intentionally infinite value on purpose; found none.
+- Verification, all suites re-run at the new commit: `make test` rc=0,
+  `ALL TESTS PASSED`; `OMPI_CC=cc OMP_NUM_THREADS=2 make test_omp test_mpi
+  test_hybrid` rc=0, `ALL OMP TESTS PASSED` / `ALL MPI TESTS PASSED` /
+  `ALL HYBRID TESTS PASSED`; `make test_slow` rc=0, `ALL SLOW TESTS PASSED`;
+  `make test_tempering_default` rc=0, OK (byte-identical against `3215eee`,
+  confirming no production behavior changed). No existing test failed from
+  a newly-caught non-finite operand, so no latent defect surfaced.
+  `make test_global_default` still cannot run here (baseline `463dc75`
+  absent), unrelated to this change, as recorded on 2026-09-27.
+
+---
+date: 2026-09-28
 datetime: 2026-09-28 01:48 JST
 model: Claude Opus 5.5 (Claude Code)
 summary: |

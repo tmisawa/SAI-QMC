@@ -669,3 +669,25 @@ lattice依存のO(1) e-foldずれうる。PTでも同じで、`beta_list=20,24.5
 短い実行が正常に終了した。この設定の余裕は`ln(DBL_MAX)`まで約1.6 e-foldしかない。
 `field_init=random`の初期配置は、各siteの時間方向の和がほぼ0なので、このスケール
 より十分小さい。
+
+### CHECK_CLOSEの非有限値の拒否（2026-09-28）
+
+test helperの`CHECK_CLOSE(a, b, tol)`は`fabs(a - b) > tol`のときだけ失敗と
+判定していた。NaNとの比較は常にfalseであり、`INFINITY - INFINITY`もNaNに
+なるため、`CHECK_CLOSE(NAN, 1.0, 1e-12)`や
+`CHECK_CLOSE(INFINITY, INFINITY, 1e-12)`は黙って合格していた。
+`tests/test_util.h`は本repositoryの最初のcommit（"Initial import of
+SAI-QMC 0.1"）以来この点を変更されていなかった。
+
+`a`、`b`、`tol`がすべて有限かつ`tol >= 0`であることを要求する
+`static inline int test_close(double a, double b, double tol)`を追加し、
+`CHECK_CLOSE`はこれを使って判定し、非有限な入力を拒否した場合は専用の
+messageを出すようにした。負の対照（NaN・Infの各組み合わせ、負のtolerance）
+を検査する`tests/test_check_close.c`を新設し、`make test`に組み込んだ。
+test helperのみの変更であり、`src/`以下のproduction codeは変更していない。
+
+この変更を含むcommitで`make test`、`OMPI_CC=cc OMP_NUM_THREADS=2 make
+test_omp test_mpi test_hybrid`、`make test_slow`、
+`make test_tempering_default`を再実行し、すべて既存の合格条件（`ALL ...
+PASSED`、および`test_tempering_default`は3215eeeとのbyte同一性）を満たして
+合格した。非有限値の検出によって新たに失敗した既存testはなかった。

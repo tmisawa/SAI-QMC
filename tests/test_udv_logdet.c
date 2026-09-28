@@ -133,7 +133,10 @@ int main(void)
         double la = 0.0, lr = 0.0;
         CHECK(udv_logdet_one_plus_work(&s, &sg, &la, &w) == 0);
         dense_ref(&s, &sr, &lr);
-        CHECK(isfinite(la) && isfinite(lr)); /* CHECK_CLOSE does not catch NaN */
+        CHECK(isfinite(la) && isfinite(lr)); /* explicit: a clearer, separate
+                                                 signal than CHECK_CLOSE below,
+                                                 which also rejects non-finite
+                                                 values */
         CHECK(sg == sr);
         CHECK_CLOSE(la, lr, 1e-9);
         /* NULL work falls back to a temporary one */
