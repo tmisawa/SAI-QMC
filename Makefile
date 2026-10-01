@@ -1,5 +1,6 @@
 CC      = cc
 CFLAGS  = -std=c11 -O2 -Wall -Wextra -Isrc
+PYTHON ?= python3
 UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Darwin)
   LDLIBS = -framework Accelerate
@@ -106,7 +107,7 @@ test_szz_parallel: dqmc dqmc_omp dqmc_mpi dqmc_hybrid
 test_sperp_parallel: dqmc dqmc_omp dqmc_mpi dqmc_hybrid
 	@printf "%-35s " tests/test_sperp_parallel.sh; sh tests/test_sperp_parallel.sh
 
-test: $(TESTBIN) test_szz test_sperp test_scalar test_dat test_global_disabled test_global_output test_global_hook_isolation test_tempering_output test_tempering_failure
+test: $(TESTBIN) test_conditional_output test_szz test_sperp test_scalar test_dat test_global_disabled test_global_output test_global_hook_isolation test_tempering_output test_tempering_failure
 	@fail=0; for t in $(TESTBIN); do printf "%-28s " $$t; ./$$t || fail=1; done; \
 	  if [ $$fail -ne 0 ]; then echo "SOME TESTS FAILED"; exit 1; fi; echo "ALL TESTS PASSED"
 
@@ -122,7 +123,7 @@ test_mpi: $(TESTBIN_MPI)
 	@fail=0; for t in $(TESTBIN_MPI); do printf "%-32s " $$t; $(MPIRUN) -np 1 ./$$t || fail=1; done; \
 	  if [ $$fail -ne 0 ]; then echo "SOME MPI TESTS FAILED"; exit 1; fi; echo "ALL MPI TESTS PASSED"
 
-test_hybrid: $(TESTBIN_HYBRID) test_szz_parallel test_sperp_parallel test_scalar_parallel test_dat_parallel test_global_parallel test_tempering_parallel test_tempering_mpi_failure
+test_hybrid: $(TESTBIN_HYBRID) test_conditional_parallel test_szz_parallel test_sperp_parallel test_scalar_parallel test_dat_parallel test_global_parallel test_tempering_parallel test_tempering_mpi_failure
 	@fail=0; for t in $(TESTBIN_HYBRID); do printf "%-35s " $$t; $(MPIRUN) -np 1 ./$$t || fail=1; done; \
 	  if [ $$fail -ne 0 ]; then echo "SOME HYBRID TESTS FAILED"; exit 1; fi; echo "ALL HYBRID TESTS PASSED"
 
@@ -204,3 +205,12 @@ test_global_output_omp: dqmc_omp $(HOOK_DIR)/dqmc_omp
 	@OMP_NUM_THREADS=2 AFQMC_TEST_MODE=omp sh tests/test_global_output.sh
 
 .PHONY: test_global_output_omp
+
+
+test_conditional_output: dqmc
+	$(PYTHON) tests/test_conditional_output.py
+
+test_conditional_parallel: dqmc dqmc_omp dqmc_mpi dqmc_hybrid
+	MPIRUN="$(MPIRUN)" $(PYTHON) tests/test_conditional_output.py --parallel
+
+.PHONY: test_conditional_output test_conditional_parallel

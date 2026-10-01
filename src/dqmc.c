@@ -34,6 +34,59 @@ static void dqmc_invalidate_carried(Dqmc *D)
     D->carried_suffix_valid = 0;
 }
 
+int dqmc_enable_conditional_measure(Dqmc *D, int enabled)
+{
+    if (D == NULL || (enabled != 0 && enabled != 1)) {
+        return 1;
+    }
+    if (enabled) {
+        if (D->status || !D->use_ph || !D->m->half_filling ||
+            !D->m->ph_symmetric || !isfinite(D->m->U) || D->m->U < 0.0 ||
+            !isfinite(D->m->dtau) || D->m->dtau <= 0.0) {
+            return 1;
+        }
+        for (int i = 0; i < D->n; i++) {
+            if (D->m->K[i + i * D->n] + D->m->mu != 0.0) {
+                return 1;
+            }
+            for (int j = 0; j < D->n; j++) {
+                if (i != j && D->m->K[i + j * D->n] != 0.0 &&
+                    D->m->bipart[i] * D->m->bipart[j] != -1) {
+                    return 1;
+                }
+            }
+        }
+    }
+    memset(&D->conditional, 0, sizeof D->conditional);
+    D->conditional.enabled = enabled;
+    if (enabled) {
+        const double x = D->m->dtau * D->m->U / 2.0;
+        D->conditional.lower_D = x > 0.0 ? -0.5 / expm1(x) : -INFINITY;
+        D->conditional.upper_D = 0.5 / (exp(x) + 1.0);
+    }
+    return 0;
+}
+
+static int dqmc_conditional_record(Dqmc *D, int site, double Ru, double Rd)
+{
+    double d, k;
+    ConditionalMeasure *c = &D->conditional;
+    if (conditional_measure_local(D->m, &D->Gu, site, Ru, Rd, &d, &k) ||
+        D->sign != 1.0) {
+        return 1;
+    }
+    const double tol = 1e-7;
+    if (d > c->upper_D + tol * (1.0 + fabs(c->upper_D)) ||
+        d < c->lower_D - tol * (1.0 + fabs(c->lower_D)) ||
+        !isfinite(c->sum_D + d) || !isfinite(c->sum_K + k)) {
+        return 1;
+    }
+    c->sum_D += d;
+    c->sum_K += k;
+    c->count++;
+    return 0;
+}
+
 static void dqmc_udv_lmul(Dqmc *D, UDV *s, const double *B, LinalgWork *w)
 {
     if (D->green_rebuild_mode == GREEN_REBUILD_CENTERED) {
@@ -738,6 +791,15 @@ static void dqmc_sweep_forward(Dqmc *D, int carry_prefix)
                                         : green_delay_ratio_N(&D->Gd, i, Nd);
             const double R = Ru * Rd;
 
+            if (D->conditional.enabled && dqmc_conditional_record(D, i, Ru, Rd)) {
+                fprintf(stderr, "ERROR: invalid conditional local measurement "
+                        "(sweep=%llu slice=%d site=%d)\n",
+                        D->sweep_count + 1ULL, l, i);
+                D->status = 1;
+                dqmc_invalidate_carried(D);
+                PROF_END(D->prof, PROF_DQMC_SWEEP, t_sweep);
+                return;
+            }
             D->accept_attempts++;
             if (rng_double(D->rng) < fabs(R)) {
                 D->accept_accepted++;
@@ -959,6 +1021,15 @@ static void dqmc_sweep_backward(Dqmc *D)
             const double Rd = green_ph_down_ratio_N(&D->Gu, i, Nd);
             const double R = Ru * Rd;
 
+            if (D->conditional.enabled && dqmc_conditional_record(D, i, Ru, Rd)) {
+                fprintf(stderr, "ERROR: invalid conditional local measurement "
+                        "(sweep=%llu slice=%d site=%d)\n",
+                        D->sweep_count + 1ULL, l, i);
+                D->status = 1;
+                dqmc_invalidate_carried(D);
+                PROF_END(D->prof, PROF_DQMC_SWEEP, t_sweep);
+                return;
+            }
             D->accept_attempts++;
             if (rng_double(D->rng) < fabs(R)) {
                 D->accept_accepted++;
@@ -1025,6 +1096,11 @@ static void dqmc_sweep_backward(Dqmc *D)
 
 void dqmc_sweep(Dqmc *D)
 {
+    if (D->conditional.enabled) {
+        D->conditional.count = 0;
+        D->conditional.sum_D = 0.0;
+        D->conditional.sum_K = 0.0;
+    }
     if (D->sweep_mode != DQMC_SWEEP_ALTERNATING) {
         dqmc_sweep_forward(D, 0);
         return;

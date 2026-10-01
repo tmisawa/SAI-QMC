@@ -36,14 +36,24 @@ int replica_bin_write(FILE *fp, const ReplicaBinView *v,
                     "beta_effective / Ltr; the dtau field above is not used\n",
                     m->tempering_ltr);
         }
+        if (m->conditional_measure) {
+            fprintf(fp, "# conditional_measure=1: local pre-update HS-pair average; "
+                    "before global updates/exchanges; accumulated by temperature slot\n"
+                    "# conditional sums are sign-free: divide by conditional_count "
+                    "(sweeps); D per site, K and Ehub total\n");
+        }
         fprintf(fp,
                 "# szz_Q_index=%d szz_0_index=%d sperp_Q_index=%d\n"
                 "# columns: beta_index\tbeta_requested\tbeta_effective\tLtr\t"
                 "replica_id\tseed\tbin_id\tsweep_begin\tsweep_end\tcount\t"
                 "sum_sign\tsum_sign_Ehub\tsum_sign_D\tlocal_accepted\t"
                 "local_attempts\tglobal_accepted\tglobal_attempts\t"
-                "sum_sign_Szz_Q\tsum_sign_Sperp_Q\tsum_sign_Szz_0\n",
+                "sum_sign_Szz_Q\tsum_sign_Sperp_Q\tsum_sign_Szz_0",
                 m->szz_Q_index, m->szz_0_index, m->sperp_Q_index);
+        if (m->conditional_measure) {
+            fputs("\tconditional_count\tsum_D_cond\tsum_K_cond\tsum_Ehub_cond", fp);
+        }
+        fputc('\n', fp);
     }
     const int per = m->nmeas / m->nbin;
     for (int r = 0; r < v->nrep; r++) {
@@ -52,7 +62,7 @@ int replica_bin_write(FILE *fp, const ReplicaBinView *v,
             const ReplicaBin *bin = &v->bins[flat];
             fprintf(fp,
                     "%d\t%.17g\t%.17g\t%d\t%d\t%llu\t%d\t%d\t%d\t%d\t%.17g\t"
-                    "%.17g\t%.17g\t%llu\t%llu\t%llu\t%llu\t%.17g\t%.17g\t%.17g\n",
+                    "%.17g\t%.17g\t%llu\t%llu\t%llu\t%llu\t%.17g\t%.17g\t%.17g",
                     m->beta_index, m->beta_requested, m->beta_effective,
                     m->Ltr, v->replica_ids[r], v->seeds[r], b, b * per + 1,
                     (b + 1) * per, bin->count, bin->sum_sign,
@@ -62,6 +72,16 @@ int replica_bin_write(FILE *fp, const ReplicaBinView *v,
                     pick(v->szz, v->szz_nq, flat, m->szz_Q_index),
                     pick(v->sperp, v->sperp_nq, flat, m->sperp_Q_index),
                     pick(v->szz, v->szz_nq, flat, m->szz_0_index));
+            if (m->conditional_measure) {
+                if (bin->conditional_count != bin->count || bin->count <= 0 ||
+                    !isfinite(bin->sum_D_cond) || !isfinite(bin->sum_K_cond) ||
+                    !isfinite(bin->sum_Ehub_cond)) {
+                    return 1;
+                }
+                fprintf(fp, "\t%d\t%.17g\t%.17g\t%.17g", bin->conditional_count,
+                        bin->sum_D_cond, bin->sum_K_cond, bin->sum_Ehub_cond);
+            }
+            fputc('\n', fp);
         }
     }
     if (fflush(fp) != 0 || ferror(fp)) {

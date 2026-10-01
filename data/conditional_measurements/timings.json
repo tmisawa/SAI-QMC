@@ -1,0 +1,164 @@
+[
+  {
+    "case": "fixed-b16-dt025",
+    "repeat": 0,
+    "enabled": 0,
+    "measurement_seconds": 9.899075055756839,
+    "warmup_seconds": 2.474747284053592,
+    "wall_seconds": 12.456659727002261,
+    "measurements": 400
+  },
+  {
+    "case": "fixed-b16-dt025",
+    "repeat": 0,
+    "enabled": 1,
+    "measurement_seconds": 10.408998501632595,
+    "warmup_seconds": 2.484119084023405,
+    "wall_seconds": 12.97310624300735,
+    "measurements": 400
+  },
+  {
+    "case": "fixed-b16-dt025",
+    "repeat": 1,
+    "enabled": 1,
+    "measurement_seconds": 10.382432405895088,
+    "warmup_seconds": 2.4772013781475835,
+    "wall_seconds": 12.93880424098461,
+    "measurements": 400
+  },
+  {
+    "case": "fixed-b16-dt025",
+    "repeat": 1,
+    "enabled": 0,
+    "measurement_seconds": 9.925032889703289,
+    "warmup_seconds": 2.483182038908126,
+    "wall_seconds": 12.489993048016913,
+    "measurements": 400
+  },
+  {
+    "case": "fixed-b16-dt025",
+    "repeat": 2,
+    "enabled": 0,
+    "measurement_seconds": 9.883433623152087,
+    "warmup_seconds": 2.477005017863121,
+    "wall_seconds": 12.44052782599465,
+    "measurements": 400
+  },
+  {
+    "case": "fixed-b16-dt025",
+    "repeat": 2,
+    "enabled": 1,
+    "measurement_seconds": 10.38272679518559,
+    "warmup_seconds": 2.476662322151242,
+    "wall_seconds": 12.939083816017956,
+    "measurements": 400
+  },
+  {
+    "case": "fixed-b16-dt0125",
+    "repeat": 0,
+    "enabled": 0,
+    "measurement_seconds": 20.00580024838564,
+    "warmup_seconds": 5.001034754066495,
+    "wall_seconds": 25.10511386700091,
+    "measurements": 400
+  },
+  {
+    "case": "fixed-b16-dt0125",
+    "repeat": 0,
+    "enabled": 1,
+    "measurement_seconds": 21.005126006988576,
+    "warmup_seconds": 5.0073218157631345,
+    "wall_seconds": 26.11124613697757,
+    "measurements": 400
+  },
+  {
+    "case": "fixed-b16-dt0125",
+    "repeat": 1,
+    "enabled": 1,
+    "measurement_seconds": 20.99308169822325,
+    "warmup_seconds": 5.0060443173279054,
+    "wall_seconds": 26.09696921700379,
+    "measurements": 400
+  },
+  {
+    "case": "fixed-b16-dt0125",
+    "repeat": 1,
+    "enabled": 0,
+    "measurement_seconds": 20.00621971450164,
+    "warmup_seconds": 5.006253827974433,
+    "wall_seconds": 25.112523481977405,
+    "measurements": 400
+  },
+  {
+    "case": "fixed-b16-dt0125",
+    "repeat": 2,
+    "enabled": 0,
+    "measurement_seconds": 20.004061578511028,
+    "warmup_seconds": 5.005904938152526,
+    "wall_seconds": 25.108961553982226,
+    "measurements": 400
+  },
+  {
+    "case": "fixed-b16-dt0125",
+    "repeat": 2,
+    "enabled": 1,
+    "measurement_seconds": 21.011556462588487,
+    "warmup_seconds": 5.010286800970789,
+    "wall_seconds": 26.121403925993945,
+    "measurements": 400
+  },
+  {
+    "case": "pt-six-slots",
+    "repeat": 0,
+    "enabled": 0,
+    "measurement_seconds": 68.350797,
+    "warmup_seconds": 14.014686,
+    "wall_seconds": 82.77146229697973,
+    "measurements": 100
+  },
+  {
+    "case": "pt-six-slots",
+    "repeat": 0,
+    "enabled": 1,
+    "measurement_seconds": 70.659194,
+    "warmup_seconds": 14.029763,
+    "wall_seconds": 85.10744146601064,
+    "measurements": 100
+  },
+  {
+    "case": "pt-six-slots",
+    "repeat": 1,
+    "enabled": 1,
+    "measurement_seconds": 70.891286,
+    "warmup_seconds": 13.687374,
+    "wall_seconds": 84.98036975701689,
+    "measurements": 100
+  },
+  {
+    "case": "pt-six-slots",
+    "repeat": 1,
+    "enabled": 0,
+    "measurement_seconds": 68.736437,
+    "warmup_seconds": 13.695186,
+    "wall_seconds": 82.84002937501646,
+    "measurements": 100
+  },
+  {
+    "case": "pt-six-slots",
+    "repeat": 2,
+    "enabled": 0,
+    "measurement_seconds": 68.095166,
+    "warmup_seconds": 14.077127,
+    "wall_seconds": 82.58334624400595,
+    "measurements": 100
+  },
+  {
+    "case": "pt-six-slots",
+    "repeat": 2,
+    "enabled": 1,
+    "measurement_seconds": 70.14345900000001,
+    "warmup_seconds": 14.037732,
+    "wall_seconds": 84.58933834699565,
+    "measurements": 100
+  }
+]

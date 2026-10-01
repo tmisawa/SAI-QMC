@@ -299,6 +299,12 @@ int replica_chain_measure_begin(ReplicaChain *c, const StructureFactorPlan *szz_
             return 1;
         }
     }
+    if (p->conditional_measure && dqmc_enable_conditional_measure(&c->D, 1)) {
+        fprintf(stderr, "ERROR: conditional_measure requires a healthy half-filled "
+                "PH model with zero diagonal hopping\n");
+        replica_result_free(result);
+        return 1;
+    }
     result->replica_id = replica_id;
     result->seed = seed;
     result->status = 1;
@@ -420,6 +426,22 @@ int replica_chain_measure(ReplicaChain *c, ReplicaResult *result, int bi, int k,
                 beta_index, beta, T, replica_id, seed, p->U, c->dtau,
                 Ltr, p->stab_interval, D->sweep_count, bi, k, D->sign);
         return 1;
+    }
+    if (p->conditional_measure) {
+        const ConditionalMeasure *cm = &D->conditional;
+        const unsigned long long expected =
+            (unsigned long long)D->n * (unsigned long long)D->L;
+        /* Stored local-sweep sums are deliberately unchanged by global passes
+           and field exchanges. This result belongs to the temperature slot. */
+        if (!cm->enabled || cm->count != expected || D->sign != 1.0 ||
+            replica_bin_add_conditional(&result->bins[bi],
+                cm->sum_D / (double)expected, cm->sum_K / (double)D->L,
+                p->U, D->n)) {
+            fprintf(stderr, "ERROR: invalid conditional sweep measurement "
+                    "(beta_index=%d replica=%d bin=%d meas=%d)\n",
+                    beta_index, replica_id, bi, k);
+            return 1;
+        }
     }
     replica_bin_add_global(&result->bins[bi],
                            D->global_accepted - gacc0,

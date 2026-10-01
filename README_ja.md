@@ -1,6 +1,6 @@
 ---
-date: 2026-09-23
-datetime: 2026-09-23 16:17 JST
+date: 2026-09-30
+datetime: 2026-09-30 13:30 JST
 model: OpenAI GPT-6 (Codex)
 summary: |
   SAI-QMC 0.1の日本語利用案内。英語READMEに対応する。
@@ -159,6 +159,16 @@ spin_consistency_file=spin_consistency.dat
 スカラー観測量は自動保存されます。従来のリダイレクトによる保存には
 `output_file=none`を使用できます。
 
+## 条件付き局所測定
+
+`conditional_measure=1`で、各局所更新時にHS変数の±を重み付き平均したDと、
+同じ時点のK・Dから作るEを追加測定する。既定値は`0`。
+`replica_bin_file`が必須で、従来の測定列を保持したまま比較用の4列を追加する。
+PTでは測定値を温度slotに蓄積する。
+式・出力規約・独立replicaでの解析方法と適用範囲は
+[条件付き測定の説明](docs/conditional-measurements.md)を参照。
+測定方式の改善と平衡化の確認は別に評価する。
+
 ## 並列実行
 
 レプリカは独立なモンテカルロ系列で、乱数種は決定的な規則で割り当てます。
@@ -251,8 +261,8 @@ siteを反転しても他のsiteの`|m_j|`もそのsiteの`|m_i|`も変わらな
 積の丸めを含めた53-bit乱数の到達点がないsite区間）は数値エラーとしてreplicaを終了します。
 相対重みの下限だけでは選択可能性を保証できないので、全区間の到達可能性も乱数消費前に検査します。
 staggered mismatch `d`による選択は実装していません。Stage Aの診断がこの指標を不支持としたためで、
-`global_site_select=staggered`は入力エラーです。polarized選択が混合を改善するかは、比較runの完了後に
-[VALIDATION.md](VALIDATION.md)へ記録します。
+`global_site_select=staggered`は入力エラーです。L4・U8・β16/24でのα=2の比較では受理数が増えましたが、
+事前に定めた混合改善基準は満たしませんでした。[VALIDATION.md §9](VALIDATION.md#9-stage-b-polarized-selection-versus-fixed-order2026-09-26)を参照してください。
 
 4×2 cluster・`U/t=8`での検証は[VALIDATION.md](VALIDATION.md)と
 [docs/validation/global-hs-4x2-2026-09-21.json](docs/validation/global-hs-4x2-2026-09-21.json)に記録しています。
@@ -391,6 +401,12 @@ PTは1つのladderのslotを複数のMPI rankへ分配せず、
 [既知の制約](docs/limitations.md)を確認してください。
 
 ## 検証と制約
+
+CLIテストと条件付きbin解析にはPython 3.10以降が必要です。
+任意実行の独立Fock空間参照generatorはNumPyとSciPyも使います。
+`python3`が古いinterpreterを指す場合は、たとえば
+`make PYTHON=python3.12 test`のように明示してください。条件付きCLI testが
+起動する解析subprocessにも同じinterpreterを使います。
 
 ```sh
 make test

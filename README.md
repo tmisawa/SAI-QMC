@@ -1,6 +1,6 @@
 ---
-date: 2026-09-23
-datetime: 2026-09-23 16:17 JST
+date: 2026-09-30
+datetime: 2026-09-30 13:30 JST
 model: OpenAI GPT-6 (Codex)
 summary: |
   User guide for SAI-QMC 0.1, a finite-temperature determinant QMC code.
@@ -162,6 +162,16 @@ Error messages go to standard error. Run `./dqmc input.txt 2> run.err` to save
 them separately; scalar data are saved automatically. Existing redirection
 workflows remain available with `output_file=none`.
 
+## Conditional local measurements
+
+`conditional_measure=1` adds local HS-pair averages of double occupancy and
+joint hopping/interaction energy to `replica_bin_file`. It preserves the
+ordinary measurements for comparison and defaults to `0`. Measurements stay
+with the temperature slot under PT. See [the estimator, output schema, and
+independent-replica analysis](docs/conditional-measurements.md) for supported
+models and statistical limits. Improved measurements do not establish mixing
+or equilibration.
+
 ## Parallel execution
 
 Replicas are independent Monte Carlo chains with deterministic seed assignment.
@@ -271,8 +281,9 @@ last check is explicit; the relative-weight limit alone does not guarantee
 that every site remains selectable. These checks consume no random numbers.
 Selection by the staggered mismatch `d` is not implemented: the Stage A
 diagnostic rejected that indicator, and `global_site_select=staggered` is an
-input error. Whether the polarized selection improves mixing is recorded in
-[VALIDATION.md](VALIDATION.md) once the comparison runs are complete.
+input error. In the L4, U8 comparison at beta 16/24, alpha 2 increased acceptance
+but did not meet the predeclared mixing-improvement criteria; see
+[VALIDATION.md §9](VALIDATION.md#9-stage-b-polarized-selection-versus-fixed-order2026-09-26).
 
 Validation on the 4x2 cluster at `U/t=8` is recorded in [VALIDATION.md](VALIDATION.md)
 and [docs/validation/global-hs-4x2-2026-09-21.json](docs/validation/global-hs-4x2-2026-09-21.json).
@@ -426,6 +437,12 @@ support the diagnostic files or profiler listed above; read
 
 ## Validation and limits
 
+The CLI tests and conditional-bin analysis require Python 3.10 or newer.
+The optional independent Fock-space reference generator also uses NumPy and SciPy.
+If `python3` names an older interpreter, select one explicitly with, for
+example, `make PYTHON=python3.12 test`; the conditional CLI test uses that same
+interpreter for its analysis subprocesses.
+
 ```sh
 make test
 make test_omp
@@ -451,6 +468,9 @@ Read [known limitations](docs/limitations.md) before production use. In particul
 - Spin error bars can underestimate independent-run variability. Long runs,
   independent seeds, and convergence checks are necessary. Some recorded
   low-temperature spin data failed convergence checks and are identified as such.
+- The 120-replica polarized-selection comparison failed its mixing-improvement
+  criterion at L4, U8, beta 24; increased acceptance does not establish equilibration
+  ([validation results](VALIDATION.md#9-stage-b-polarized-selection-versus-fixed-order2026-09-26)).
 
 [Reference data](data/README.md) include finite-temperature ED comparisons and
 Trotter extrapolation, with checksums and provenance in

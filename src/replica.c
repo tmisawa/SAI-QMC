@@ -2,6 +2,7 @@
 #include "structure_factor.h"
 
 #include <math.h>
+#include <limits.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -350,4 +351,25 @@ double replica_bins_global_acceptance(const ReplicaBin *bins, int nbins,
         *attempts = att;
     }
     return att == 0ULL ? NAN : (double)acc / (double)att;
+}
+
+int replica_bin_add_conditional(ReplicaBin *bin, double D, double K,
+                                double U, int nsite)
+{
+    if (bin == NULL || nsite <= 0 || !isfinite(U) || U < 0.0 ||
+        !isfinite(D) || !isfinite(K) || bin->conditional_count == INT_MAX) {
+        return 1;
+    }
+    const double E = K + U * (double)nsite * D;
+    const double sd = bin->sum_D_cond + D;
+    const double sk = bin->sum_K_cond + K;
+    const double se = bin->sum_Ehub_cond + E;
+    if (!isfinite(sd) || !isfinite(sk) || !isfinite(se)) {
+        return 1;
+    }
+    bin->sum_D_cond = sd;
+    bin->sum_K_cond = sk;
+    bin->sum_Ehub_cond = se;
+    bin->conditional_count++;
+    return 0;
 }

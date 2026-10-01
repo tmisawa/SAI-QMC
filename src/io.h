@@ -30,6 +30,7 @@ typedef struct {
     char global_update[16];
     int global_interval;
     char replica_bin_file[256];
+    int conditional_measure;       /* 0 default; 1 appends comparison bin sums */
     char global_site_diag_file[256];
     char global_site_select[16];   /* fixed | polarized (spec 4) */
     double global_site_power;      /* alpha >= 0, finite; default 2 */

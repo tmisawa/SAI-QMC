@@ -1,0 +1,1039 @@
+{
+  "cases": [
+    {
+      "name": "fixed-b16-dt025",
+      "conditions": {
+        "name": "fixed-b16-dt025",
+        "dtau": 0.025,
+        "seed": 2026093001,
+        "nwarm": 10000,
+        "nmeas": 10000,
+        "nbin": 20,
+        "nrep": 8
+      },
+      "input_parameters": {
+        "lattice": "square",
+        "Lx": "4",
+        "Ly": "4",
+        "pbc": "1",
+        "t": "-1",
+        "U": "8",
+        "stab": "4",
+        "sweep_order": "alternating",
+        "green_rebuild": "centered",
+        "global_update": "site",
+        "global_interval": "10",
+        "szz_q": "all",
+        "sperp_q": "all",
+        "spin_consistency_file": "spin.dat",
+        "replica_bin_file": "bins.tsv",
+        "replica_log": "replicas.tsv",
+        "conditional_measure": "1",
+        "parallel": "omp",
+        "seed": "2026093001",
+        "nwarm": "10000",
+        "nmeas": "10000",
+        "nbin": "20",
+        "nrep": "8",
+        "beta_list": "16",
+        "dtau": "0.025",
+        "profile": "1",
+        "profile_file": "profile.dat"
+      },
+      "field_init": "random (default)",
+      "cost": {
+        "measurement_on_over_off_ratios": [
+          1.0515122314967407,
+          1.0460854408519218,
+          1.050518189434075
+        ],
+        "measurement_ratio_median": 1.050518189434075,
+        "method": "profile=1; nonoverlapping dqmc_sweep/dqmc_global/measure_sample/measure_spin regions",
+        "scope": "Short paired serial timings on a different platform from the pilot samples; fixed-beta profiling is enabled. Variance-times-cost gains are cross-platform descriptive proxies, not same-machine efficiency measurements, unprofiled-runtime guarantees, or asymptotic claims."
+      },
+      "slots": [
+        {
+          "slot": 0,
+          "beta": 16.0,
+          "dtau": 0.025,
+          "seeds": [
+            2026093001,
+            14885646842116508516,
+            15862602198597199945,
+            2670393992320311249,
+            944463728333677888,
+            7007812593131145817,
+            15832678753417834752,
+            8616276999115075420
+          ],
+          "quantities": {
+            "D": {
+              "ordinary": {
+                "mean": 0.053255630224547525,
+                "se": 0.0001067526049076555
+              },
+              "conditional": {
+                "mean": 0.05315417092447687,
+                "se": 3.0428338724753183e-05
+              },
+              "paired_difference": {
+                "mean": -0.00010145930007065575,
+                "se": 0.00011139410243069603
+              },
+              "paired_z": -0.9108139287156496,
+              "SE_ordinary_over_conditional": 3.508328399828585,
+              "leave_one_replica_out_SE_ratio_range": [
+                2.34812770258553,
+                3.9851671313362824
+              ],
+              "descriptive_variance_cost_gain": 11.716473150907026
+            },
+            "E_per_site": {
+              "ordinary": {
+                "mean": -0.5314439478099267,
+                "se": 0.0011417839095182016
+              },
+              "conditional": {
+                "mean": -0.5318227188518617,
+                "se": 0.00034352557305277343
+              },
+              "paired_difference": {
+                "mean": -0.000378771041935011,
+                "se": 0.0010387173051836312
+              },
+              "paired_z": -0.364652673104401,
+              "SE_ordinary_over_conditional": 3.323723178369598,
+              "leave_one_replica_out_SE_ratio_range": [
+                2.840161497364569,
+                3.9340429739617204
+              ],
+              "descriptive_variance_cost_gain": 10.515891945081416
+            }
+          },
+          "bin_D": {
+            "ordinary_min": 0.046372269608714996,
+            "conditional_min": 0.05202973138971183,
+            "ordinary_negative": 0,
+            "conditional_negative": 0,
+            "bins": 160
+          },
+          "last_half_minus_first_half": {
+            "sum_D_cond": {
+              "mean": -2.2386469691416076e-05,
+              "se": 5.349698879447387e-05
+            },
+            "sum_Ehub_cond": {
+              "mean": -0.0005101749393151694,
+              "se": 0.0006295685011790892
+            }
+          },
+          "spin_statistics": {
+            "Szz_Q": {
+              "mean": 1.225158934280502,
+              "se": 0.05046972977069534,
+              "replicas": 8
+            },
+            "Sperp_from_2Szz_Q": {
+              "mean": 2.450317868561004,
+              "se": 0.10093945954139068,
+              "replicas": 8
+            },
+            "Stot_from_3Szz_Q": {
+              "mean": 3.6754768028415064,
+              "se": 0.15140918931208602,
+              "replicas": 8
+            },
+            "Sperp_Q": {
+              "mean": 2.424040204282022,
+              "se": 0.07310746552362098,
+              "replicas": 8
+            },
+            "Stot_Q": {
+              "mean": 3.6491991385625244,
+              "se": 0.05602407897820273,
+              "replicas": 8
+            },
+            "SU2_residual_Sperp_over_2_minus_Szz": {
+              "mean": -0.01313883213949095,
+              "se": 0.0791199586607459,
+              "replicas": 8
+            }
+          }
+        }
+      ],
+      "pilot_execution": "local",
+      "timing_execution": "separate remote timing host"
+    },
+    {
+      "name": "fixed-b16-dt0125",
+      "conditions": {
+        "name": "fixed-b16-dt0125",
+        "dtau": 0.0125,
+        "seed": 2026093002,
+        "nwarm": 10000,
+        "nmeas": 10000,
+        "nbin": 20,
+        "nrep": 8
+      },
+      "input_parameters": {
+        "lattice": "square",
+        "Lx": "4",
+        "Ly": "4",
+        "pbc": "1",
+        "t": "-1",
+        "U": "8",
+        "stab": "4",
+        "sweep_order": "alternating",
+        "green_rebuild": "centered",
+        "global_update": "site",
+        "global_interval": "10",
+        "szz_q": "all",
+        "sperp_q": "all",
+        "spin_consistency_file": "spin.dat",
+        "replica_bin_file": "bins.tsv",
+        "replica_log": "replicas.tsv",
+        "conditional_measure": "1",
+        "parallel": "omp",
+        "seed": "2026093002",
+        "nwarm": "10000",
+        "nmeas": "10000",
+        "nbin": "20",
+        "nrep": "8",
+        "beta_list": "16",
+        "dtau": "0.0125",
+        "profile": "1",
+        "profile_file": "profile.dat"
+      },
+      "field_init": "random (default)",
+      "cost": {
+        "measurement_on_over_off_ratios": [
+          1.0499518012874078,
+          1.0493277589571945,
+          1.0503645162320308
+        ],
+        "measurement_ratio_median": 1.0499518012874078,
+        "method": "profile=1; nonoverlapping dqmc_sweep/dqmc_global/measure_sample/measure_spin regions",
+        "scope": "Short paired serial timings on a different platform from the pilot samples; fixed-beta profiling is enabled. Variance-times-cost gains are cross-platform descriptive proxies, not same-machine efficiency measurements, unprofiled-runtime guarantees, or asymptotic claims."
+      },
+      "slots": [
+        {
+          "slot": 0,
+          "beta": 16.0,
+          "dtau": 0.0125,
+          "seeds": [
+            2026093002,
+            10616039170656147180,
+            13460845770599062106,
+            3817704115879578799,
+            3129284078696650491,
+            884884046591113672,
+            7186552328997183170,
+            7874168228522255
+          ],
+          "quantities": {
+            "D": {
+              "ordinary": {
+                "mean": 0.05351636778658874,
+                "se": 0.00011899152842624823
+              },
+              "conditional": {
+                "mean": 0.053325950773082206,
+                "se": 2.3683911892911615e-05
+              },
+              "paired_difference": {
+                "mean": -0.00019041701350653445,
+                "se": 0.0001270844203992179
+              },
+              "paired_z": -1.498350568137039,
+              "SE_ordinary_over_conditional": 5.024150105112549,
+              "leave_one_replica_out_SE_ratio_range": [
+                3.7104317607902457,
+                9.130214907202195
+              ],
+              "descriptive_variance_cost_gain": 24.041183840774046
+            },
+            "E_per_site": {
+              "ordinary": {
+                "mean": -0.5291557779133084,
+                "se": 0.0012481430800950974
+              },
+              "conditional": {
+                "mean": -0.5284340248214214,
+                "se": 0.00046804643863200323
+              },
+              "paired_difference": {
+                "mean": 0.0007217530918869897,
+                "se": 0.00102393348979585
+              },
+              "paired_z": 0.704882786899461,
+              "SE_ordinary_over_conditional": 2.6667077816960747,
+              "leave_one_replica_out_SE_ratio_range": [
+                2.231310880325366,
+                3.093199147117931
+              ],
+              "descriptive_variance_cost_gain": 6.773006517288487
+            }
+          },
+          "bin_D": {
+            "ordinary_min": 0.04928955072602056,
+            "conditional_min": 0.052308176845238356,
+            "ordinary_negative": 0,
+            "conditional_negative": 0,
+            "bins": 160
+          },
+          "last_half_minus_first_half": {
+            "sum_D_cond": {
+              "mean": 0.0001022830161583237,
+              "se": 7.579469413761684e-05
+            },
+            "sum_Ehub_cond": {
+              "mean": -0.000982541010981039,
+              "se": 0.0013033747242348313
+            }
+          },
+          "spin_statistics": {
+            "Szz_Q": {
+              "mean": 1.2916205402994294,
+              "se": 0.050142841398468314,
+              "replicas": 8
+            },
+            "Sperp_from_2Szz_Q": {
+              "mean": 2.583241080598859,
+              "se": 0.10028568279693663,
+              "replicas": 8
+            },
+            "Stot_from_3Szz_Q": {
+              "mean": 3.8748616208982885,
+              "se": 0.15042852419540495,
+              "replicas": 8
+            },
+            "Sperp_Q": {
+              "mean": 2.3761644222822635,
+              "se": 0.09047095571263442,
+              "replicas": 8
+            },
+            "Stot_Q": {
+              "mean": 3.667784962581693,
+              "se": 0.08463270853545977,
+              "replicas": 8
+            },
+            "SU2_residual_Sperp_over_2_minus_Szz": {
+              "mean": -0.10353832915829767,
+              "se": 0.07955409800200097,
+              "replicas": 8
+            }
+          }
+        }
+      ],
+      "pilot_execution": "local",
+      "timing_execution": "separate remote timing host"
+    },
+    {
+      "name": "pt-six-slots",
+      "conditions": {
+        "name": "pt-six-slots",
+        "seed": 2026093003,
+        "nwarm": 5000,
+        "nmeas": 5000,
+        "nbin": 20,
+        "nrep": 8
+      },
+      "input_parameters": {
+        "lattice": "square",
+        "Lx": "4",
+        "Ly": "4",
+        "pbc": "1",
+        "t": "-1",
+        "U": "8",
+        "stab": "4",
+        "sweep_order": "alternating",
+        "green_rebuild": "centered",
+        "global_update": "site",
+        "global_interval": "10",
+        "szz_q": "all",
+        "sperp_q": "all",
+        "spin_consistency_file": "spin.dat",
+        "replica_bin_file": "bins.tsv",
+        "replica_log": "replicas.tsv",
+        "conditional_measure": "1",
+        "parallel": "omp",
+        "seed": "2026093003",
+        "nwarm": "5000",
+        "nmeas": "5000",
+        "nbin": "20",
+        "nrep": "8",
+        "beta_list": "16,17.6,19.2,20.8,22.4,24",
+        "tempering": "dtau_ladder",
+        "tempering_ltr": "1920",
+        "tempering_interval": "1",
+        "tempering_file": "pt.tsv"
+      },
+      "field_init": "random (default)",
+      "cost": {
+        "measurement_on_over_off_ratios": [
+          1.0337727883407124,
+          1.0313494427998937,
+          1.0300798591195153
+        ],
+        "measurement_ratio_median": 1.0313494427998937,
+        "method": "PT built-in sweep/exchange/measurement counters",
+        "scope": "Short paired serial timings on a different platform from the pilot samples; fixed-beta profiling is enabled. Variance-times-cost gains are cross-platform descriptive proxies, not same-machine efficiency measurements, unprofiled-runtime guarantees, or asymptotic claims."
+      },
+      "slots": [
+        {
+          "slot": 0,
+          "beta": 16.0,
+          "dtau": 0.008333333333333333,
+          "seeds": [
+            2026093003,
+            18370508182247544925,
+            3001247938405348903,
+            13592577156457079185,
+            4430405926156806002,
+            14031925619824461182,
+            2939865645977079350,
+            7282186805910247542
+          ],
+          "quantities": {
+            "D": {
+              "ordinary": {
+                "mean": 0.05358126422344873,
+                "se": 0.00011957230338967464
+              },
+              "conditional": {
+                "mean": 0.05348699288305141,
+                "se": 4.840760098529921e-05
+              },
+              "paired_difference": {
+                "mean": -9.427134039731964e-05,
+                "se": 0.00010531153811551064
+              },
+              "paired_z": -0.8951663045118419,
+              "SE_ordinary_over_conditional": 2.4701142166906243,
+              "leave_one_replica_out_SE_ratio_range": [
+                2.250898943045676,
+                2.8767440150362646
+              ],
+              "descriptive_variance_cost_gain": 5.916000911323482
+            },
+            "E_per_site": {
+              "ordinary": {
+                "mean": -0.5247621975977134,
+                "se": 0.0015442869770262069
+              },
+              "conditional": {
+                "mean": -0.5288436370870921,
+                "se": 0.00040117771685258566
+              },
+              "paired_difference": {
+                "mean": -0.004081439489378752,
+                "se": 0.0014696803455114666
+              },
+              "paired_z": -2.777093333148142,
+              "SE_ordinary_over_conditional": 3.8493837323314275,
+              "leave_one_replica_out_SE_ratio_range": [
+                2.076387123073788,
+                4.714162550735349
+              ],
+              "descriptive_variance_cost_gain": 14.367346801982833
+            }
+          },
+          "bin_D": {
+            "ordinary_min": 0.048352098567135536,
+            "conditional_min": 0.05236786637643407,
+            "ordinary_negative": 0,
+            "conditional_negative": 0,
+            "bins": 160
+          },
+          "last_half_minus_first_half": {
+            "sum_D_cond": {
+              "mean": -8.953421837108212e-05,
+              "se": 7.13437677341904e-05
+            },
+            "sum_Ehub_cond": {
+              "mean": 0.0007317877321184607,
+              "se": 0.0007854396515884863
+            }
+          },
+          "spin_statistics": {
+            "Szz_Q": {
+              "mean": 1.219991273237829,
+              "se": 0.026420627068226243,
+              "replicas": 8
+            },
+            "Sperp_from_2Szz_Q": {
+              "mean": 2.439982546475658,
+              "se": 0.052841254136452485,
+              "replicas": 8
+            },
+            "Stot_from_3Szz_Q": {
+              "mean": 3.659973819713487,
+              "se": 0.07926188120467872,
+              "replicas": 8
+            },
+            "Sperp_Q": {
+              "mean": 2.4819330412471063,
+              "se": 0.10442258584870026,
+              "replicas": 8
+            },
+            "Stot_Q": {
+              "mean": 3.701924314484935,
+              "se": 0.09150956076834968,
+              "replicas": 8
+            },
+            "SU2_residual_Sperp_over_2_minus_Szz": {
+              "mean": 0.020975247385724108,
+              "se": 0.07097979834083902,
+              "replicas": 8
+            }
+          }
+        },
+        {
+          "slot": 1,
+          "beta": 17.6,
+          "dtau": 0.009166666666666667,
+          "seeds": [
+            2026094003,
+            14716778048387755631,
+            4081137751068859790,
+            16048319265288307724,
+            2525384373667004114,
+            3071782734623195390,
+            10558298030419598871,
+            8721867964178618958
+          ],
+          "quantities": {
+            "D": {
+              "ordinary": {
+                "mean": 0.053254287208463535,
+                "se": 0.00018299603726833267
+              },
+              "conditional": {
+                "mean": 0.053392631296253726,
+                "se": 4.02246511813462e-05
+              },
+              "paired_difference": {
+                "mean": 0.00013834408779018516,
+                "se": 0.00016881217986193688
+              },
+              "paired_z": 0.8195148472303949,
+              "SE_ordinary_over_conditional": 4.549350507561278,
+              "leave_one_replica_out_SE_ratio_range": [
+                2.092182369210022,
+                6.173987777035461
+              ],
+              "descriptive_variance_cost_gain": 20.067485550252716
+            },
+            "E_per_site": {
+              "ordinary": {
+                "mean": -0.5266894609622895,
+                "se": 0.001313379363154047
+              },
+              "conditional": {
+                "mean": -0.5286148401503801,
+                "se": 0.00044358821225495083
+              },
+              "paired_difference": {
+                "mean": -0.0019253791880904786,
+                "se": 0.0013159413528609403
+              },
+              "paired_z": -1.463119297759419,
+              "SE_ordinary_over_conditional": 2.960807629394774,
+              "leave_one_replica_out_SE_ratio_range": [
+                2.5743798093177754,
+                3.848112208272638
+              ],
+              "descriptive_variance_cost_gain": 8.499914242919882
+            }
+          },
+          "bin_D": {
+            "ordinary_min": 0.041010926223234385,
+            "conditional_min": 0.05226691569410325,
+            "ordinary_negative": 0,
+            "conditional_negative": 0,
+            "bins": 160
+          },
+          "last_half_minus_first_half": {
+            "sum_D_cond": {
+              "mean": -0.0001316157254306182,
+              "se": 3.0242125136562638e-05
+            },
+            "sum_Ehub_cond": {
+              "mean": 0.0012318913076274501,
+              "se": 0.00042948600743165287
+            }
+          },
+          "spin_statistics": {
+            "Szz_Q": {
+              "mean": 1.187646797302464,
+              "se": 0.019219895100376146,
+              "replicas": 8
+            },
+            "Sperp_from_2Szz_Q": {
+              "mean": 2.375293594604928,
+              "se": 0.03843979020075229,
+              "replicas": 8
+            },
+            "Stot_from_3Szz_Q": {
+              "mean": 3.5629403919073916,
+              "se": 0.05765968530112843,
+              "replicas": 8
+            },
+            "Sperp_Q": {
+              "mean": 2.4370913600796515,
+              "se": 0.06975916681937802,
+              "replicas": 8
+            },
+            "Stot_Q": {
+              "mean": 3.6247381573821156,
+              "se": 0.055895936789821556,
+              "replicas": 8
+            },
+            "SU2_residual_Sperp_over_2_minus_Szz": {
+              "mean": 0.0308988827373618,
+              "se": 0.05139732184850382,
+              "replicas": 8
+            }
+          }
+        },
+        {
+          "slot": 2,
+          "beta": 19.2,
+          "dtau": 0.01,
+          "seeds": [
+            2026095003,
+            13112563867722465638,
+            5931349741589493337,
+            3288526921245861649,
+            864545478366488773,
+            10640981124056393025,
+            12737727114654644414,
+            1317765406236992427
+          ],
+          "quantities": {
+            "D": {
+              "ordinary": {
+                "mean": 0.05342589170978343,
+                "se": 0.0002990955546627851
+              },
+              "conditional": {
+                "mean": 0.05338351898033696,
+                "se": 2.777144859741397e-05
+              },
+              "paired_difference": {
+                "mean": -4.237272944646736e-05,
+                "se": 0.0003056644675345523
+              },
+              "paired_z": -0.13862497590328374,
+              "SE_ordinary_over_conditional": 10.7698938934945,
+              "leave_one_replica_out_SE_ratio_range": [
+                5.5706330905875205,
+                13.572040318568963
+              ],
+              "descriptive_variance_cost_gain": 112.46490245075455
+            },
+            "E_per_site": {
+              "ordinary": {
+                "mean": -0.5329346576936105,
+                "se": 0.003801532820719921
+              },
+              "conditional": {
+                "mean": -0.5291338061571708,
+                "se": 0.0001769234834738133
+              },
+              "paired_difference": {
+                "mean": 0.0038008515364396783,
+                "se": 0.0037817005532240085
+              },
+              "paired_z": 1.0050641194209158,
+              "SE_ordinary_over_conditional": 21.48687526425847,
+              "leave_one_replica_out_SE_ratio_range": [
+                11.24623234435366,
+                31.920966934617795
+              ],
+              "descriptive_variance_cost_gain": 447.65216275137936
+            }
+          },
+          "bin_D": {
+            "ordinary_min": -0.0029169069046273395,
+            "conditional_min": 0.05242355439912308,
+            "ordinary_negative": 1,
+            "conditional_negative": 0,
+            "bins": 160
+          },
+          "last_half_minus_first_half": {
+            "sum_D_cond": {
+              "mean": -6.826243561599676e-05,
+              "se": 6.980504108860669e-05
+            },
+            "sum_Ehub_cond": {
+              "mean": 6.189678188611714e-05,
+              "se": 0.0006550627751203206
+            }
+          },
+          "spin_statistics": {
+            "Szz_Q": {
+              "mean": 1.2107552443234706,
+              "se": 0.018973620106395504,
+              "replicas": 8
+            },
+            "Sperp_from_2Szz_Q": {
+              "mean": 2.421510488646941,
+              "se": 0.03794724021279101,
+              "replicas": 8
+            },
+            "Stot_from_3Szz_Q": {
+              "mean": 3.6322657329704118,
+              "se": 0.05692086031918652,
+              "replicas": 8
+            },
+            "Sperp_Q": {
+              "mean": 2.648041857040174,
+              "se": 0.18811012857299386,
+              "replicas": 8
+            },
+            "Stot_Q": {
+              "mean": 3.8587971013636446,
+              "se": 0.19273178108947434,
+              "replicas": 8
+            },
+            "SU2_residual_Sperp_over_2_minus_Szz": {
+              "mean": 0.11326568419661656,
+              "se": 0.09222956696614924,
+              "replicas": 8
+            }
+          }
+        },
+        {
+          "slot": 3,
+          "beta": 20.8,
+          "dtau": 0.010833333333333334,
+          "seeds": [
+            2026096003,
+            17437044389188643981,
+            1270665603536935620,
+            14870752770520703248,
+            15919862519692921615,
+            3328875207813201480,
+            15600140313719660510,
+            14262116643157045859
+          ],
+          "quantities": {
+            "D": {
+              "ordinary": {
+                "mean": 0.053382595567418395,
+                "se": 0.00011282245521511902
+              },
+              "conditional": {
+                "mean": 0.0533926895716897,
+                "se": 1.7893557367371372e-05
+              },
+              "paired_difference": {
+                "mean": 1.0094004271303351e-05,
+                "se": 0.00011188569389184871
+              },
+              "paired_z": 0.09021711284250915,
+              "SE_ordinary_over_conditional": 6.305199849240098,
+              "leave_one_replica_out_SE_ratio_range": [
+                4.818521780915508,
+                7.263974327552634
+              ],
+              "descriptive_variance_cost_gain": 38.54711457537566
+            },
+            "E_per_site": {
+              "ordinary": {
+                "mean": -0.5291575616719634,
+                "se": 0.002260141463098133
+              },
+              "conditional": {
+                "mean": -0.5293266545459705,
+                "se": 0.0003304512879460568
+              },
+              "paired_difference": {
+                "mean": -0.00016909287400711237,
+                "se": 0.0023396805286662087
+              },
+              "paired_z": -0.0722717789609968,
+              "SE_ordinary_over_conditional": 6.83956015770494,
+              "leave_one_replica_out_SE_ratio_range": [
+                3.877335402131702,
+                8.041760505030972
+              ],
+              "descriptive_variance_cost_gain": 45.357646215300456
+            }
+          },
+          "bin_D": {
+            "ordinary_min": 0.04403057017527471,
+            "conditional_min": 0.05248828288176967,
+            "ordinary_negative": 0,
+            "conditional_negative": 0,
+            "bins": 160
+          },
+          "last_half_minus_first_half": {
+            "sum_D_cond": {
+              "mean": -4.114558287980456e-06,
+              "se": 4.36595795751043e-05
+            },
+            "sum_Ehub_cond": {
+              "mean": -0.0011027233466536224,
+              "se": 0.000396884669668704
+            }
+          },
+          "spin_statistics": {
+            "Szz_Q": {
+              "mean": 1.2245928642305688,
+              "se": 0.023813767559587837,
+              "replicas": 8
+            },
+            "Sperp_from_2Szz_Q": {
+              "mean": 2.4491857284611376,
+              "se": 0.047627535119175675,
+              "replicas": 8
+            },
+            "Stot_from_3Szz_Q": {
+              "mean": 3.673778592691707,
+              "se": 0.0714413026787635,
+              "replicas": 8
+            },
+            "Sperp_Q": {
+              "mean": 2.3937607784523838,
+              "se": 0.0638582299627286,
+              "replicas": 8
+            },
+            "Stot_Q": {
+              "mean": 3.6183536426829526,
+              "se": 0.04623577807699404,
+              "replicas": 8
+            },
+            "SU2_residual_Sperp_over_2_minus_Szz": {
+              "mean": -0.027712475004376957,
+              "se": 0.0532932908663008,
+              "replicas": 8
+            }
+          }
+        },
+        {
+          "slot": 4,
+          "beta": 22.4,
+          "dtau": 0.011666666666666665,
+          "seeds": [
+            2026097003,
+            14385751301097489320,
+            11669903003002502411,
+            8641186100998426639,
+            17641889557193362742,
+            16548062281390422481,
+            4737415412958863046,
+            9307589627045461028
+          ],
+          "quantities": {
+            "D": {
+              "ordinary": {
+                "mean": 0.05352705976967909,
+                "se": 0.00014598495915069592
+              },
+              "conditional": {
+                "mean": 0.05343576983760949,
+                "se": 1.1688092428669462e-05
+              },
+              "paired_difference": {
+                "mean": -9.12899320696034e-05,
+                "se": 0.00014894301957559165
+              },
+              "paired_z": -0.6129184995022333,
+              "SE_ordinary_over_conditional": 12.49005858240928,
+              "leave_one_replica_out_SE_ratio_range": [
+                8.175835153619499,
+                20.36442435883893
+              ],
+              "descriptive_variance_cost_gain": 151.25965741398448
+            },
+            "E_per_site": {
+              "ordinary": {
+                "mean": -0.5299950093951437,
+                "se": 0.0019414207033187402
+              },
+              "conditional": {
+                "mean": -0.5296882604183918,
+                "se": 0.00026882574789950875
+              },
+              "paired_difference": {
+                "mean": 0.0003067489767519249,
+                "se": 0.0017686381806802092
+              },
+              "paired_z": 0.17343794796624307,
+              "SE_ordinary_over_conditional": 7.221855489990019,
+              "leave_one_replica_out_SE_ratio_range": [
+                5.079898336727936,
+                10.429601164587037
+              ],
+              "descriptive_variance_cost_gain": 50.56985979137075
+            }
+          },
+          "bin_D": {
+            "ordinary_min": 0.04698276195816628,
+            "conditional_min": 0.05272291920071362,
+            "ordinary_negative": 0,
+            "conditional_negative": 0,
+            "bins": 160
+          },
+          "last_half_minus_first_half": {
+            "sum_D_cond": {
+              "mean": -1.0395598027233485e-05,
+              "se": 4.674335549460589e-05
+            },
+            "sum_Ehub_cond": {
+              "mean": 0.00040273176208578676,
+              "se": 0.0005450965907831093
+            }
+          },
+          "spin_statistics": {
+            "Szz_Q": {
+              "mean": 1.218244646684081,
+              "se": 0.024468798911121567,
+              "replicas": 8
+            },
+            "Sperp_from_2Szz_Q": {
+              "mean": 2.436489293368162,
+              "se": 0.048937597822243134,
+              "replicas": 8
+            },
+            "Stot_from_3Szz_Q": {
+              "mean": 3.654733940052243,
+              "se": 0.07340639673336465,
+              "replicas": 8
+            },
+            "Sperp_Q": {
+              "mean": 2.457891467666208,
+              "se": 0.034918243923124724,
+              "replicas": 8
+            },
+            "Stot_Q": {
+              "mean": 3.676136114350289,
+              "se": 0.04186576391621071,
+              "replicas": 8
+            },
+            "SU2_residual_Sperp_over_2_minus_Szz": {
+              "mean": 0.010701087149022986,
+              "se": 0.030596975423913052,
+              "replicas": 8
+            }
+          }
+        },
+        {
+          "slot": 5,
+          "beta": 24.0,
+          "dtau": 0.0125,
+          "seeds": [
+            2026098003,
+            17799903608478154549,
+            17348949915243007043,
+            2236997038161827111,
+            4491814452628672223,
+            12879361964090995141,
+            11339974546632924604,
+            17588947180648952682
+          ],
+          "quantities": {
+            "D": {
+              "ordinary": {
+                "mean": 0.05378022618737458,
+                "se": 0.0001622542025781317
+              },
+              "conditional": {
+                "mean": 0.053461193034998196,
+                "se": 2.052600439905995e-05
+              },
+              "paired_difference": {
+                "mean": -0.00031903315237638997,
+                "se": 0.0001673255967807829
+              },
+              "paired_z": -1.9066607770379724,
+              "SE_ordinary_over_conditional": 7.904811838857572,
+              "leave_one_replica_out_SE_ratio_range": [
+                6.1491847983202454,
+                9.301977191909375
+              ],
+              "descriptive_variance_cost_gain": 60.58669119760858
+            },
+            "E_per_site": {
+              "ordinary": {
+                "mean": -0.5310571085282065,
+                "se": 0.001789808646226368
+              },
+              "conditional": {
+                "mean": -0.5305274958348648,
+                "se": 0.00020639582487644946
+              },
+              "paired_difference": {
+                "mean": 0.0005296126933417716,
+                "se": 0.0017970641485734714
+              },
+              "paired_z": 0.29470995443439446,
+              "SE_ordinary_over_conditional": 8.671728932975096,
+              "leave_one_replica_out_SE_ratio_range": [
+                7.8614066933784725,
+                10.314774892782278
+              ],
+              "descriptive_variance_cost_gain": 72.91309770124903
+            }
+          },
+          "bin_D": {
+            "ordinary_min": 0.04698421570248763,
+            "conditional_min": 0.052524563219880735,
+            "ordinary_negative": 0,
+            "conditional_negative": 0,
+            "bins": 160
+          },
+          "last_half_minus_first_half": {
+            "sum_D_cond": {
+              "mean": 5.6648290101444024e-05,
+              "se": 4.676144295552202e-05
+            },
+            "sum_Ehub_cond": {
+              "mean": -0.0007208114871232324,
+              "se": 0.0006864132350077428
+            }
+          },
+          "spin_statistics": {
+            "Szz_Q": {
+              "mean": 1.2415569774488358,
+              "se": 0.01800383818218196,
+              "replicas": 8
+            },
+            "Sperp_from_2Szz_Q": {
+              "mean": 2.4831139548976715,
+              "se": 0.03600767636436392,
+              "replicas": 8
+            },
+            "Stot_from_3Szz_Q": {
+              "mean": 3.724670932346507,
+              "se": 0.054011514546545944,
+              "replicas": 8
+            },
+            "Sperp_Q": {
+              "mean": 2.49330864438362,
+              "se": 0.10730910705283925,
+              "replicas": 8
+            },
+            "Stot_Q": {
+              "mean": 3.734865621832456,
+              "se": 0.09885610494028801,
+              "replicas": 8
+            },
+            "SU2_residual_Sperp_over_2_minus_Szz": {
+              "mean": 0.005097344742974463,
+              "se": 0.06508744797816975,
+              "replicas": 8
+            }
+          }
+        }
+      ],
+      "pilot_execution": "remote PT host",
+      "timing_execution": "separate remote timing host"
+    }
+  ],
+  "all_bins_retained": true,
+  "independent_units_per_slot": 8,
+  "limits": "Exploratory independent-series sample errors; no low-temperature equilibration, interval coverage, or asymptotic efficiency claim. Leave-one-out ranges diagnose sensitivity, not confidence intervals. First/last halves cannot prove equilibration. PT slots share ladders."
+}

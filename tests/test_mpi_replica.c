@@ -181,14 +181,35 @@ int main(void)
         CHECK(rr.bins[0].global_attempts == 16ULL);
         double values[2 * REPLICA_MPI_BIN_DOUBLES];
         int counts[2];
+        rr.bins[0].sum_D_cond = 0.375;
+        rr.bins[0].sum_K_cond = -7.25;
+        rr.bins[0].sum_Ehub_cond = -1.25;
+        rr.bins[0].conditional_count = 17;
         replica_mpi_pack_bins(&rr, 1, 2, values, counts);
+        CHECK_CLOSE(values[10], 0.375, 0);
+        CHECK_CLOSE(values[11], -7.25, 0);
+        CHECK_CLOSE(values[12], -1.25, 0);
+        CHECK_CLOSE(values[13], 17, 0);
+        /* Independent expected layout, including a maximum int count. */
+        values[REPLICA_MPI_BIN_DOUBLES + 10] = -0.625;
+        values[REPLICA_MPI_BIN_DOUBLES + 11] = -3.5;
+        values[REPLICA_MPI_BIN_DOUBLES + 12] = -13.5;
+        values[REPLICA_MPI_BIN_DOUBLES + 13] = INT_MAX;
         ReplicaBin out[2];
         memset(out, 0, sizeof out);
         replica_mpi_unpack_bins(values, counts, 2, out);
         CHECK(out[0].global_accepted == 4ULL);
         CHECK(out[0].global_attempts == 16ULL);
         CHECK(out[1].global_attempts == 0ULL);
-        CHECK(REPLICA_MPI_BIN_DOUBLES == 10);
+        CHECK_CLOSE(out[0].sum_D_cond, 0.375, 0);
+        CHECK_CLOSE(out[0].sum_K_cond, -7.25, 0);
+        CHECK_CLOSE(out[0].sum_Ehub_cond, -1.25, 0);
+        CHECK(out[0].conditional_count == 17);
+        CHECK_CLOSE(out[1].sum_D_cond, -0.625, 0);
+        CHECK_CLOSE(out[1].sum_K_cond, -3.5, 0);
+        CHECK_CLOSE(out[1].sum_Ehub_cond, -13.5, 0);
+        CHECK(out[1].conditional_count == INT_MAX);
+        CHECK(REPLICA_MPI_BIN_DOUBLES == 14);
         replica_result_free(&rr);
     }
     {

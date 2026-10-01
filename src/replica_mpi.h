@@ -3,7 +3,7 @@
 
 #include "replica.h"
 
-#define REPLICA_MPI_BIN_DOUBLES 10
+#define REPLICA_MPI_BIN_DOUBLES 14
 #define REPLICA_MPI_SITE_DIAG_DOUBLES (4 * GLOBAL_SITE_DIAG_NBIN)
 
 void replica_mpi_rank_range(int nrep, int nranks, int rank, int *first_replica,

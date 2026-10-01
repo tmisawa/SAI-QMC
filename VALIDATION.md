@@ -1,6 +1,6 @@
 ---
-date: 2026-09-28
-datetime: 2026-09-28 01:43 JST
+date: 2026-09-30
+datetime: 2026-09-30 13:47 JST
 model: OpenAI GPT-6 (Codex; revision), Codex GPT-5 (original), Claude Sonnet 5 (Anthropic; 2026-09-27 addition), Claude Opus 5.5 (Anthropic; 2026-09-28 addition)
 summary: |
   Delta tau-ladder並列テンパリング（PT）の実装検証: cross-weight直接検査、厳密列挙χ²と負の対照、
@@ -8,7 +8,7 @@ summary: |
   screen（16/16、最大|z|=1.808）はすべて合格。PTがTrotter誤差を解消したとは主張しない。
   09-28: 統合ladder driverの厳密列挙回帰（3選択肢組×3 slot×E/D、18比較で最大|z|=1.89）と
   slot破綻/交換失敗のmessage検査を追加し、field_init=uniformの倍精度上限を実測で記録した。
-  120 replicaの追加診断は正常終了し、63受理・31 replicaでp支持、d不支持。段階Bの効果は未検証。
+  120 replicaの段階B比較は受理増加に対して混合改善基準を満たさずfail（§9）。PT検証は§10。
   Stage Aの4×4・12 replica診断pilotは正常終了。受理8件・4 replicaで両指標とも判定不能。
   半充填ハバード模型の E(T) を grand-canonical ED/TPQ と比較する検証手順。
   アンサンブル整合・dtau→0 外挿・規約変換・符号/粒子数チェック・2D の ED サイズ制約をまとめる。
@@ -411,7 +411,100 @@ pilot 12 replicaは今回のseed集合の部分集合なので、合算して132
 
 数値・全histogram・provenanceは[機械可読の検証記録](docs/validation/global-site-diag-120-2026-09-26.json)にも保存した。
 
-## 9. Δτ-ladder parallel tempering（2026-09-27〜）
+## 9. Stage B polarized selection versus fixed order（2026-09-26）
+
+**α=2で受理数は増えたが、事前規定の混合改善基準は満たさず、総合判定は`fail`となった。**
+At the tested L4, U8 conditions, polarized selection increased acceptance but
+did not meet the predeclared mixing-improvement criteria. The implementation
+checks passed; these results do not establish sufficient equilibration or
+scientific adoption of the U≥8 DQMC values. This section supersedes the
+pending-performance status recorded in §8 without changing that observation.
+
+### 条件と完全性
+
+- source: `3215eee700b9b6359242e228e515cf83a5a53732`。fixed基準は
+  `c422af0fb69cc3b008a6847f4cc6955f0057f965`、診断onの計時基準は§8のsource。
+- square 4×4、P/P、入力`t=-1`、`|t|=1`、`U=8`、`mu=4`、相互作用`U n_up n_down`。
+  grand canonical、粒子数は固定しない。`dtau=0.0125`、`stab=4`、
+  `sweep_order=alternating`、`green_rebuild=combine`。
+- P1はβ24・interval10、P2はβ24・interval100、P3はβ16・interval10。
+  全て`global_update=site`、`global_site_select=polarized`、`global_site_power=2`、診断on。
+  β24の時間分割数は1920、β16は1280。各120 replica、warmup10,000・測定50,000 sweep・100 bins。
+- P1/P2のbase seedは`1032491301596221733`、P3は`299273251183640732`。
+  対応するfixed基準と全120 seedsが整数として一致する。同一seedの組は比較の対応付けであり、
+  乱数消費数の異なるfixedとpolarizedで軌道が同じことを意味しない。
+- 120 MPI ranks × 1 OpenMP thread、Intel 2023.2 / Intel MPI 2021.10.0 / MKL sequential。
+  3本ともexit 0、stderr 0 bytes、保存した各29 filesのstrict checksum検証が合格。
+  各12,000測定bins・12,000診断行、ID 0–119、seed、試行数・受理数の和が一致した。
+- binary SHA-256: `2f2ccb5e31afa0ef96b2b1baf908c040447e3b58a7b129ed369228819965a8a5`。
+  凍結した解析script SHA-256: `a8689213bbf53f115178baf940de4f92ac73c3efa17bb4e0a4c30830f7e4cd42`。
+  入力・bins・診断・profileのSHA、全seeds、計時値は
+  [機械可読記録](docs/validation/global-site-select-2026-09-26.json)に保存した。
+
+既存3基準と診断on基準もstrict検証した。旧sourceのprofileはCSV、新sourceは空白区切りだったため、
+旧profileの区切りのみを変換した派生ファイルを解析へ渡した。全15列・全行の文字列一致と変換前後SHAを確認し、
+原データと凍結解析scriptは変更していない。別実装で全6条件のsector統計とP1−fixedのpaired energy差を再計算し、解析JSONと一致した。
+
+### 受理とsector統計
+
+sectorは各保存binの`16 * sum_sign_Szz_0 / count > 0.5`を高側とする。
+横断数は隣接bin間で側が変わった回数であり、個々の受理やbin内の反転回数ではない。
+表中の矢印は同条件のfixed→polarizedを表す。
+
+| 条件 | 試行数 | 受理数 | 受理倍率 | bin間横断 | 両側訪問replica | 全bin高側replica |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| P1: β24、interval10 | 9,600,000 | 63→367 | 5.8254 | 61→60 | 30→34 | 0→0 |
+| P2: β24、interval100 | 960,000 | 16→111 | 6.9375 | 16→13 | 15→13 | 9→15 |
+| P3: β16、interval10 | 9,600,000 | 3,406→12,162 | 3.5708 | 1,243→1,160 | 120→119 | 0→0 |
+
+P1の提案で`p≥0.16`の比率は0.4258884375（fixed診断は0.2645338542）。
+受理倍率は記述値であり、独立なBernoulli試行を仮定した誤差や改善の有意性は付けていない。
+受理増加をsector横断の増加と同一視しない。bin内の再反転などの機構は、この集計だけでは特定できない。
+
+### 精度と6基準
+
+誤差はreplicaを独立単位とするdelete-one jackknifeのSE。
+共通gateは`SE(E/N)≤0.0004`かつ`SE(3Szz(Q))≤0.03`。
+paired差と後半−前半差はreplicaごとの差の平均を`sd/√120`で割ってzとする。
+該当runが精度未達なら、各基準は先に`undetermined/precision`となる。
+
+| run | E/N ± SE | 3Szz(Q) ± SE | 精度gate |
+| --- | --- | --- | --- |
+| P1 | −0.529537519 ± 0.000251750 | 3.711617785 ± 0.022117217 | pass |
+| P2 | −0.528163283 ± 0.000415674 | 3.531173606 ± 0.054025854 | fail |
+| P3 | −0.528473682 ± 0.000212665 | 3.748340586 ± 0.015345419 | pass |
+| fixed β24、interval10 | −0.530341052 ± 0.000260986 | 3.784039760 ± 0.016867709 | pass |
+| fixed β24、interval100 | −0.528619321 ± 0.000342331 | 3.616747923 ± 0.046136212 | fail |
+| fixed β16、interval10 | −0.529005887 ± 0.000233899 | 3.739695395 ± 0.016138417 | pass |
+
+| 基準 | 規定と実測 | 判定 |
+| --- | --- | --- |
+| 1: P1の横断・両側訪問 | 目標≥122回・≥60本に対し60回・34本 | fail |
+| 2: P1/P2の全bin高側0本 | 実測0本・15本。P2精度未達を先に適用 | undetermined |
+| 3: P1−P2の一致 | z(E/N)=−3.0341、z(3Szz)=3.1884。P2精度未達を先に適用 | undetermined |
+| 4: P1の前後半一致 | z(E/N)=0.1255、z(3Szz)=0.5978、z(高側比率)=−0.8313、全て絶対値<3 | pass |
+| 5: P1とfixed β24の非劣化 | z=2.1720、−2.4468。SE比=0.9646、1.3112（上限1.5） | pass |
+| 6: P3とfixed β16の非劣化 | z=1.6670、0.3992。SE比=0.9092、0.9509（上限1.5） | pass |
+
+基準1がfailのため総合はfail。基準2/3は観測値に懸念があっても、事前規定どおり判定不能であり、
+事後的にfailへ付け替えていない。基準5/6の合格は規定内の整合性であり、十分な混合の証明ではない。
+
+### 計時・補助ED比較・範囲
+
+`profile`の`all beta_total` walltimeはP1=1813.690 s、P2=1362.329 s、P3=1224.205 s。
+P1 / fixed診断onのwall比は0.997996、測定中`dqmc_global`のthread-summed time比は1.013513。
+診断なしの旧fixedに対してはそれぞれ1.009865、1.018699。
+profile wallはMPI起動などを含む外部計時とは異なる。これらは各1回の実測であり、実行時の変動を含むため純粋なアルゴリズム追加コストとは断定しない。
+
+合否に使わないED基底状態値`E/N=−0.5293046883872968`、`3Szz(Q)=3.775202868960937`との差は、
+P1で−0.000232831・−0.063585084、P2で+0.001141405・−0.244029263、
+P3で+0.000831007・−0.026862283。統計SEは上表のとおりで、有限温度差とTrotter偏差の寄与は今回分離できていない。
+β・dtau外挿なしに、EDとの差を統計誤差だけで説明したり科学的採用へ進めたりしない。
+
+このα=2・L4・U8・β16/24・指定run長で、受理率の増加は確認したが、規定した混合改善は確認できなかった。
+他のα、長さ、温度、更新法への一般化はしない。科学的採用は引き続き保留する。
+
+## 10. Δτ-ladder parallel tempering（2026-09-27〜）
 
 **cross-weight検査・厳密列挙χ²・統合ladder driverの厳密列挙回帰・3215eeeとのbyte同一性・
 serial/OpenMP/MPI/hybrid一致・MPI失敗経路・失敗messageの区別・L6 chain U=4でのPT対独立chain
@@ -691,3 +784,57 @@ test_omp test_mpi test_hybrid`、`make test_slow`、
 `make test_tempering_default`を再実行し、すべて既存の合格条件（`ALL ...
 PASSED`、および`test_tempering_default`は3215eeeとのbyte同一性）を満たして
 合格した。非有限値の検出によって新たに失敗した既存testはなかった。
+
+
+## 11. 条件付き局所D・同期K/Eの比較用測定（2026-09-30）
+
+`conditional_measure=1`は、各局所更新の直前に同じsite/time cutのHS二状態を
+条件付き平均する。DとKを同時測定し、`Ehub=K+U*N*D`とする。
+既定値0、従来のscalar・spin・bin先頭20列を保持し、測定時の乱数消費や更新を変えない。
+仕様と解析手順は[利用説明](docs/conditional-measurements.md)を参照。
+
+### 独立参照と実装検査
+
+- 2サイト・4sliceの全256 HS配置について、独立した両spin直接行列積で
+  反転前後を作り、明示的な重み付き平均と新しいD/Kの式を照合した。
+  U=0も含め、delayed Greenの読み出しも一致する。
+- [独立Fock参照](data/conditional_measurements/README.md)は
+  2サイトのΔτ0.125/0.025と4サイトのΔτ0.25を全列挙し、全Fock空間の
+  同じ有限Δτ transfer matrixと比較した。D・Eの期待値が一致し、
+  局所エネルギー条件付き式と明示反転平均との差は最大2.5e-15以内。
+- 固定β0.5とPT β0.25/0.375/0.5（U8、2サイト、Ltr4）、各64独立系列、
+  warmup 200・測定3000で統合driverを検査した。forward/globalなしと
+  alternating/global interval 3のD・E全16比較が規定の5SE以内、最大|z|=2.173。
+- field・RNG・Green・受理数の不変性、受理したPT交換でも測定蓄積がslotに残ること、
+  MPI転送layout・出力schema・欠落bin/非有限値の拒否を検査した。
+  変更前binaryとの既定出力比較も一致した。
+
+小系の定常期待値の確認を、低温4×4の平衡化やSEのcoverage保証へ拡張しない。
+条件付きDの境界は固定Δτでのみ有限であり、K/Eやspinの裾にも同じ境界が
+成立するとは主張しない。全binを保持して独立系列・測定費用とともに評価する。
+
+`make test`、`make test_omp`、`OMPI_CC=clang make test_mpi`、
+`OMPI_CC=clang make test_hybrid`、`make test_slow`はすべて合格。
+MPI/hybridはserial/OMPとcompilerを揃えた。既存のbyte一致基準を緩和していない。
+新規のcross-mode検査だけは異なるcompiler間も想定し、整数は厳密一致、
+浮動小数点は絶対・相対1e-12の許容差で比較する。
+
+
+### 独立8系列の最初の低温比較
+
+4×4 PBC・U8・β16・Δτ0.025で、base seed 2026093001の8系列、
+各warmup 10000・測定10000、20 binを全て保持した。条件付きDの系列間SEは
+通常の1/3.508、同期K/EによるE/NのSEは1/3.324となった。paired平均差は
+Dで−0.91 SE、E/Nで−0.36 SE。入力・全bin・平均値・解析commandは
+[data/conditional_measurements](data/conditional_measurements/README.md)を参照。
+別Δτ・PT・費用比較はこの記録時点で実行中であり、費用当たりの改善や
+低温の平衡化をこの結果だけから確定しない。
+
+
+### 追加の独立8系列: Δτ0.0125
+
+同じ4×4 PBC・U8・β16で、base seed 2026093002、warmup 10000・測定10000、
+8系列・各20 binを保持した。通常SE/条件付きSEはDで5.024、E/Nで2.667。
+paired平均差はDで−1.50 SE、E/Nで+0.70 SEだった。
+各Δτの入力・bin・解析値を上記data directoryに保存した。
+PT各slotと測定費用の比較は継続中であり、この2条件だけから本計算の採用を決めない。

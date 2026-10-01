@@ -1,6 +1,6 @@
 ---
-date: 2026-09-23
-datetime: 2026-09-23 15:27 JST
+date: 2026-09-30
+datetime: 2026-09-30 13:30 JST
 model: OpenAI GPT-6 (Codex)
 summary: |
   SAI-QMC 0.1の入出力リファレンス。英語版usage.mdに対応する日本語訳。
@@ -49,6 +49,8 @@ summary: |
 | `profile` | `0` | `1`で時間計測の出力を有効にする |
 | `profile_file` | 有効時は`profile.dat` | 時間計測データの保存先 |
 | `replica_log` | `nrep>1`では`replicas.dat`、それ以外では無効 | 保存先を明示すればレプリカが1個でも有効。`none`で無効にする |
+| `replica_bin_file` | 無効 | replica・温度ごとのbin和の保存先 |
+| `conditional_measure` | `0` | `1`で条件付き局所D/K/Eの比較用4列を追加。`replica_bin_file`が必須。[式と出力規約](conditional-measurements.md)を参照 |
 | `szz_q`, `sperp_q` | `none` | スピン測定の運動量指定。`none`、`af`、`all`、または`mx:my,...` |
 | `szz_file`, `sperp_file` | `szz.dat`, `sperp.dat` | 有効にしたスピン測定の保存先 |
 | `spin_consistency_file` | `none` | 対応するビンから求めた`Sperp/2-Szz`の保存先。両スピン測定で同じ順序の運動量指定が必要 |

@@ -503,6 +503,7 @@ static void fill_bin_meta(ReplicaBinMeta *meta, const Params *p,
     meta->dtau = use_pt ? NAN : dtau;
     meta->tempering = use_pt;
     meta->tempering_ltr = p->tempering_ltr;
+    meta->conditional_measure = p->conditional_measure;
     meta->nwarm = p->nwarm;
     meta->nmeas = p->nmeas;
     meta->nbin = p->nbin;

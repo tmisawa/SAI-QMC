@@ -97,6 +97,7 @@ static void defaults(Params *p)
     strcpy(p->global_update, "none");
     p->global_interval = 100;
     p->replica_bin_file[0] = '\0';
+    p->conditional_measure = 0;
     p->global_site_diag_file[0] = '\0';
     strcpy(p->global_site_select, "fixed");
     p->global_site_power = 2.0;
@@ -335,6 +336,11 @@ int params_read(Params *p, const char *path)
                 FAIL("ERROR: global_interval must be a positive integer (got %s)\n",
                      val);
             }
+        } else if (strcmp(key, "conditional_measure") == 0) {
+            if (parse_int_value(val, &p->conditional_measure) ||
+                (p->conditional_measure != 0 && p->conditional_measure != 1)) {
+                FAIL("ERROR: conditional_measure must be 0 or 1 (got %s)\n", val);
+            }
         } else if (strcmp(key, "replica_bin_file") == 0) {
             memcpy(p->replica_bin_file, val, strlen(val) + 1); /* val < 256 by the strict parse */
         } else if (strcmp(key, "global_site_diag_file") == 0) {
@@ -401,6 +407,12 @@ int params_read(Params *p, const char *path)
     fclose(fp);
 #undef FAIL
 
+    if (p->conditional_measure &&
+        (p->replica_bin_file[0] == '\0' ||
+         strcmp(p->replica_bin_file, "none") == 0)) {
+        fprintf(stderr, "ERROR: conditional_measure=1 requires replica_bin_file\n");
+        return 1;
+    }
     if (p->nbeta == 0) {
         p->beta_list[0] = 2.0;
         p->nbeta = 1;

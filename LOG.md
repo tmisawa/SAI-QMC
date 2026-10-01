@@ -1,6 +1,87 @@
 # LOG
 
 ---
+date: 2026-10-01
+datetime: 2026-10-01 16:48 JST
+model: OpenAI GPT-6 (Codex)
+summary: |
+  Final integration review kept conditional_measure disabled by default.
+  Made the Python 3.10+ test interpreter explicit and inherited by child analysis.
+---
+
+## 2026-10-01: Conditional-measurement final integration review fix
+
+The numerical implementation and default-off behavior were unchanged. The
+conditional CLI target now accepts the conventional `PYTHON` Make variable,
+and its analysis subprocess uses `sys.executable`. This prevents a supported
+outer interpreter from accidentally launching an older `python3` from `PATH`.
+The English and Japanese validation instructions document the override.
+
+The final review rechecked default-off byte compatibility, all build modes and
+the slow suite, exact references, retained-data checksums, sanitizers, public
+provenance, and the absence of private paths or account identifiers. The
+option remains `conditional_measure=0` by default; no production values were
+adopted by this software-integration decision.
+
+---
+date: 2026-09-30
+datetime: 2026-09-30 13:47 JST
+model: OpenAI GPT-6 (Codex)
+summary: |
+  Added optional conditional local D and synchronized K/E measurements.
+  Preserves ordinary outputs and update trajectories; validates formulas,
+  MPI transfer, bin analysis, and serial/OpenMP/MPI/hybrid compatibility.
+---
+
+## 2026-09-30: Conditional local measurements for D and energy
+
+`conditional_measure=1` adds four columns to the replica-bin output, retaining
+ordinary scalar, spin, and bin measurements. The default remains off. At each
+local proposal the helper reads the effective delayed Green and averages the
+matching site's observable over its two HS values without drawing randomness
+or modifying the update state. K is measured at the same stages as D, so energy
+retains their covariance. Local measurements stay at the temperature slot
+through global passes and PT exchanges. Invalid values, signs, bounds, or
+measurement counts fail the run instead of discarding samples.
+
+The implementation includes MPI packing and an optional standard-library
+analysis script that uses independent replicas/ladders, retains all bins, and
+rejects incomplete data. The [measurement guide](docs/conditional-measurements.md)
+defines the formulas, units, supported scope, and statistical limitations.
+Tests compare all 256 small-system HS fields with direct two-spin matrices,
+check Fock-space reference values, preserve field/RNG/Green trajectories, and
+verify slot ownership and CLI compatibility across all four parallel builds.
+
+Initial cross-compiler comparisons exposed last-bit spin differences between
+Clang and GCC. The existing byte-equality regressions pass with the documented
+matching MPI compiler setting; their criteria were retained. New cross-mode
+checks use numerical tolerance for floats and exact comparison for integer
+identities. An initial CLI-test loop variable collision was also corrected.
+
+All serial, OpenMP, MPI, hybrid, and slow suites passed. The slow suite also
+retains the existing 800-ladder exact-driver regression.
+
+Scientific validation and follow-up are recorded in [VALIDATION.md](VALIDATION.md)
+and [TODO.md](TODO.md). The option does not establish low-temperature
+equilibration or replace the ordinary spin measurements.
+
+---
+date: 2026-09-30
+datetime: 2026-09-30 09:50 JST
+model: OpenAI GPT-6 (Codex)
+summary: |
+  Combined the Stage B scientific validation record with the PT documentation.
+  Stage B retains section 9; PT validation is section 10. Numerical source is unchanged.
+---
+
+## 2026-09-30: Combine Stage B and PT validation records
+
+The 120-replica Stage B results and their JSON record are now included alongside
+PT validation. Stage B did not meet its mixing-improvement criterion. This result
+does not change the implementation tests or establish equilibration of PT runs.
+The original Stage B record is retained below with its original date.
+
+---
 date: 2026-09-28
 datetime: 2026-09-28 20:05 JST
 model: Claude Sonnet 5 (Claude Code)
@@ -182,6 +263,34 @@ summary: |
 
 ---
 date: 2026-09-26
+datetime: 2026-09-26 19:50 JST
+model: OpenAI GPT-6 (Codex)
+summary: |
+  Recorded the 120-replica comparison of polarized alpha=2 and fixed-order selection.
+  Acceptance increased, but the predeclared mixing-improvement verdict is fail.
+  Added conditions, numerical results, provenance and limits to VALIDATION section 9 and its JSON record.
+---
+
+## 2026-09-26: Record the Stage B polarized-selection comparison
+
+- All three L4, U8 runs completed with 120 replicas each. Result checksums,
+  replica completeness, seeds and diagnostic counts passed validation.
+- At beta 24 and interval 10, accepted flips increased from 63 to 367, but
+  adjacent-bin sector switches were 61 versus 60 and replicas visiting both
+  sides were 30 versus 34, below the required 122 switches and 60 replicas.
+- Criterion 1 failed; criteria 2 and 3 were undetermined because the interval-100
+  run missed the precision gate; criteria 4, 5 and 6 passed. Acceptance gains
+  alone do not establish better mixing or scientific adoption.
+- Independent sector recounts and a paired energy calculation matched the
+  frozen analysis. Historical CSV profile data required a delimiter-only
+  conversion with exact field preservation and recorded checksums.
+- Added [VALIDATION section 9](VALIDATION.md), the
+  [machine-readable record](docs/validation/global-site-select-2026-09-26.json),
+  and README guidance. Numerical source is unchanged from `3215eee`.
+
+
+---
+date: 2026-09-26
 datetime: 2026-09-26 16:16 JST
 model: OpenAI gpt-5.6-sol (Codex)
 summary: |
@@ -208,7 +317,7 @@ model: |
 summary: |
   Added the opt-in polarized site selection (Stage B): weights (p_i/p_0)^alpha + 1/n,
   two draws per attempt, no Hastings factor. Fixed-order runs stay byte-identical.
-  The comparison against the fixed baseline is pending.
+  The 120-replica comparison against the fixed baseline is pending.
 ---
 
 ## 2026-09-26: Polarized site selection (Stage B)

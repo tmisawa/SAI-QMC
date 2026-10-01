@@ -2,6 +2,7 @@
 #define DQMC_H
 
 #include "field.h"
+#include "conditional_measure.h"
 #include "global_select.h"
 #include "green.h"
 #include "model.h"
@@ -86,6 +87,8 @@ typedef struct {
     unsigned long long accept_accepted;
     unsigned long long global_attempts;
     unsigned long long global_accepted;
+    /* Local measurements stay at the temperature slot across PT exchanges. */
+    ConditionalMeasure conditional;
     /* Stage A diagnostic (spec 3.3): NULL unless dqmc_enable_global_site_diag(D, 1). */
     GlobalSiteDiag *site_diag;
     int *site_diag_sums;
@@ -131,6 +134,9 @@ int dqmc_enable_udv_centered_diag(Dqmc *D, const char *path, int beta_index,
                                   unsigned long long seed);
 void dqmc_set_green_rebuild_mode(Dqmc *D, GreenRebuildMode mode);
 void dqmc_sweep(Dqmc *D);
+/* Enable comparison measurements for subsequent sweeps (normally only after
+   warmup). Requires a half-filled PH model with zero diagonal hopping. */
+int dqmc_enable_conditional_measure(Dqmc *D, int enabled);
 
 /* log|W| and sign(W) of the current field, W = det(1+A_up) det(1+A_down).
    Uses the PH identity when D->use_ph. Does not modify the Green functions. */

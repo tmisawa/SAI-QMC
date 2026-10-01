@@ -1,0 +1,51 @@
+{
+  "passed": true,
+  "cases": [
+    {
+      "nsite": 2,
+      "Ltr": 4,
+      "U": 8.0,
+      "dtau": 0.125,
+      "configurations": 256,
+      "ordinary_E_per_site": 0.37042557882057536,
+      "conditional_E_per_site": 0.3704255788205754,
+      "fock_trotter_E_per_site": 0.3704255788205761,
+      "ordinary_D": 0.06632707266956286,
+      "fock_trotter_D": 0.06632707266956295,
+      "explicit_pair_formula_max_error": 1.7277845820728999e-15,
+      "local_variance": 0.27119384121691287,
+      "conditional_local_variance": 0.15204763620048972
+    },
+    {
+      "nsite": 2,
+      "Ltr": 4,
+      "U": 8.0,
+      "dtau": 0.025,
+      "configurations": 256,
+      "ordinary_E_per_site": 1.5576899533919017,
+      "conditional_E_per_site": 1.5576899533919017,
+      "fock_trotter_E_per_site": 1.557689953391902,
+      "ordinary_D": 0.20080450586967258,
+      "fock_trotter_D": 0.2008045058696726,
+      "explicit_pair_formula_max_error": 1.5543122344752192e-15,
+      "local_variance": 0.13003453099482606,
+      "conditional_local_variance": 0.07484656849979393
+    },
+    {
+      "nsite": 4,
+      "Ltr": 2,
+      "U": 8.0,
+      "dtau": 0.25,
+      "configurations": 256,
+      "ordinary_E_per_site": 0.18973614634350738,
+      "conditional_E_per_site": 0.18973614634350744,
+      "fock_trotter_E_per_site": 0.18973614634350736,
+      "ordinary_D": 0.06851809524903343,
+      "fock_trotter_D": 0.06851809524903342,
+      "explicit_pair_formula_max_error": 2.491062911502695e-15,
+      "local_variance": 0.24724392391195485,
+      "conditional_local_variance": 0.020249993305768838
+    }
+  ],
+  "scope": "Local K_i+U D_i at the matching site/time cut, real half-filled bipartite PH path. Conditional single-coordinate variance is checked; integrated chain variance and cost require separate measurement."
+}

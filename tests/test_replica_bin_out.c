@@ -38,7 +38,7 @@ int main(void)
     const unsigned long long seeds[2] = {11ULL, 22ULL};
     ReplicaBinView v = {2, 2, 2, 2, bins, szz, sperp, ids, seeds};
     ReplicaBinMeta m = {0, 20, 4, 1.0, 1.0, 4.0, 0.05, 7, 10, 2, "chain",
-                        4, 1, 1, "site", 3, 0, 1, 1, 0, 0};
+                        4, 1, 1, "site", 3, 0, 1, 1, 0, 0, 0};
     const char *path = "tests/tmp_replica_bins.tsv";
     FILE *fp = fopen(path, "w");
     CHECK(replica_bin_write(fp, &v, &m, 1) == 0);
