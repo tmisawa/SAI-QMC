@@ -1,8 +1,9 @@
 ---
-date: 2026-09-08
-datetime: 2026-09-08 11:37 JST
-model: OpenAI GPT-6 (Codex)
+date: 2026-10-03
+datetime: 2026-10-03 08:43 JST
+model: OpenAI GPT-6 (Codex); OpenAI GPT-5.6 Sol (Codex; 2026-10-02 validation); OpenAI GPT-6 (Codex; 2026-10-03 metadata update)
 summary: |
+  Includes the preregistered 4x2 antiperiodic finite-temperature ED comparison dataset.
   Small numerical reference datasets shipped with SAI-QMC.
   Describes historical provenance, reproducibility, and the limits of fixed-step comparisons.
 ---

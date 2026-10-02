@@ -1,8 +1,9 @@
 ---
-date: 2026-09-30
-datetime: 2026-09-30 13:30 JST
-model: OpenAI GPT-6 (Codex)
+date: 2026-10-03
+datetime: 2026-10-03 08:43 JST
+model: OpenAI GPT-6 (Codex); OpenAI GPT-5.6 Luna (Codex; 2026-10-02 directional boundaries); OpenAI GPT-6 (Codex; 2026-10-03 metadata update)
 summary: |
+  組み込み格子の方向別境界keyと、解決済み境界の出力表記を含む。
   SAI-QMC 0.1の入出力リファレンス。英語版usage.mdに対応する日本語訳。
   入力の既定値、出力列、観測量の規約、追加の診断出力、旧形式との違いを説明する。
 ---

@@ -1,8 +1,9 @@
 ---
-date: 2026-09-30
-datetime: 2026-09-30 13:47 JST
-model: OpenAI GPT-6 (Codex; revision), Codex GPT-5 (original), Claude Sonnet 5 (Anthropic; 2026-09-27 addition), Claude Opus 5.5 (Anthropic; 2026-09-28 addition)
+date: 2026-10-03
+datetime: 2026-10-03 08:43 JST
+model: OpenAI GPT-6 (Codex; revision), Codex GPT-5 (original), Claude Sonnet 5 (Anthropic; 2026-09-27 addition), Claude Opus 5.5 (Anthropic; 2026-09-28 addition); OpenAI GPT-5.6 Sol (Codex; 2026-10-02 validation); OpenAI GPT-6 (Codex; 2026-10-03 metadata update)
 summary: |
+  方向別境界の実装検査と4×2 AP/P・U=4・β≤4の事前規定ED比較はPASS（§12）。
   Delta tau-ladder並列テンパリング（PT）の実装検証: cross-weight直接検査、厳密列挙χ²と負の対照、
   3215eeeとのbyte同一性、serial/OpenMP/MPI/hybrid一致、MPI失敗経路、L6 chain U=4のPT対独立chain
   screen（16/16、最大|z|=1.808）はすべて合格。PTがTrotter誤差を解消したとは主張しない。

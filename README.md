@@ -1,8 +1,9 @@
 ---
-date: 2026-09-30
-datetime: 2026-09-30 13:30 JST
-model: OpenAI GPT-6 (Codex)
+date: 2026-10-03
+datetime: 2026-10-03 08:43 JST
+model: OpenAI GPT-6 (Codex); OpenAI GPT-5.6 Luna (Codex; 2026-10-02 directional boundaries); OpenAI GPT-6 (Codex; 2026-10-03 metadata update)
 summary: |
+  Covers directional periodic, antiperiodic and open boundaries with spin momentum selectors.
   User guide for SAI-QMC 0.1, a finite-temperature determinant QMC code.
   Describes input syntax, output columns, build commands, validation, and development records.
 ---

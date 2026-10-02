@@ -1,6 +1,21 @@
 # LOG
 
 ---
+date: 2026-10-03
+datetime: 2026-10-03 08:43 JST
+model: OpenAI GPT-6 (Codex)
+summary: |
+  Updated the metadata of seven user and validation documents to include the
+  directional-boundary additions and their contributors. Document bodies are unchanged.
+---
+
+## 2026-10-03: Directional-boundary documentation metadata
+
+Updated document dates, model attribution and summaries for the directional-boundary
+usage guides, validation scope and reference-data index. The dates record this metadata
+update; the contributor entries identify the additions made on 2026-10-02.
+
+---
 date: 2026-10-02
 datetime: 2026-10-02 22:33 JST
 model: OpenAI GPT-5.6 Sol (Codex)

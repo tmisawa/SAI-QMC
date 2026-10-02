@@ -1,8 +1,9 @@
 ---
-date: 2026-09-23
-datetime: 2026-09-23 15:12 JST
-model: OpenAI GPT-6 (Codex)
+date: 2026-10-03
+datetime: 2026-10-03 08:43 JST
+model: OpenAI GPT-6 (Codex); OpenAI GPT-5.6 Luna (Codex; 2026-10-02 directional boundaries); OpenAI GPT-5.6 Sol (Codex; 2026-10-02 validation); OpenAI GPT-6 (Codex; 2026-10-03 metadata update)
 summary: |
+  Limits interacting antiperiodic validation to the 4x2, U=4, beta<=4 ED comparison.
   Supported scope and known numerical/statistical limitations of the initial source snapshot.
   Separates passing implementation tests from unresolved production convergence checks.
   Clarifies input syntax and supported geometry for spin measurements.

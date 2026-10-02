@@ -1,8 +1,9 @@
 ---
-date: 2026-09-30
-datetime: 2026-09-30 13:30 JST
-model: OpenAI GPT-6 (Codex)
+date: 2026-10-03
+datetime: 2026-10-03 08:43 JST
+model: OpenAI GPT-6 (Codex); OpenAI GPT-5.6 Luna (Codex; 2026-10-02 directional boundaries); OpenAI GPT-6 (Codex; 2026-10-03 metadata update)
 summary: |
+  方向別の周期・反周期・開放境界とspin運動量selectorの対応を含む。
   SAI-QMC 0.1の日本語利用案内。英語READMEに対応する。
   ビルド、入出力、並列実行、検証範囲、開発記録を説明する。
 ---
