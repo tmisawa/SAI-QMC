@@ -11,15 +11,16 @@ summary: |
 
 Most of these are historical numerical results used during development; they
 are not new calculations made with the current source snapshot. The
-exception is `tempering_L6_U4_ed_20260927/`, which was computed with this
-branch's own source (see that directory's README for the exact commit and
-binary checksums).
+exceptions are `tempering_L6_U4_ed_20260927/` and `antiperiodic_4x2_U4_ed/`,
+which were computed with this repository's own source (see each directory's
+README for the exact commit and binary checksums).
 
 | Directory | Contents |
 | --- | --- |
 | `benchmark_L468_U4_full_diag_20260626/` | 39 finite-temperature comparison points: periodic L=4,6,8 Hubbard chains, U=4, mu=2, dtau=0.05; inputs, QMC output, replica/profiler records, figures, analysis, ED curves |
 | `L6_U4_mu2_dtau_ed_comparison/` | L=6, U=4 energy/doublon Trotter extrapolation tables and dtau=0.2/0.1/0.05 QMC output |
 | `tempering_L6_U4_ed_20260927/` | Periodic L=6 Hubbard chain, U=4, half filling: `tempering=dtau_ladder` PT (4 slots, `tempering_ltr=200`) vs. 4 independent (non-PT) chains at the same `(beta, dtau)`, with finite-T ED reported for context; inputs, QMC/PT output, analysis script and results |
+| `antiperiodic_4x2_U4_ed/` | 4x2 square lattice, x antiperiodic / y periodic, U=4, beta=2,4: 96 independent single-series runs at dtau=0.1/0.05/0.025 versus finite-T ED (AP/P and P/P); pre-registered seeds, inputs, outputs, ED, analysis and verdict |
 
 The ED curves under `benchmark_L468_U4_full_diag_20260626/reference/` originate
 from FullDiag numerical reference data supplied by the maintainer. They are data, not a bundled

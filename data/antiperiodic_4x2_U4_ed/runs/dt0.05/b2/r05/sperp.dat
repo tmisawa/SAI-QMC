@@ -1,0 +1,15 @@
+# definition=Sperp(q)=N^-1 sum_ij exp[-iq.(ri-rj)] <Sxi Sxj + Syi Syj>
+# ladder_definition=Sperp(q)=0.5*(S+-(q)+S-+(q)); Splus=Sx+iSy
+# su2_relation=ensemble Sperp(q)=2*Szz(q) at any dtau for the current SU(2)-invariant model
+# hs_caveat=individual spin-channel-HS samples select the z axis; equality is restored by ensemble averaging
+# lattice=square Lx=4 Ly=2 n=8 bc_x=antiperiodic bc_y=periodic t=-1 U=4 mu=2 dtau=0.050000000000000003
+# sperp_q=all seed=12360188159668623489 parallel=serial nrep=1 bins=20 nbeta=1
+# beta_requested beta T q_index mx my qx_over_pi qy_over_pi qx_folded_over_pi qy_folded_over_pi Sperp dSperp
+2 2 0.5 0 0 0 0 0 0 0 0.12538087503337905 0.0017108814104491226
+2 2 0.5 1 1 0 0.5 0 0.5 0 0.12354838988206171 0.0015937357228077804
+2 2 0.5 2 2 0 1 0 1 0 0.13178656697322724 0.0016086855870845662
+2 2 0.5 3 3 0 1.5 0 -0.5 0 0.12354838988206171 0.0015937357228077806
+2 2 0.5 4 0 1 0 1 0 1 0.50303413670256736 0.0018233779483711949
+2 2 0.5 5 1 1 0.5 1 0.5 1 0.57528943883247385 0.0013179329598212981
+2 2 0.5 6 2 1 1 1 1 1 0.71511832627782979 0.0024455672025483939
+2 2 0.5 7 3 1 1.5 1 -0.5 1 0.57528943883247374 0.0013179329598213547

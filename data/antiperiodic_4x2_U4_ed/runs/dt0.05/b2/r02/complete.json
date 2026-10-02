@@ -1,0 +1,17 @@
+{
+  "context": {
+    "input_sha256": "5b8c0b9f15ec4d8998506436b6107b059833167cbd92fded20d6e14407312089",
+    "dqmc_sha256": "d685f060cc9e1f88547868b5fabeeda0245c284c5a218923d6d6e3d52ed5ce4f"
+  },
+  "outputs": {
+    "exit_code.txt": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "bins.tsv": "e6f4803700fac47ea6982175e00b53dda32d78e7725d4554b4256171af7d209a",
+    "szz.dat": "95dc351b89fed043af3966c61d56fd3718a6a6dc0116c77f5427634595021d1a",
+    "sperp.dat": "ac5f4c9fdd6cbc8e55d6338784e86f1a60d696148f79d7c54f62707f77892a0a",
+    "observables.dat": "eafbdb7fab7e18e378d30ae9256fb0a26111b5eac419b682a2452658e704050b",
+    "stdout.txt": "eafbdb7fab7e18e378d30ae9256fb0a26111b5eac419b682a2452658e704050b",
+    "stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "hopping_used.sha256": "4dc96ea4b1a408ebcb1f06c8677d2f2dfb85201eb3eed1423b561ec91312ca81"
+  },
+  "numerical_holds": []
+}
