@@ -123,7 +123,7 @@ test_mpi: $(TESTBIN_MPI)
 	@fail=0; for t in $(TESTBIN_MPI); do printf "%-32s " $$t; $(MPIRUN) -np 1 ./$$t || fail=1; done; \
 	  if [ $$fail -ne 0 ]; then echo "SOME MPI TESTS FAILED"; exit 1; fi; echo "ALL MPI TESTS PASSED"
 
-test_hybrid: $(TESTBIN_HYBRID) test_conditional_parallel test_szz_parallel test_sperp_parallel test_scalar_parallel test_dat_parallel test_global_parallel test_tempering_parallel test_tempering_mpi_failure
+test_hybrid: $(TESTBIN_HYBRID) test_conditional_parallel test_szz_parallel test_sperp_parallel test_scalar_parallel test_dat_parallel test_global_parallel test_tempering_parallel test_tempering_mpi_failure test_bc_parallel
 	@fail=0; for t in $(TESTBIN_HYBRID); do printf "%-35s " $$t; $(MPIRUN) -np 1 ./$$t || fail=1; done; \
 	  if [ $$fail -ne 0 ]; then echo "SOME HYBRID TESTS FAILED"; exit 1; fi; echo "ALL HYBRID TESTS PASSED"
 
@@ -219,3 +219,8 @@ test_bc_output: dqmc
 	@printf "%-40s " tests/test_bc_output.sh; sh tests/test_bc_output.sh
 
 .PHONY: test_bc_output
+
+test_bc_parallel: dqmc dqmc_omp dqmc_mpi dqmc_hybrid
+	@printf "%-40s " tests/test_bc_parallel.sh; MPIRUN="$(MPIRUN)" sh tests/test_bc_parallel.sh
+
+.PHONY: test_bc_parallel
