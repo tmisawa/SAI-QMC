@@ -80,9 +80,12 @@ Each `beta/dtau` must be an integer to within `1e-9`.
 The chemical potential is fixed to `mu=U/2`; there is no `mu` input key.
 
 Use `lattice=square` with `Lx` and `Ly` for a rectangular square lattice;
-`pbc=1` is periodic and `pbc=0` is open. With periodic boundaries, active
-directions must have even length to retain bipartiteness. Omitted settings
-use defaults documented in [the input/output reference](docs/usage.md).
+`pbc=1` is periodic and `pbc=0` is open. To set each direction separately, use
+`bc_x` and `bc_y` (`periodic`, `antiperiodic`, or `open`) instead of `pbc`; for
+example, `bc_x=antiperiodic` gives x-antiperiodic, y-periodic boundaries. With
+periodic or antiperiodic boundaries, active directions must have even length to
+retain bipartiteness, and antiperiodic directions need length 4 or more. Omitted
+settings use defaults documented in [the input/output reference](docs/usage.md).
 
 ## Model and observables
 

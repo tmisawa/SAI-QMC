@@ -21,7 +21,9 @@ Compare finite-temperature results with grand-canonical ED at the same chemical
 potential. The mean particle number equals the site count at half filling,
 but this does not make a finite system equivalent to canonical ED at finite
 temperature. Match hopping/boundary conventions, especially small periodic
-lattices. Finite `dtau` bias requires an extrapolation or separate estimate.
+lattices. Antiperiodic boundaries are built in through `bc_x`/`bc_y` for even
+lengths of at least 4; hopping files still have no spin momentum selectors.
+Finite `dtau` bias requires an extrapolation or separate estimate.
 
 ## Low-temperature stability
 
