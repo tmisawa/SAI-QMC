@@ -224,3 +224,8 @@ test_bc_parallel: dqmc dqmc_omp dqmc_mpi dqmc_hybrid
 	@printf "%-40s " tests/test_bc_parallel.sh; MPIRUN="$(MPIRUN)" sh tests/test_bc_parallel.sh
 
 .PHONY: test_bc_parallel
+
+test_bc_default: dqmc
+	@printf "%-40s " tests/test_bc_default_unchanged.sh; sh tests/test_bc_default_unchanged.sh
+
+.PHONY: test_bc_default
