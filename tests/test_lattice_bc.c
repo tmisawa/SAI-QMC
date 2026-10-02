@@ -289,4 +289,3 @@ int main(void)
     CHECK(lattice_boundary_parse(NULL, &unused) != 0);
     TEST_END();
 }
-
