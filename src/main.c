@@ -1292,10 +1292,20 @@ int main(int argc, char **argv)
             mpi_finalize_if_enabled(&mpi_env);
             return 1;
         }
-    } else if (strcmp(p.lattice, "square") == 0) {
-        lattice_square(&L, p.Lx, p.Ly, p.thop, p.pbc);
-    } else if (strcmp(p.lattice, "chain") == 0) {
-        lattice_chain(&L, p.Lx, p.thop, p.pbc);
+    } else if (strcmp(p.lattice, "square") == 0 ||
+               strcmp(p.lattice, "chain") == 0) {
+        const int bad_boundary =
+            strcmp(p.lattice, "square") == 0
+                ? lattice_square_bc(&L, p.Lx, p.Ly, p.thop, p.bc_x, p.bc_y)
+                : lattice_chain_bc(&L, p.Lx, p.thop, p.bc_x);
+        if (bad_boundary) {
+            if (mpi_is_root(&mpi_env)) {
+                fprintf(stderr, "ERROR: invalid boundary for lattice=%s\n",
+                        p.lattice);
+            }
+            mpi_finalize_if_enabled(&mpi_env);
+            return 1;
+        }
     } else {
         if (mpi_is_root(&mpi_env)) {
             fprintf(stderr, "ERROR: unknown lattice %s\n", p.lattice);
