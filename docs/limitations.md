@@ -23,6 +23,9 @@ but this does not make a finite system equivalent to canonical ED at finite
 temperature. Match hopping/boundary conventions, especially small periodic
 lattices. Antiperiodic boundaries are built in through `bc_x`/`bc_y` for even
 lengths of at least 4; hopping files still have no spin momentum selectors.
+Their validation covers U=0 exact results and a 4x2, U=4, beta<=4
+finite-temperature ED comparison (VALIDATION.md section 12, verdict PASS),
+not larger interacting lattices.
 Finite `dtau` bias requires an extrapolation or separate estimate.
 
 ## Low-temperature stability

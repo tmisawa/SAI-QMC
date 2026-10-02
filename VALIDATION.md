@@ -838,3 +838,40 @@ Dで−0.91 SE、E/Nで−0.36 SE。入力・全bin・平均値・解析command�
 paired平均差はDで−1.50 SE、E/Nで+0.70 SEだった。
 各Δτの入力・bin・解析値を上記data directoryに保存した。
 PT各slotと測定費用の比較は継続中であり、この2条件だけから本計算の採用を決めない。
+
+
+## 12. 方向別境界条件と反周期S(q)（2026-10-02）
+
+組み込みのchain/square格子は`bc_x`/`bc_y`（`periodic`・`antiperiodic`・`open`）で境界を
+方向ごとに指定できる。反周期の方向は折り返しbondを`-t`で加え、格子座標を保つので、
+S(q)の運動量selectorがそのまま使える。S(q)の運動量は`2π m/L`のままで、kernelは変えていない。
+
+### 実装検査
+
+- `tests/test_lattice_bc.c`: 手書きの期待行列、許可・拒否の長さ、固有値が半整数運動量の解析値と1e-12で一致。
+- `tests/test_io_bc.c`: `pbc`/`bc`との併用禁止を含む解決規則、エラー文、header文字列。
+- `tests/test_integration_bc.c`: U=0のDQMC GreenからのE・Szz(q)・Sperp(q)が半整数運動量の厳密式と一致し、
+  周期の式とは一致しない（chain 4 AP、4×4 AP/P、4×2 AP/P、4×4 AP/AP）。
+- `tests/test_bc_output.sh`: 同じ行列の`lattice=file`と、scalar・binのデータ行がbyte一致。spin測定のon/offで
+  非spin列が不変。header 5か所とscalar header、拒否とエラー文、PT・条件付き測定・大域更新との併用。
+- `tests/test_bc_parallel.sh`: U=4のAP/Pでserial/OpenMP/MPI/hybridの出力がbyte一致。
+- `make test_bc_default`: `a614a8f`と、既存入力の全出力がbyte一致（PTの計時値は構造だけ比較）。
+- mutation検査: 反周期の符号を落とすと`test_lattice_bc`が48件、`test_integration_bc`が76件失敗し、
+  legacyのheader文字列を変えると`test_bc_default`が失敗する。
+
+### 4×2 AP/P・U=4の有限温度ED比較
+
+条件・判定基準・再現手順・全結果は[data/antiperiodic_4x2_U4_ed](data/antiperiodic_4x2_U4_ed/README.md)。
+基準はrunの前に固定した（`preregistration.sha256`）。各量を16独立系列で平均し、Δτ²の重み付き直線
+（絶対誤差、残差によるrescaleなし）で外挿した。P1（E/N、D、Szz(Q)、Sperp(Q)/2がAP/P EDと|z|<3.5）、
+P2（全qのSzz、Sperp/2が|z|<4）、N1（β=4のD、Szz(1,1)、Szz(1,0)がP/P EDと|z|>5）、外挿fitのp<0.001は判定保留。
+
+- 結果: P1 8/8、P2 32/32、N1 3/3。最小のfit pは0.014676288144015334。
+- 判定: PASS
+
+### 範囲
+
+- 4×2・U=4・β≤4の検証であり、4×4以上・低温・強結合のAP/Pは本節では検証していない。
+- `make test`、`make test_omp`、`OMPI_CC=cc make test_mpi`、`OMPI_CC=cc make test_hybrid`、`make test_slow`、
+  `make test_tempering_default`、`make test_bc_default`が合格。`make test_global_default`は比較先`463dc75`が
+  このrepositoryにないため実行できない（§10の2026-09-27の記録）。

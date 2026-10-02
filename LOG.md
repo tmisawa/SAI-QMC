@@ -1,6 +1,28 @@
 # LOG
 
 ---
+date: 2026-10-02
+datetime: 2026-10-02 22:33 JST
+model: OpenAI GPT-5.6 Sol (Codex)
+summary: |
+  Added bc_x/bc_y (periodic, antiperiodic, open) for built-in lattices. Antiperiodic
+  directions keep coordinates, so spin momentum selectors work. Legacy inputs are byte-identical.
+---
+
+## 2026-10-02: Directional boundaries and antiperiodic spin structure factors
+
+Built-in chains and square lattices accept `bc_x` and `bc_y`. An antiperiodic direction
+adds its closing bond with amplitude `-t`; its length must be even and at least 4. The
+keys cannot be combined with `pbc`/`bc`. Output metadata keeps `pbc=0|1` for the legacy
+combinations and otherwise records the resolved values, so antiperiodic runs are not
+labelled as periodic.
+
+Validation covers U=0 exact momentum formulas, identity with the same matrix given as a
+hopping file, byte identity with a614a8f for legacy inputs, identical serial/OpenMP/MPI/hybrid
+output, and a pre-registered 4x2 finite-temperature ED comparison (verdict PASS,
+VALIDATION.md section 12). Larger antiperiodic lattices are not validated here.
+
+---
 date: 2026-10-01
 datetime: 2026-10-01 16:48 JST
 model: OpenAI GPT-6 (Codex)
