@@ -1,0 +1,4 @@
+# lattice=square n=8 U=4 mu=2 dtau=0.05 bipartite=1 green_rebuild=combine parallel=serial nrep=16 bins=32 bc_x=antiperiodic bc_y=periodic
+# T  E_hub dE_hub  E_gc dE_gc  E_ph dE_ph  ntot dN  doublon dD  sign  acceptance dAcceptance
+0.5 -8.8883247 0.48 -24.888325 0.48 -16.888325 0.48 8 0 0.12994477 0.0074 1 0.77207031 0.00905
+0.25 -9.2929671 0.39 -25.292967 0.39 -17.292967 0.39 8 0 0.12879398 0.0067 1 0.76411133 0.0058

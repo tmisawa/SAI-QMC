@@ -1,0 +1,12 @@
+lattice=square
+Lx=4
+Ly=2
+pbc=1
+t=-1.0
+U=4
+dtau=0.1
+beta_list=2
+nwarm=0
+nmeas=2
+nbin=2
+seed=1
