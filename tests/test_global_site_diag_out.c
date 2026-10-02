@@ -73,7 +73,7 @@ int main(void)
     const unsigned long long seeds[2] = {11ULL, 22ULL};
     const double lambda = 0.31886946750622885;
     GlobalSiteDiagMeta m = {0, 20, 4, 1.0, 4.0, 0.05, lambda,
-                            7, 10, 2, "chain", 4, 1, 1, 3, "fixed"};
+                            7, 10, 2, "chain", 4, 1, "pbc=1", 3, "fixed"};
     const char *path = "tests/tmp_site_diag.tsv";
     FILE *fp = fopen(path, "w");
     CHECK(global_site_diag_write(fp, h, 2, ids, seeds, &m, 1) == 0);
@@ -92,6 +92,7 @@ int main(void)
     CHECK_CLOSE(got_lambda, lambda, 1e-15);
     CHECK_CLOSE(got_tanh_lambda, tanh(lambda), 1e-15);
     CHECK(strstr(text, "global_site_select=fixed") != NULL);
+    CHECK(strstr(text, "\n# lattice=chain Lx=4 Ly=1 n=4 pbc=1 U=4 dtau=") != NULL);
     CHECK(strstr(text, "global_update=site global_interval=3") != NULL);
     Row r;
     CHECK(find_row(text, 0, 0, 'p', 15, &r) == 0);
@@ -140,6 +141,18 @@ int main(void)
         }
         CHECK(ordered);
     }
+    free(text);
+
+    /* a directional boundary label replaces pbc= verbatim */
+    GlobalSiteDiagMeta mb = m;
+    mb.beta_index = 0;
+    strcpy(mb.boundary, "bc_x=antiperiodic bc_y=periodic");
+    fp = fopen(path, "w");
+    CHECK(global_site_diag_write(fp, h, 2, ids, seeds, &mb, 1) == 0);
+    fclose(fp);
+    text = slurp(path);
+    CHECK(strstr(text, "\n# lattice=chain Lx=4 Ly=1 n=4 bc_x=antiperiodic bc_y=periodic U=4 dtau=") != NULL);
+    CHECK(strstr(text, "pbc=") == NULL);
     free(text);
     remove(path);
     CHECK(global_site_diag_write(NULL, h, 2, ids, seeds, &m, 0) != 0);

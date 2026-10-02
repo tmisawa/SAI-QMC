@@ -510,7 +510,7 @@ static void fill_bin_meta(ReplicaBinMeta *meta, const Params *p,
     meta->lattice = p->lattice;
     meta->Lx = L->Lx;
     meta->Ly = L->Ly;
-    meta->pbc = p->pbc;
+    (void)params_boundary_label(p, meta->boundary, sizeof meta->boundary);
     meta->global_update = p->global_update;
     meta->global_interval = p->global_interval;
     meta->szz_Q_index = has_Q ? plan_q_index(szz_plan, Qx, Qy) : -1;
@@ -534,7 +534,7 @@ static void fill_site_diag_meta(GlobalSiteDiagMeta *meta, const Params *p,
     meta->lattice = p->lattice;
     meta->Lx = L->Lx;
     meta->Ly = L->Ly;
-    meta->pbc = p->pbc;
+    (void)params_boundary_label(p, meta->boundary, sizeof meta->boundary);
     meta->global_interval = p->global_interval;
     meta->global_site_select = p->global_site_select;
 }
@@ -1226,6 +1226,14 @@ int main(int argc, char **argv)
         mpi_finalize_if_enabled(&mpi_env);
         return 1;
     }
+    char boundary_label[64];
+    if (params_boundary_label(&p, boundary_label, sizeof boundary_label) != 0) {
+        if (mpi_is_root(&mpi_env)) {
+            fprintf(stderr, "ERROR: boundary label does not fit\n");
+        }
+        mpi_finalize_if_enabled(&mpi_env);
+        return 1;
+    }
     const int use_pt = strcmp(p.tempering, "dtau_ladder") == 0;
     int scalar_path_failed = mpi_is_root(&mpi_env) &&
         validate_scalar_output_path(&p, argv[1]);
@@ -1557,6 +1565,9 @@ int main(int argc, char **argv)
         setup_failed |= scalar_output_printf(scalar_fp, "# lattice=%s n=%d U=%g mu=%g dtau=%s bipartite=%d green_rebuild=%s parallel=%s nrep=%d bins=%d",
                p.lattice, L.n, p.U, mu, dtau_label, L.is_bipartite,
                p.green_rebuild, p.parallel, p.nrep, p.nrep * p.nbin);
+        if (!params_boundary_is_legacy(&p)) {
+            setup_failed |= scalar_output_printf(scalar_fp, " %s", boundary_label);
+        }
         if (parallel_uses_mpi(p.parallel)) {
             setup_failed |= scalar_output_printf(scalar_fp, " nranks=%d", mpi_env.nranks);
         }
@@ -1649,8 +1660,8 @@ int main(int argc, char **argv)
             fprintf(szz_fp,
                     "# spin_operator=Szi=(n_up-n_down)/2 factor3_applied=0\n");
             fprintf(szz_fp,
-                    "# lattice=%s Lx=%d Ly=%d n=%d pbc=%d t=%.17g U=%.17g mu=%.17g dtau=%s\n",
-                    p.lattice, L.Lx, L.Ly, L.n, p.pbc, p.thop, p.U, mu,
+                    "# lattice=%s Lx=%d Ly=%d n=%d %s t=%.17g U=%.17g mu=%.17g dtau=%s\n",
+                    p.lattice, L.Lx, L.Ly, L.n, boundary_label, p.thop, p.U, mu,
                     dtau_label17);
             fprintf(szz_fp,
                     "# szz_q=%s seed=%llu parallel=%s nrep=%d bins=%d nbeta=%d\n",
@@ -1681,8 +1692,8 @@ int main(int argc, char **argv)
             fprintf(sperp_fp,
                     "# hs_caveat=individual spin-channel-HS samples select the z axis; equality is restored by ensemble averaging\n");
             fprintf(sperp_fp,
-                    "# lattice=%s Lx=%d Ly=%d n=%d pbc=%d t=%.17g U=%.17g mu=%.17g dtau=%s\n",
-                    p.lattice, L.Lx, L.Ly, L.n, p.pbc, p.thop, p.U, mu,
+                    "# lattice=%s Lx=%d Ly=%d n=%d %s t=%.17g U=%.17g mu=%.17g dtau=%s\n",
+                    p.lattice, L.Lx, L.Ly, L.n, boundary_label, p.thop, p.U, mu,
                     dtau_label17);
             fprintf(sperp_fp,
                     "# sperp_q=%s seed=%llu parallel=%s nrep=%d bins=%d nbeta=%d\n",
@@ -1710,8 +1721,8 @@ int main(int argc, char **argv)
             fprintf(consistency_fp,
                     "# error=paired jackknife over the same sign-reweighted replica/bin samples\n");
             fprintf(consistency_fp,
-                    "# lattice=%s Lx=%d Ly=%d n=%d pbc=%d t=%.17g U=%.17g mu=%.17g dtau=%s\n",
-                    p.lattice, L.Lx, L.Ly, L.n, p.pbc, p.thop, p.U, mu,
+                    "# lattice=%s Lx=%d Ly=%d n=%d %s t=%.17g U=%.17g mu=%.17g dtau=%s\n",
+                    p.lattice, L.Lx, L.Ly, L.n, boundary_label, p.thop, p.U, mu,
                     dtau_label17);
             fprintf(consistency_fp,
                     "# szz_q=%s sperp_q=%s seed=%llu parallel=%s nrep=%d bins=%d nbeta=%d\n",

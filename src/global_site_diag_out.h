@@ -9,7 +9,8 @@ typedef struct {
     double beta_requested, U, dtau, lambda;
     int nwarm, nmeas, nbin;
     const char *lattice;
-    int Lx, Ly, pbc;
+    int Lx, Ly;
+    char boundary[64];  /* params_boundary_label */
     int global_interval;
     const char *global_site_select;
 } GlobalSiteDiagMeta;

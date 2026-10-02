@@ -107,7 +107,7 @@ test_szz_parallel: dqmc dqmc_omp dqmc_mpi dqmc_hybrid
 test_sperp_parallel: dqmc dqmc_omp dqmc_mpi dqmc_hybrid
 	@printf "%-35s " tests/test_sperp_parallel.sh; sh tests/test_sperp_parallel.sh
 
-test: $(TESTBIN) test_conditional_output test_szz test_sperp test_scalar test_dat test_global_disabled test_global_output test_global_hook_isolation test_tempering_output test_tempering_failure
+test: $(TESTBIN) test_conditional_output test_szz test_sperp test_scalar test_dat test_global_disabled test_global_output test_global_hook_isolation test_tempering_output test_tempering_failure test_bc_output
 	@fail=0; for t in $(TESTBIN); do printf "%-28s " $$t; ./$$t || fail=1; done; \
 	  if [ $$fail -ne 0 ]; then echo "SOME TESTS FAILED"; exit 1; fi; echo "ALL TESTS PASSED"
 
@@ -214,3 +214,8 @@ test_conditional_parallel: dqmc dqmc_omp dqmc_mpi dqmc_hybrid
 	MPIRUN="$(MPIRUN)" $(PYTHON) tests/test_conditional_output.py --parallel
 
 .PHONY: test_conditional_output test_conditional_parallel
+
+test_bc_output: dqmc
+	@printf "%-40s " tests/test_bc_output.sh; sh tests/test_bc_output.sh
+
+.PHONY: test_bc_output
