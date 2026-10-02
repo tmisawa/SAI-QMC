@@ -113,8 +113,8 @@ def self_test():
     return 0 if not failures else 1
 
 
-def ed_reference(path, beta):
-    row = vio.read_ed(path)[beta]
+def ed_reference(path, beta, expected_hopping):
+    row = vio.read_ed(path, expected_hopping)[beta]
     szz = {(e['mx'], e['my']): e['value'] for e in row['Szz']}
     ref = {'E/N': row['E_hub_per_site'], 'D': row['doublon_per_site'],
            'Szz(Q)': szz[Q], 'Sperp(Q)/2': szz[Q]}
@@ -151,7 +151,8 @@ def analyze():
     names = list(series[(rv.DTAUS[0], rv.BETAS[0])][0])
     rows, holds = [], list(inconsistent)
     for beta in rv.BETAS:
-        ed_ap, ed_pp = ed_reference(HERE / 'ed_app.json', beta), ed_reference(HERE / 'ed_pp.json', beta)
+        ed_ap = ed_reference(HERE / 'ed_app.json', beta, 'hopping_app.txt')
+        ed_pp = ed_reference(HERE / 'ed_pp.json', beta, 'hopping_pp.txt')
         for name in names:
             y, s = [], []
             for dtau in rv.DTAUS:

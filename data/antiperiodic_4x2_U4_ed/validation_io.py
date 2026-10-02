@@ -165,10 +165,11 @@ def series_values(directory, dtau, beta, seed):
     return values, mismatches
 
 
-def validate_ed(data, interaction, label):
+def validate_ed(data, interaction, expected_hopping, label):
     """Validate all reference rows, including finite values and unique beta/q grids."""
     require(isinstance(data, dict), label + ': expected ED object')
     match_header(data, dict(sites=8, Lx=4, Ly=2, U=float(interaction), mu=interaction/2), label)
+    require(data.get('hopping') == expected_hopping, label + ': hopping identity mismatch')
     require(isinstance(data.get('results'), list) and len(data['results']) == 2,
             label + ': expected beta=2,4')
     result = {}
@@ -194,6 +195,6 @@ def validate_ed(data, interaction, label):
     return result
 
 
-def read_ed(path, interaction=4.0):
+def read_ed(path, expected_hopping, interaction=4.0):
     path = Path(path)
-    return validate_ed(json.loads(path.read_text()), interaction, path.name)
+    return validate_ed(json.loads(path.read_text()), interaction, expected_hopping, path.name)

@@ -30,6 +30,7 @@ BINARY = hashlib.sha256(b'synthetic binary identity').hexdigest()
 
 def reference(periodic=False):
     return dict(sites=8, Lx=4, Ly=2, U=4.0, mu=2.0,
+                hopping='hopping_pp.txt' if periodic else 'hopping_app.txt',
                 results=[dict(beta=beta, E_hub_per_site=-0.9 if periodic else -1.0,
                               doublon_per_site=0.18 if periodic else 0.15, ntot=8.0,
                               Szz=[dict(mx=mx, my=my, value=(0.125 if periodic else 0.14)+0.01*k)
@@ -119,8 +120,24 @@ class ValidationTests(unittest.TestCase):
 
     def test_normal_and_wrong_reference(self):
         self.assertEqual(self.invoke(),0)
-        with self.change(self.root/'ed_app.json',lambda _: (self.root/'ed_pp.json').read_text()):
+        def wrong_numeric_reference(text):
+            obj = json.loads(text)
+            obj['results'] = reference(periodic=True)['results']
+            return json.dumps(obj)
+        with self.change(self.root/'ed_app.json', wrong_numeric_reference):
             self.assertEqual(self.invoke(),1)
+
+    def test_ed_hopping_provenance(self):
+        for mode in ('missing', 'wrong'):
+            def mutate(text):
+                obj = json.loads(text)
+                if mode == 'missing':
+                    del obj['hopping']
+                else:
+                    obj['hopping'] = 'hopping_pp.txt'
+                return json.dumps(obj)
+            with self.subTest(mode=mode), self.change(self.root/'ed_app.json', mutate):
+                self.assertEqual(self.invoke(),3)
 
     def test_nonfinite_references(self):
         for filename in ('ed_app.json','ed_pp.json'):
@@ -133,7 +150,9 @@ class ValidationTests(unittest.TestCase):
                         return json.dumps(obj)
                     with self.subTest(file=filename,field=field,value=value), self.change(self.root/filename,mutate):
                         self.assertEqual(self.invoke(),2)
-                        with self.assertRaises(vio.NumericHold): vio.read_ed(self.root/filename)
+                        hopping = 'hopping_pp.txt' if filename == 'ed_pp.json' else 'hopping_app.txt'
+                        with self.assertRaises(vio.NumericHold):
+                            vio.read_ed(self.root/filename, hopping)
 
     def test_ed_schema(self):
         for field in ('mu','U','sites'):
@@ -146,6 +165,7 @@ class ValidationTests(unittest.TestCase):
     def test_ed_checker_rejects_nonfinite(self):
         free = reference()
         free.update(U=0.0, mu=0.0)
+        free['hopping'] = str(self.root/'hopping_app.txt')
         for row in free['results']:
             row['E_hub_per_site'], values = checker.free_values(row['beta'])
             row['doublon_per_site'] = 0.25
@@ -171,6 +191,34 @@ class ValidationTests(unittest.TestCase):
                         with self.change(self.root/filename, mutate), \
                              patch.object(checker.subprocess, 'run', return_value=SimpleNamespace(stdout=json.dumps(free))):
                             with self.assertRaises(vio.NumericHold): checker.main()
+
+    def test_ed_checker_rejects_wrong_hopping(self):
+        free = reference()
+        free.update(U=0.0, mu=0.0, hopping=str(self.root/'hopping_app.txt'))
+        for row in free['results']:
+            row['E_hub_per_site'], values = checker.free_values(row['beta'])
+            row['doublon_per_site'] = 0.25
+            for q in row['Szz']:
+                q['value'] = values[q['mx'], q['my']]
+        with patch.object(checker, 'HERE', self.root), contextlib.redirect_stdout(io.StringIO()):
+            for mode in ('missing', 'wrong'):
+                obj = json.loads(json.dumps(free))
+                if mode == 'missing':
+                    del obj['hopping']
+                else:
+                    obj['hopping'] = 'hopping_app.txt'
+                with self.subTest(source='U0', mode=mode), \
+                     patch.object(checker.subprocess, 'run', return_value=SimpleNamespace(stdout=json.dumps(obj))):
+                    with self.assertRaises(vio.DataError):
+                        checker.main()
+            for filename, wrong in (('ed_app.json', 'hopping_pp.txt'),
+                                    ('ed_pp.json', 'hopping_app.txt')):
+                with self.subTest(source=filename), self.change(
+                        self.root/filename,
+                        lambda text, wrong=wrong: json.dumps(dict(json.loads(text), hopping=wrong))), \
+                     patch.object(checker.subprocess, 'run', return_value=SimpleNamespace(stdout=json.dumps(free))):
+                    with self.assertRaises(vio.DataError):
+                        checker.main()
 
     def test_driver_run_resume_and_bound_context(self):
         with tempfile.TemporaryDirectory() as temp:

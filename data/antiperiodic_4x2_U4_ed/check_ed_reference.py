@@ -44,15 +44,17 @@ def main():
     out = subprocess.run([sys.executable, str(HERE / 'ed_finite_t.py'),
                           str(HERE / 'hopping_app.txt'), '4', '2', '0', '2,4'],
                          capture_output=True, text=True, check=True).stdout
-    for r in vio.validate_ed(json.loads(out), 0.0, 'U=0 ED').values():
+    u0_hopping = str(HERE / 'hopping_app.txt')
+    for r in vio.validate_ed(json.loads(out), 0.0, u0_hopping, 'U=0 ED').values():
         energy, szz = free_values(r['beta'])
         worst = max([abs(r['E_hub_per_site'] - energy), abs(r['doublon_per_site'] - 0.25)] +
                     [abs(e['value'] - szz[(e['mx'], e['my'])]) for e in r['Szz']])
         print(f"U=0 beta={r['beta']:g}: max |ED - momentum formula| = {worst:.2e}")
         if not math.isfinite(worst) or worst > 1e-10:
             failures.append(f"U=0 beta={r['beta']:g}")
-    for name in ('ed_app.json', 'ed_pp.json'):
-        for r in vio.read_ed(HERE / name).values():
+    for name, hopping in (('ed_app.json', 'hopping_app.txt'),
+                          ('ed_pp.json', 'hopping_pp.txt')):
+        for r in vio.read_ed(HERE / name, hopping).values():
             rule = 0.25 * (N - 2.0 * N * r['doublon_per_site'])
             total = sum(e['value'] for e in r['Szz'])
             print(f"{name} beta={r['beta']:g}: ntot={r['ntot']:.12f} "
