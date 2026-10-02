@@ -59,6 +59,50 @@ The corresponding analysis summaries, including failed checks, are under
 An old diagnostic suggestion to run with `nbin=1` is incompatible with the
 current input requirement `nbin>=2` and should not be used as a runnable example.
 
+## Parallel tempering
+
+The optional `tempering=dtau_ladder` mode is validated only within the scope
+above: every slot must already be a sign-free, particle-hole-symmetric model
+at half filling on a bipartite lattice, and the same finite-`dtau` Trotter
+bias applies independently to each slot's own `dtau_k`. Exchanging
+configurations between slots does not reduce or otherwise change that bias.
+
+A ladder's slots and exchanges all run on one MPI rank and one OpenMP thread
+for the ladder's entire lifetime; the current implementation does not
+distribute a single ladder's slots across ranks or threads, so a ladder's
+per-rank/per-thread cost scales with its own number of slots. The
+diagnostic and profiling files rejected together with PT (`stab_drift_file`,
+`udv_scale_file`, `udv_centered_file`, `global_site_diag_file`, `profile=1`)
+have not been given a per-slot, per-ladder meaning; using them requires
+`tempering=none`. The `beta_list` temperature ladder is fixed by the input
+file; there is no feedback-optimized, or otherwise automatic, placement of
+temperatures based on observed exchange acceptance rates.
+
+One failed ladder fails the whole run: the other ladders still run to
+completion, but the run exits nonzero and writes no observables for any
+ladder; only `tempering_file` is written in full, with `failed=1` in each
+failed ladder's row. A failure late in a long run therefore loses the
+observables of every ladder in that run. With exactly two slots, only every
+second exchange round has a pair to try, so the effective exchange interval
+is `2*tempering_interval` sweeps.
+
+`field_init=uniform` (available with or without PT) starts from the all-`+1`
+field, the configuration of largest numerical scale. Its up-spin product
+`B_{L-1}...B_0` has largest scale about `exp(Ltr*lambda + beta*w)`, with
+`lambda = acosh(exp(dtau*U/2))` and `w` the largest eigenvalue of the
+hopping matrix (`4|t|` on the periodic square lattice, `2|t|` on the
+periodic chain). When
+this exponent passes the double-precision limit `ln(DBL_MAX) ≈ 709.78` by a
+margin of order one (1.0 to 1.4 in the measured 4x4 case), the run fails at
+initialization, before any sweep
+(`udv_lmul_work non-finite matrix at stage=qr_raw`, then `dqmc_init failed`,
+nonzero exit). On the periodic 4x4 square lattice at `U=8` and
+`dtau=0.0125`, `beta=24` (`Ltr=1920`, exponent 708.2) keeps about 1.6
+e-folds of margin, while `beta=24.5`, `25`, and `26` fail at initialization.
+Under PT the coldest slot (largest `beta_k` and `dtau_k`) sets the bound.
+Inputs are not checked against this bound in advance; check it before using
+`field_init=uniform` at low temperature or large `Ltr`.
+
 ## Distribution details
 
 Spin structure factors currently require built-in chain/square geometry.

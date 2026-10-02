@@ -30,6 +30,18 @@ typedef struct {
     char global_update[16];
     int global_interval;
     char replica_bin_file[256];
+    int conditional_measure;       /* 0 default; 1 appends comparison bin sums */
+    char global_site_diag_file[256];
+    char global_site_select[16];   /* fixed | polarized (spec 4) */
+    double global_site_power;      /* alpha >= 0, finite; default 2 */
+
+    char tempering[16];            /* none | dtau_ladder */
+    int tempering_ltr;             /* fixed time slices of every slot */
+    int tempering_interval;        /* sweeps between exchange rounds */
+    char tempering_file[256];
+    int dtau_given;                /* 1 when the input sets dtau */
+
+    char field_init[16];           /* initial HS field: random (default) | uniform (all +1) */
 
     char szz_q[256];
     char szz_file[256];

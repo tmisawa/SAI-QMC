@@ -22,6 +22,13 @@ void field_init(Field *f, int n, int L, double U, double dtau, Rng *r)
     }
 }
 
+void field_set_uniform(Field *f, signed char value)
+{
+    for (int k = 0; k < f->L * f->n; k++) {
+        f->s[k] = value;
+    }
+}
+
 void field_free(Field *f)
 {
     free(f->s);
@@ -60,4 +67,17 @@ int field_site_sum(const Field *f, int i)
         m += f->s[l * f->n + i];
     }
     return m;
+}
+
+void field_site_sums(const Field *f, int *out)
+{
+    for (int i = 0; i < f->n; i++) {
+        out[i] = 0;
+    }
+    for (int l = 0; l < f->L; l++) {
+        const signed char *row = f->s + (size_t)l * (size_t)f->n;
+        for (int i = 0; i < f->n; i++) {
+            out[i] += row[i];
+        }
+    }
 }

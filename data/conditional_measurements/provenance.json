@@ -1,0 +1,85 @@
+{
+  "base_commit": "6f0a1d4c7cde9ede05add3c140731a2111115d2c",
+  "numerical_source_sha256": {
+    "src/replica_bin_out.c": "f4ffb6fd0887233d6987b2b59b93bafcdc5dcf6e2f189cda170f8609d097a653",
+    "src/replica_run.h": "9c45d3dd06fd4c0c2a4acef11835aa9a2b6a5626e906b6df212cdae2c094e471",
+    "src/tempering_run.h": "6862bf41ef45ca2611f10f9a0f3f43c60e31934a081c8fe1e067376da252ae40",
+    "src/global_select.c": "d0e983c4242271a1681e303bb4a9d111ad05e546e6267b7662a25ee224beca57",
+    "src/tempering.h": "1a20e8f8547bdeed7ea805d8b4df78248a02a7c380424f768f8be78fd5b4890b",
+    "src/model.c": "38b78043a39f3edbf21b16d5977c3815efb95867f99914b84a68439a47b05e5e",
+    "src/linalg.c": "a8e28b9a11022194948661db5d1c0fdc887c39e88337c9265f62ec5e200052d3",
+    "src/replica_mpi.c": "f34d372732aeaf398088f453919b9dc19a435e6c7271b29d1d13710a8816acbe",
+    "src/conditional_measure.h": "9d50641777a0931b90131abe666ea33ab0bbf41e3b95075eac0f7fa411a0b18e",
+    "src/global_site_diag_out.c": "bb992533648000e9544893e578a033ba56c5e27094360dc53b4b3f7249d876d8",
+    "src/io.c": "7d5839263905b617fbe95ca7ea5c095f3acd8ab8052199157b4af362f7253aea",
+    "src/dqmc.c": "0e541d33745b082f1c17e1baa9aa6d520078a50ee995617ae113c11f59e6e746",
+    "src/profiler.c": "4bb00b2e149551e27ba8e9af0ebe5872b0eb79355e824562d6270d7c8002a0ef",
+    "src/scalar_output.h": "ba66b14e30b0fe215c0b75b565cb49d4a2d233001399a85184d0264718e80c68",
+    "src/structure_factor.h": "f39712a6b56135c854f1aa18b346a8e39918215c7128acf5d1732838d3aa7268",
+    "src/field.h": "cb5f0f27c63314dabed4cff35ee62774fffdd38af7760d9a3c3279f23aa3379c",
+    "src/measure.h": "463afc54e2801f53c70a76c09f54907986bcbee7f1255f3535be4373e877e43f",
+    "src/lattice.c": "4e25afe454133cbcc78199f455f033b2f27e08da5a48ba5e08cdfa0d02d42793",
+    "src/rng.h": "714ecb6c36d2d16e9d29d7ba6df0e5283bbb20d58fc3ebdc40cdba3d2da6f05b",
+    "src/green.h": "ee99d613dd9cd82cb804597fc7cbc2e808bc570e963258cb796c81f9cac25f10",
+    "src/tempering_out.h": "7e82008d593b285ea4ca773f3ebd470831b70687aaff0f262300cd156bc87add",
+    "src/replica.c": "83235d01ac1f0d6700cbc5fc1968c9b6e50fc4a700850151f93fe632cdad10cb",
+    "src/replica_chain.h": "a0d8354d4b3e08bfca58267c562c79020264060a8c806ab63f5b1768fe2d311d",
+    "src/tempering_run.c": "7ece25cfb5ad06db4dded4ed91fa76f988b28c20bac54d2401e50b175d6bef78",
+    "src/global_select.h": "1ffa2fcb9f41189461855c95ddb3bd0c1f00a6f3feaf7c47c7ef1c01da108bc5",
+    "src/replica_run.c": "26aefa0bce47013860b3fbb70e604eb0183dfd931e2f0c50b41fc397b87c8539",
+    "src/replica_bin_out.h": "686053738ff8ba90713f96ad4f15158813328ffbe4bad3681e89f5a85c0296b8",
+    "src/main.c": "daa14d4aa245acdc59f3525fe0ea6a1774705a59f1c170a320ea18a17c61f2d2",
+    "src/io.h": "0713793119314e58e687f6ce558016989d606893c9a3cbeb54a3a312074760db",
+    "src/replica_mpi.h": "fc12fc27a2a594927df14af798b81acdafd718d281881a9449770b05025d5347",
+    "src/global_site_diag_out.h": "7c40645bab83c3d1e2e47a62769b5d44fb6a96e74588e26b426ace8912c97010",
+    "src/conditional_measure.c": "f1f95d22b765ec6ca2360c6368fc19f153530c3e49b53b9a9f7dd0b6abb3de13",
+    "src/tempering.c": "0de1dba303ff14b024a80b247c90e8e497c85fc739b2de0c9ecf4ffc275dfd36",
+    "src/linalg.h": "31907e22fa2996eaecd5e17f710be90fd5bd6dcc933e4d361bfd451812657e7d",
+    "src/model.h": "701bdcd1ae9347494b35e19734f3b08e5ed753aa7e6fc744e25cc266f6443897",
+    "src/measure.c": "c076bcd819e493bf97270986f5318ae9dac014ece948ebe6b5370420d0205f41",
+    "src/field.c": "de5c348bfe085e315ad89cdb19f5f3b515ee6d9bdbcc84b4c8ca793f77570bf4",
+    "src/structure_factor.c": "beb6bbf1bc38fd3d1b68bf42d13209a6d239f38dbdf1ae651cd6b63071a654cc",
+    "src/scalar_output.c": "a09e1ec4da58d4bd9fbcd0ce673b71fcdc24fd02fefd35be028b7fcfb734997e",
+    "src/profiler.h": "7d5ba75be1cb124f78ab944bd9d2474f5d784123e53e63029e7e603cb780a9cb",
+    "src/dqmc.h": "195a676f07023acefe5a95073f051a98541628e873f391f2a841b140f533fb0f",
+    "src/replica.h": "93f5eeea8b6cfab3e44f4deac842c5d645386a72202aae28d05fcb8fdc9c17aa",
+    "src/replica_chain.c": "756b89e78e47c1a5259b6de0901c8f33536d6c107fe9ee32e09c3301fa564be6",
+    "src/tempering_out.c": "1dfaa363022d2c3d3df88f2a1a422360d4f35e8e6c94866aa497d9f522915087",
+    "src/green.c": "43a96c58b6f0b50f99af2e32cd6f34db9f86dfb08c06c839d93895965bbbb58e",
+    "src/rng.c": "01944305266d0e882efd3e32a697d0984d949fbf74dccca390b3a24752502fa5",
+    "src/lattice.h": "150404ba36a91cb71b1449198cce65714344612130e40b3704c699efe6737e60"
+  },
+  "binary_sha256": {
+    "fixed_beta_local": {
+      "dqmc": "2a04695adc96a1dbf258780e112e44c6b1e2e307a1875f4e34a5b092532201b9",
+      "dqmc_omp": "c24ae514457085709c452ce5baa12578f638b48cf66e89d24f960bc86f10b247",
+      "dqmc_mpi": "610c6cdffc248eb441a1a161df16501fcde6a78c66a597a4f5aa21d1a6c943e6",
+      "dqmc_hybrid": "cf558a7d866dd58827421f6661a8f21c5640632933730d4126678bbc1916c4df"
+    },
+    "pt_remote": {
+      "dqmc": "c73b0d7dcb56634ed4ef2a3d3a10b6c1a89322cd894a4a97c5a4671e13e673a9",
+      "dqmc_omp": "47a1f0211f2f3bf4ab89c78c5086389ed8786db2a9134052569432d7f4bea4c5"
+    },
+    "timings_remote": {
+      "dqmc": "6084a66efbd46ee66ddca338b73a37b2cf92e5ca3cfa1699ba27a0d67230d938",
+      "dqmc_omp": "159500fd6fb5cab942122944cf72efbac80388230f99204e6b68a3ab373238cf"
+    }
+  },
+  "pilot_omp_threads": {
+    "fixed_beta": 4,
+    "pt": 8
+  },
+  "blas_threads": 1,
+  "timing_scope": "Timings and pilot SEs were collected on different hardware. Derived variance-times-cost gains are descriptive cross-platform proxies, not same-machine efficiency measurements.",
+  "cost_execution": "serial; three paired repeats, alternating off/on execution order",
+  "analysis_python": {
+    "fixed_beta": "3.12.5",
+    "pt": "3.10.14",
+    "portability_note": "Across these supported Python versions, statistics.stdev changed 12 retained PT standard errors by at most 2 ULP; means and per-replica values were identical."
+  },
+  "exact_reference_packages": {
+    "numpy": "2.4.2",
+    "scipy": "1.18.0"
+  },
+  "scope": "Exploratory scientific validation; source hashes identify the uncommitted implementation. No release or production adoption is implied."
+}

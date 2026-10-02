@@ -3,7 +3,8 @@
 
 #include "replica.h"
 
-#define REPLICA_MPI_BIN_DOUBLES 10
+#define REPLICA_MPI_BIN_DOUBLES 14
+#define REPLICA_MPI_SITE_DIAG_DOUBLES (4 * GLOBAL_SITE_DIAG_NBIN)
 
 void replica_mpi_rank_range(int nrep, int nranks, int rank, int *first_replica,
                             int *local_nrep);
@@ -19,5 +20,9 @@ int replica_mpi_pack_szz(const ReplicaResult *results, int local_nrep,
                          int nbin, int nq, double *values);
 int replica_mpi_pack_sperp(const ReplicaResult *results, int local_nrep,
                            int nbin, int nq, double *values);
+int replica_mpi_pack_site_diag(const ReplicaResult *results, int local_nrep,
+                               double *values);
+int replica_mpi_unpack_site_diag(const double *values, int nrep,
+                                 GlobalSiteDiag *out);
 
 #endif

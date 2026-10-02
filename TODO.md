@@ -1,6 +1,6 @@
 ---
-date: 2026-09-23
-datetime: 2026-09-23 14:54 JST
+date: 2026-09-30
+datetime: 2026-09-30 13:47 JST
 model: OpenAI GPT-6 (Codex)
 summary: |
   Scientific and software follow-up beyond the version 0.1 implementation.
@@ -8,6 +8,12 @@ summary: |
 ---
 
 # Planned improvements
+
+- Evaluate conditional D/K/E measurement efficiency, independent-series error
+  stability, initial-state dependence, and finite-time-step effects before
+  production adoption. Validate spin alternatives separately; the new option
+  leaves ordinary spin measurements unchanged. See
+  [conditional measurements](docs/conditional-measurements.md).
 
 - Automate build and test checks in continuous integration for macOS and Linux.
 - Improve input-parser diagnostics so malformed setting lines are consistently

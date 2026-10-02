@@ -1,6 +1,7 @@
 #ifndef REPLICA_H
 #define REPLICA_H
 
+#include "global_select.h"
 #include "measure.h"
 
 typedef struct {
@@ -15,6 +16,8 @@ typedef struct {
     unsigned long long global_accepted;
     unsigned long long global_attempts;
     int count;
+    double sum_D_cond, sum_K_cond, sum_Ehub_cond;
+    int conditional_count; /* sweeps, not local HS updates; sign-free only */
 } ReplicaBin;
 
 typedef struct {
@@ -30,6 +33,7 @@ typedef struct {
     int replica_id;
     unsigned long long seed;
     int status;
+    GlobalSiteDiag *site_diag;
 } ReplicaResult;
 
 unsigned long long replica_seed(unsigned long long base_seed, int beta_index,
@@ -42,9 +46,12 @@ void replica_bin_add_acceptance(ReplicaBin *bin, unsigned long long accepted,
 double replica_bin_acceptance(const ReplicaBin *bin);
 int replica_bin_values(const ReplicaBin *bin, double *Ehub, double *Egc,
                        double *Eph, double *N, double *D, double *sign);
+int replica_bin_add_conditional(ReplicaBin *bin, double D, double K,
+                                double U, int nsite);
 int replica_result_alloc(ReplicaResult *result, int nbin);
 int replica_result_enable_szz(ReplicaResult *result, int nq);
 int replica_result_enable_sperp(ReplicaResult *result, int nq);
+int replica_result_enable_site_diag(ReplicaResult *result);
 int replica_result_add_szz(ReplicaResult *result, int bin, const double *szz,
                            int nq, double sign);
 int replica_result_add_sperp(ReplicaResult *result, int bin,

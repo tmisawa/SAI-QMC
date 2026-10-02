@@ -1,0 +1,3 @@
+# lattice=chain n=6 U=4 mu=2 dtau=0.0333333 bipartite=1 green_rebuild=combine parallel=omp nrep=16 bins=1600 szz_file=data/tempering_L6_U4_ed_20260927/szz_fixed_b3.tsv szz_nq=6 sperp_file=data/tempering_L6_U4_ed_20260927/sperp_fixed_b3.tsv sperp_nq=6
+# T  E_hub dE_hub  E_gc dE_gc  E_ph dE_ph  ntot dN  doublon dD  sign  acceptance dAcceptance
+0.15 -3.6629778 0.00225 -15.662978 0.00225 -9.6629778 0.00225 6 0 0.1102098 5.9e-05 1 0.75594846 4.14e-05

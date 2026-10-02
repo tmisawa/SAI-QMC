@@ -1,6 +1,6 @@
 ---
-date: 2026-09-23
-datetime: 2026-09-23 15:27 JST
+date: 2026-09-30
+datetime: 2026-09-30 13:30 JST
 model: OpenAI GPT-6 (Codex)
 summary: |
   Input/output reference for SAI-QMC 0.1, including defaults and file schemas.
@@ -49,6 +49,8 @@ and invalid combinations are errors. See [the examples](../input/) and
 | `profile` | `0` | Enable timing output with `1` |
 | `profile_file` | `profile.dat` when enabled | Timing data path |
 | `replica_log` | `replicas.dat` if `nrep>1`; otherwise off | Explicit path enables the log even for one replica; `none` disables it |
+| `replica_bin_file` | Unset | Save raw per-replica, per-temperature bin sums |
+| `conditional_measure` | `0` | `1` appends conditional local D/K/E comparison sums to `replica_bin_file`; requires that file; see [conditional measurements](conditional-measurements.md) |
 | `szz_q`, `sperp_q` | `none` | Spin momentum selectors: `none`, `af`, `all`, or `mx:my,...` |
 | `szz_file`, `sperp_file` | `szz.dat`, `sperp.dat` | Paths for enabled spin measurements |
 | `spin_consistency_file` | `none` | Path for paired `Sperp/2-Szz`; requires both selectors with the same ordered momenta |

@@ -43,6 +43,40 @@ int main(void)
     CHECK(read_with("global_interval=\n", &p) != 0);
     CHECK(read_with("replica_bin_file=\n", &p) != 0);
     CHECK(read_with("replica_bin_file=a b.tsv\n", &p) != 0);
+    CHECK(read_with("", &p) == 0);
+    CHECK(p.global_site_diag_file[0] == '\0');
+    CHECK(read_with("global_update=site\nglobal_site_diag_file=site_diag.tsv\n", &p) == 0);
+    CHECK(strcmp(p.global_site_diag_file, "site_diag.tsv") == 0);
+    /* only meaningful with the site update: reject otherwise (never silently ignore) */
+    CHECK(read_with("global_site_diag_file=site_diag.tsv\n", &p) != 0);
+    CHECK(read_with("global_update=none\nglobal_site_diag_file=site_diag.tsv\n", &p) != 0);
+    CHECK(read_with("global_update=site\nglobal_site_diag_file=\n", &p) != 0);
+    CHECK(read_with("global_update=site\nglobal_site_diag_file=a b.tsv\n", &p) != 0);
+    /* Stage B keys (spec 4): defaults, accepted values, rejection independent of global_update */
+    CHECK(read_with("", &p) == 0);
+    CHECK(strcmp(p.global_site_select, "fixed") == 0);
+    CHECK(p.global_site_power == 2.0);
+    CHECK(read_with("global_update=site\nglobal_site_select=polarized\nglobal_site_power=1.5\n", &p) == 0);
+    CHECK(strcmp(p.global_site_select, "polarized") == 0);
+    CHECK(p.global_site_power == 1.5);
+    CHECK(read_with("global_update=site\nglobal_site_select=fixed\nglobal_site_power=0\n", &p) == 0);
+    CHECK(p.global_site_power == 0.0);
+    /* the keys are validated even without the site update (never silently ignored) */
+    CHECK(read_with("global_site_select=polarized\n", &p) == 0);
+    CHECK(strcmp(p.global_site_select, "polarized") == 0);
+    CHECK(read_with("global_update=none\nglobal_site_power=3\n", &p) == 0);
+    CHECK(read_with("global_site_select=staggered\n", &p) != 0);          /* not implemented */
+    CHECK(read_with("global_site_select=random\n", &p) != 0);             /* unknown */
+    CHECK(read_with("global_update=none\nglobal_site_select=staggered\n", &p) != 0);
+    CHECK(read_with("global_site_select=\n", &p) != 0);
+    CHECK(read_with("global_site_select=polarized extra\n", &p) != 0);
+    CHECK(read_with("global_site_power=-0.5\n", &p) != 0);
+    CHECK(read_with("global_site_power=nan\n", &p) != 0);
+    CHECK(read_with("global_site_power=inf\n", &p) != 0);
+    CHECK(read_with("global_site_power=abc\n", &p) != 0);
+    CHECK(read_with("global_site_power=\n", &p) != 0);
+    CHECK(read_with("global_site_power=2 junk\n", &p) != 0);
+    CHECK(read_with("global_update=site\nglobal_site_select=fixed\nglobal_site_power=-1\n", &p) != 0); /* validated for fixed too */
     /* path length: 255 characters are accepted unchanged, 256 and 300 are rejected (never truncated) */
     char line[400];
     char path[301];

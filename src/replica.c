@@ -2,6 +2,7 @@
 #include "structure_factor.h"
 
 #include <math.h>
+#include <limits.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -172,6 +173,18 @@ int replica_result_enable_sperp(ReplicaResult *result, int nq)
                           : q_observable_enable(result, &result->sperp, nq);
 }
 
+int replica_result_enable_site_diag(ReplicaResult *result)
+{
+    if (result == NULL) {
+        return 1;
+    }
+    if (result->site_diag != NULL) {
+        return 0;
+    }
+    result->site_diag = calloc(1, sizeof(GlobalSiteDiag));
+    return result->site_diag == NULL;
+}
+
 static int q_add_is_valid(const ReplicaResult *result,
                           const ReplicaQObservable *observable, int bin,
                           const double *values, int nq, double sign)
@@ -302,9 +315,11 @@ void replica_result_free(ReplicaResult *result)
     free(result->bins);
     free(result->szz.sum_sign_values);
     free(result->sperp.sum_sign_values);
+    free(result->site_diag);
     result->bins = NULL;
     result->szz.sum_sign_values = NULL;
     result->sperp.sum_sign_values = NULL;
+    result->site_diag = NULL;
     result->nbin = 0;
     result->szz.nq = 0;
     result->sperp.nq = 0;
@@ -336,4 +351,25 @@ double replica_bins_global_acceptance(const ReplicaBin *bins, int nbins,
         *attempts = att;
     }
     return att == 0ULL ? NAN : (double)acc / (double)att;
+}
+
+int replica_bin_add_conditional(ReplicaBin *bin, double D, double K,
+                                double U, int nsite)
+{
+    if (bin == NULL || nsite <= 0 || !isfinite(U) || U < 0.0 ||
+        !isfinite(D) || !isfinite(K) || bin->conditional_count == INT_MAX) {
+        return 1;
+    }
+    const double E = K + U * (double)nsite * D;
+    const double sd = bin->sum_D_cond + D;
+    const double sk = bin->sum_K_cond + K;
+    const double se = bin->sum_Ehub_cond + E;
+    if (!isfinite(sd) || !isfinite(sk) || !isfinite(se)) {
+        return 1;
+    }
+    bin->sum_D_cond = sd;
+    bin->sum_K_cond = sk;
+    bin->sum_Ehub_cond = se;
+    bin->conditional_count++;
+    return 0;
 }

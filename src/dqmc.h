@@ -2,6 +2,8 @@
 #define DQMC_H
 
 #include "field.h"
+#include "conditional_measure.h"
+#include "global_select.h"
 #include "green.h"
 #include "model.h"
 #include "profiler.h"
@@ -85,6 +87,22 @@ typedef struct {
     unsigned long long accept_accepted;
     unsigned long long global_attempts;
     unsigned long long global_accepted;
+    /* Local measurements stay at the temperature slot across PT exchanges. */
+    ConditionalMeasure conditional;
+    /* Stage A diagnostic (spec 3.3): NULL unless dqmc_enable_global_site_diag(D, 1). */
+    GlobalSiteDiag *site_diag;
+    int *site_diag_sums;
+    double *site_diag_p;
+    double *site_diag_d;
+    /* Stage B (spec 3.1/3.2): 0 = fixed order (default). Work arrays are NULL
+       unless dqmc_set_global_site_select(D, 1, alpha). */
+    int site_select_polarized;
+    double site_select_power;
+    int *site_select_sums;
+    double *site_select_p;
+    double *site_select_d;
+    double *site_select_w;
+    double *site_select_cum;
 
     DqmcStabDrift stab_drift;
     DqmcUdvScaleDiag udv_scale_diag;
@@ -99,6 +117,13 @@ int dqmc_init_modes(Dqmc *D, Model *m, Field *f, Rng *rng, int stab_interval,
 void dqmc_init(Dqmc *D, Model *m, Field *f, Rng *rng, int stab_interval,
                Profiler *prof);
 void dqmc_free(Dqmc *D);
+/* Attach (enabled=1) or detach (enabled=0) the site-flip histogram. Recording
+   happens in dqmc_global_site_pass only; it never draws random numbers. */
+int dqmc_enable_global_site_diag(Dqmc *D, int enabled);
+/* polarized=1: draw the site of each attempt with weight (p_i/p_0)^alpha + 1/n
+   (two random draws per attempt: site, then acceptance). polarized=0: fixed
+   order, one draw per site (default). Returns 1 on bad alpha or allocation failure. */
+int dqmc_set_global_site_select(Dqmc *D, int polarized, double alpha);
 int dqmc_enable_stab_drift(Dqmc *D, int enabled);
 int dqmc_enable_udv_scale_diag(Dqmc *D, const char *path, int beta_index,
                                int Ltr, int replica_id,
@@ -109,6 +134,9 @@ int dqmc_enable_udv_centered_diag(Dqmc *D, const char *path, int beta_index,
                                   unsigned long long seed);
 void dqmc_set_green_rebuild_mode(Dqmc *D, GreenRebuildMode mode);
 void dqmc_sweep(Dqmc *D);
+/* Enable comparison measurements for subsequent sweeps (normally only after
+   warmup). Requires a half-filled PH model with zero diagonal hopping. */
+int dqmc_enable_conditional_measure(Dqmc *D, int enabled);
 
 /* log|W| and sign(W) of the current field, W = det(1+A_up) det(1+A_down).
    Uses the PH identity when D->use_ph. Does not modify the Green functions. */
@@ -125,5 +153,14 @@ int dqmc_global_site_step(Dqmc *D, int i, double u, double *logw, int *sign,
    acceptance (spec 3.3). Leaves Gu/Gd/sign rebuilt at l=0 and carried stacks
    invalid. Returns nonzero and sets D->status on numerical failure. */
 int dqmc_global_site_pass(Dqmc *D);
+
+/* log|W| and sign(W) of configuration s (D->L * D->n entries, layout
+   s[l*n+i]) under D's own model and lambda (parallel tempering cross-weight).
+   D->f->s, the Green functions and D->status are unchanged. */
+int dqmc_log_weight_of(Dqmc *D, const signed char *s, double *logw, int *sign);
+/* Copies s into D->f->s and rebuilds Gu/Gd/sign at l=0 exactly as the end of
+   dqmc_global_site_pass; carried stacks become invalid. Returns nonzero and
+   sets D->status on numerical failure. Does not draw random numbers. */
+int dqmc_replace_field(Dqmc *D, const signed char *s);
 
 #endif

@@ -1,4 +1,5 @@
 #include "test_util.h"
+#include "global_select.h"
 #include "measure.h"
 #include "replica.h"
 #include "replica_mpi.h"
@@ -180,14 +181,35 @@ int main(void)
         CHECK(rr.bins[0].global_attempts == 16ULL);
         double values[2 * REPLICA_MPI_BIN_DOUBLES];
         int counts[2];
+        rr.bins[0].sum_D_cond = 0.375;
+        rr.bins[0].sum_K_cond = -7.25;
+        rr.bins[0].sum_Ehub_cond = -1.25;
+        rr.bins[0].conditional_count = 17;
         replica_mpi_pack_bins(&rr, 1, 2, values, counts);
+        CHECK_CLOSE(values[10], 0.375, 0);
+        CHECK_CLOSE(values[11], -7.25, 0);
+        CHECK_CLOSE(values[12], -1.25, 0);
+        CHECK_CLOSE(values[13], 17, 0);
+        /* Independent expected layout, including a maximum int count. */
+        values[REPLICA_MPI_BIN_DOUBLES + 10] = -0.625;
+        values[REPLICA_MPI_BIN_DOUBLES + 11] = -3.5;
+        values[REPLICA_MPI_BIN_DOUBLES + 12] = -13.5;
+        values[REPLICA_MPI_BIN_DOUBLES + 13] = INT_MAX;
         ReplicaBin out[2];
         memset(out, 0, sizeof out);
         replica_mpi_unpack_bins(values, counts, 2, out);
         CHECK(out[0].global_accepted == 4ULL);
         CHECK(out[0].global_attempts == 16ULL);
         CHECK(out[1].global_attempts == 0ULL);
-        CHECK(REPLICA_MPI_BIN_DOUBLES == 10);
+        CHECK_CLOSE(out[0].sum_D_cond, 0.375, 0);
+        CHECK_CLOSE(out[0].sum_K_cond, -7.25, 0);
+        CHECK_CLOSE(out[0].sum_Ehub_cond, -1.25, 0);
+        CHECK(out[0].conditional_count == 17);
+        CHECK_CLOSE(out[1].sum_D_cond, -0.625, 0);
+        CHECK_CLOSE(out[1].sum_K_cond, -3.5, 0);
+        CHECK_CLOSE(out[1].sum_Ehub_cond, -13.5, 0);
+        CHECK(out[1].conditional_count == INT_MAX);
+        CHECK(REPLICA_MPI_BIN_DOUBLES == 14);
         replica_result_free(&rr);
     }
     {
@@ -208,6 +230,28 @@ int main(void)
         memset(b4, 0, sizeof b4);
         CHECK(isnan(replica_bins_global_acceptance(b4, 4, &att)));
         CHECK(att == 0ULL);
+    }
+    {
+        ReplicaResult rr[2];
+        CHECK(replica_result_alloc(&rr[0], 1) == 0);
+        CHECK(replica_result_alloc(&rr[1], 1) == 0);
+        CHECK(replica_result_enable_site_diag(&rr[0]) == 0);
+        rr[0].site_diag->attempts[0][3] = 7ULL;
+        rr[0].site_diag->accepted[1][49] = 2ULL;
+        double values[2 * REPLICA_MPI_SITE_DIAG_DOUBLES];
+        CHECK(replica_mpi_pack_site_diag(rr, 2, values) == 0);
+        GlobalSiteDiag out[2];
+        CHECK(replica_mpi_unpack_site_diag(values, 2, out) == 0);
+        CHECK(out[0].attempts[0][3] == 7ULL);
+        CHECK(out[0].accepted[1][49] == 2ULL);
+        CHECK(out[1].attempts[0][3] == 0ULL);   /* replica without a histogram packs zeros */
+        /* an empty rank is a normal case, not an error */
+        CHECK(replica_mpi_pack_site_diag(NULL, 0, NULL) == 0);
+        CHECK(replica_mpi_unpack_site_diag(NULL, 0, NULL) == 0);
+        CHECK(replica_mpi_pack_site_diag(NULL, 1, values) == 1);
+        CHECK(replica_mpi_pack_site_diag(rr, -1, values) == 1);
+        replica_result_free(&rr[0]);
+        replica_result_free(&rr[1]);
     }
     TEST_END();
 }

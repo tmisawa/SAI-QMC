@@ -1,6 +1,6 @@
 ---
-date: 2026-09-23
-datetime: 2026-09-23 16:17 JST
+date: 2026-09-30
+datetime: 2026-09-30 13:30 JST
 model: OpenAI GPT-6 (Codex)
 summary: |
   SAI-QMC 0.1の日本語利用案内。英語READMEに対応する。
@@ -159,6 +159,16 @@ spin_consistency_file=spin_consistency.dat
 スカラー観測量は自動保存されます。従来のリダイレクトによる保存には
 `output_file=none`を使用できます。
 
+## 条件付き局所測定
+
+`conditional_measure=1`で、各局所更新時にHS変数の±を重み付き平均したDと、
+同じ時点のK・Dから作るEを追加測定する。既定値は`0`。
+`replica_bin_file`が必須で、従来の測定列を保持したまま比較用の4列を追加する。
+PTでは測定値を温度slotに蓄積する。
+式・出力規約・独立replicaでの解析方法と適用範囲は
+[条件付き測定の説明](docs/conditional-measurements.md)を参照。
+測定方式の改善と平衡化の確認は別に評価する。
+
 ## 並列実行
 
 レプリカは独立なモンテカルロ系列で、乱数種は決定的な規則で割り当てます。
@@ -187,13 +197,17 @@ Cコンパイラと互換性のあるものを選んでください。
 低温・大`U`では、局所flipだけの更新でreplicaが全`S^z`の非零sectorに似た
 長寿命状態に留まることがあります。opt-inのsite world-line更新は、1つのsiteの
 Hubbard–Stratonovich場を全time sliceで一括反転する提案に対し、安定化した
-行列式の比でMetropolis判定します。各passは全siteを固定順に試行し、Green関数を再構築します。
+行列式の比でMetropolis判定します。既定の`global_site_select=fixed`では、
+各passは全siteを固定順に試行し、Green関数を再構築します。
 
 | key | 値 | 既定 | 意味 |
 | --- | --- | --- | --- |
 | `global_update` | `none` / `site` | `none` | `site`でsite world-line大域更新を行う |
 | `global_interval` | 正の整数 | 100 | 何sweepごとに大域passを1回行うか。warmupから通算する |
 | `replica_bin_file` | path | 空 | replica・binごとのsign付き和を書くTSV。大域更新と独立に有効化できる |
+| `global_site_diag_file` | path | 空 | site flipの試行数・受理数をpolarization別に集計するhistogramを書く。`global_update=site`が必要 |
+| `global_site_select` | `fixed` / `polarized` | `fixed` | flipを試すsiteの選び方。`polarized`は重み`(p_i/p_0)^alpha + 1/n`で抽選する |
+| `global_site_power` | 実数`>= 0` | 2 | polarized重みの指数`alpha`。`fixed`でも値を検証する |
 
 ```text
 global_update=site
@@ -219,11 +233,180 @@ passのコストはsite数・time slice数・stabilization block数とともに�
 binの出力先が有効な他の出力先と同じ場合はファイルを書く前に拒否し、数値エラーがあった`beta`の行は出さず、
 完了済み`beta`の行は保持します。open・write・closeの失敗は非0終了です。
 
+`global_site_diag_file`は、`beta`とreplicaごとに、siteのworld-line flipの
+試行数と受理数を、2つのsiteごとの指標に対して記録します。1つ目は
+`p = |m_i|/L`で、siteのHS world lineのpolarizationです（`m_i`はそのsite
+の全time sliceにわたる場の和です。atomic limitで物理スピンを固定したsite
+では、符号付き`m_i/L`の平均は`±tanh(lambda)`になりますが、これはheaderに
+書くscaleであり、有限`L`での`p`の期待値ではありません）。2つ目は
+`d = -eps_i m_i sign(M)/L`で、majorityのstaggered patternからのmismatchです
+（`eps_i`はsublatticeの符号、`M = sum_j eps_j m_j`、`M = 0`では
+`sign(M) = +1`とします）。各指標は50 binで、`p`の幅は`[0,1]`で0.02、
+`d`の幅は`[-1,1]`で0.04です。数えるのは測定sweepだけで、`beta`とreplicaごとに
+100行のTSVを書きます。このdiagnosticは乱数列や他の出力を変更しません。
+キーを省略した場合（`global_update=site`だけを指定した場合も含む）はdiagnosticを
+収集しません。以下で説明するweighted site selectionの設計に使われます。
+
+`global_site_select=polarized`は、site flipの固定順序を重み付き抽選に置き換えます。
+各passの先頭で全siteのpolarization `p_i = |m_i|/L`を1回計算し、`n`回の各試行で
+反転するsiteを`w_i = (p_i/p_0)^alpha + 1/n`に比例する確率で選びます。`p_0 = tanh(lambda)`は
+atomic limitのscale（`U = 0`では`p_0 = 1`）、`alpha = global_site_power`です。
+siteを反転しても他のsiteの`|m_j|`もそのsiteの`|m_i|`も変わらないため、重みは提案の前後で同じであり、
+受理はHastings補正のないMetropolis比です。各試行で乱数を2回（site、次に受理判定）使うので、
+同じseedでも`polarized`の乱数列と結果は`fixed`と異なります。`fixed`の実行は、これらのkeyの有無に
+かかわらず変わりません。同じpassで同じsiteを複数回選ぶことがあります。`1/n`により全siteが提案され得て、
+`alpha = 0`では一様ランダムなsite選択になります。選択方式が`fixed`でないときだけ、stdoutのheaderに
+` global_site_select=<value> global_site_power=<alpha>`が付き、diagnosticのheaderにも選択方式が入ります。
+重みが使えない場合（非有限、累積和の増分消失、相対重みが保守的な下限`2^-52`未満、または
+積の丸めを含めた53-bit乱数の到達点がないsite区間）は数値エラーとしてreplicaを終了します。
+相対重みの下限だけでは選択可能性を保証できないので、全区間の到達可能性も乱数消費前に検査します。
+staggered mismatch `d`による選択は実装していません。Stage Aの診断がこの指標を不支持としたためで、
+`global_site_select=staggered`は入力エラーです。L4・U8・β16/24でのα=2の比較では受理数が増えましたが、
+事前に定めた混合改善基準は満たしませんでした。[VALIDATION.md §9](VALIDATION.md#9-stage-b-polarized-selection-versus-fixed-order2026-09-26)を参照してください。
+
 4×2 cluster・`U/t=8`での検証は[VALIDATION.md](VALIDATION.md)と
 [docs/validation/global-hs-4x2-2026-09-21.json](docs/validation/global-hs-4x2-2026-09-21.json)に記録しています。
 site反転の受理率は低温で急速に下がるため、任意のサイズ・温度で混合を保証するものではありません。
 
+## Δτラダー並列テンパリング
+
+局所flipだけの更新（前節の大域site更新を含む）でも緩和が遅い計算には、
+並列テンパリング（PT）が使えます。PTは`beta_list`の各値に対応する`nbeta`個の
+slotからなるladderを1本走らせ、全slotで共通の時間slice数を共有するため、
+各slotは自分の時間刻み`dtau_k = beta_k / tempering_ltr`を持ちます。
+一定間隔で、隣接する2 slotのHubbard–Stratonovich配置を交換する提案を行います。
+
+| key | 値 | 既定 | 意味 |
+| --- | --- | --- | --- |
+| `tempering` | `none` / `dtau_ladder` | `none` | `dtau_ladder`でΔτラダー並列テンパリングを有効化する |
+| `tempering_ltr` | 非負整数 | `0` | 全slotが共有する時間slice数。`tempering=dtau_ladder`では`> 0`が必須（`dtau_k = beta_k / tempering_ltr`）。`tempering=none`では`0`のままにする |
+| `tempering_interval` | 正の整数 | `1` | 交換roundを行うsweep間隔（warmup中も含む）。slotがちょうど2個のときは試行するpairがあるroundが2回に1回なので、そのpairの試行は`2*tempering_interval` sweepに1回になる。`tempering=none`でも検証されるが効果はない |
+| `tempering_file` | path | 空 | 交換統計を書くTSV（任意）。`tempering=dtau_ladder`でのみ使用可。空のままでもPTは実行できる |
+| `field_init` | `random` / `uniform` | `random` | 初期Hubbard–Stratonovich場の族。PTの有無にかかわらず使える |
+
+```text
+tempering=dtau_ladder
+tempering_ltr=200
+tempering_interval=1
+beta_list=4,5,6.666666666666667,10
+tempering_file=pt.tsv
+```
+
+`tempering=dtau_ladder`では`dtau`を指定できません（各slot自身の
+`dtau_k = beta_k / tempering_ltr`が代わりに使われます）。`beta_list`は
+2個以上の値を昇順（strictly increasing）で指定する必要があり、
+`stab_drift_file`・`udv_scale_file`・`udv_centered_file`・
+`global_site_diag_file`・`profile=1`は拒否されます。全slotがすでに
+sign-freeでparticle-hole対称な模型（半充填・二部格子）である必要があります。
+`global_update=site`はPTと併用できます。
+
+隣接するslot `a`、`b`の交換提案では、両slotそれぞれの配置と相手の配置を
+比較します。`log W_k(C) = 2 log|det(1+B^k_up(C))| - lambda_k * sum(s)`
+（`lambda_k = acosh(exp(dtau_k * U / 2))`）を用い、
+`log R = log W_a(C_b) + log W_b(C_a) - log W_a(C_a) - log W_b(C_b)`に対して
+`min(1, exp(log R))`の確率で受理します。専用の交換用乱数streamから、
+1回の試行につき必ず1つの乱数を引きます（`log R >= 0`でも引きます）。
+試行する隣接pairは交換roundごとに`(0,1),(2,3),...`と`(1,2),(3,4),...`を
+交互に切り替え、warmup中も交換を行います。slotがちょうど2個の場合、
+`(1,2),...`側のroundには試行するpairがないため、唯一のpair `(0,1)`は
+2 roundに1回、すなわち`2*tempering_interval` sweepに1回だけ試行されます。
+
+`log R`が非有限になった場合、weight評価が失敗した場合、受理後の配置再構築が
+失敗した場合は、棄却としてではなく、そのladderの数値的失敗
+（`tempering exchange failed`）として終了します。slot自身のsweepまたは
+大域更新で数値破綻が起きた場合もladderは終了しますが、交換失敗としてではなく、
+そのslotの`dqmc warmup numerical breakdown`または
+`dqmc measurement numerical breakdown`行（`slot=`と`ladder=`を含む）として
+報告されます。slotが破綻した後は交換roundを試行しません。
+
+1本のladderが失敗すると、run全体が失敗します。他のladderは最後まで実行され、
+その後プロセスは（MPIでは全rankで）非zeroで終了し、stderrに失敗した各ladderを
+`tempering ladder r failed`として示します。どのladderの観測量も書かれません。
+スカラー出力（標準出力または`output_file`）はheader行だけで、温度ごとの行も
+最後の`solver_elapsed_seconds`行もありません。`replica_bin_file`は空のままで、
+`szz_file`・`sperp_file`・`spin_consistency_file`・`replica_log`はheaderだけです。
+完全に書かれるのは（指定した場合の）`tempering_file`だけで、失敗したladderの
+`ladder`行は`failed=1`になります。
+
+slot `k`（ladder `r`）自身のMonte Carlo chainは、通常のreplicaと同じ規則で
+`replica_seed(seed, k, r)`をseedとします。専用の交換用乱数streamはその代わりに
+`replica_seed(seed, nbeta, r)`を使います（`nbeta`はどのslotの番号としても
+使われません）。`tempering_file`の`ladder`行は、この値を`swap_seed`として
+記録します。
+
+各ladderのslotと交換は、そのladderの実行中を通じて1つのMPI rank・1つの
+OpenMP threadの中で逐次実行され、ladder自体は通常のreplicaと同じ規則で
+rank・threadに分配されます。同じseedなら`serial`・`omp`・`mpi`・`hybrid`の
+結果は一致します。slot `k`の観測量は、通常のreplicaの出力と同じ場所に
+`beta_index=k`、`replica_id`をladder idとして書かれます。統計単位は
+slotではなくladderです。PTはTrotter誤差を変えません。各slotは自分の
+`dtau_k`を保持し、配置を交換しても統計誤差と時間刻み誤差は混ざりません。
+
+PT時は、標準出力の先頭行と`szz_file`・`sperp_file`・
+`spin_consistency_file`のheaderで、数値の代わりに`dtau=ladder`と表示します。
+標準出力の先頭行には`tempering=dtau_ladder tempering_ltr=... tempering_interval=...`
+（`tempering_file`を指定した場合は`tempering_file=...`も）が追加されます。
+`replica_bin_file`には`# tempering=dtau_ladder tempering_ltr=...`という
+header行が1行追加されます。通常の単一`dtau=`欄は使われないため、各行自身の
+`Ltr`と`beta_effective`列から`dtau_k = beta_effective / Ltr`を求めます。
+標準出力の最後の行は`# tempering solver_elapsed_seconds=... nranks=...`で、
+プロセス開始から出力を閉じる直前までのsolver自身のwall時間です
+（schedulerのjob時間や、ladder間の総和ではありません）。
+
+`tempering_file`は自己記述的なTSVで（`# tempering=...`header、slotごとの
+`# slot=k beta=... dtau=... lambda=...`行、`# columns:`の列定義を含む）、
+5種類の行を持ちます。
+
+| kind | 意味 |
+| --- | --- |
+| `pair` | binごとの、隣接pairの交換試行数・受理数（`bin=-1`はwarmup全体の合計） |
+| `slot` | binごと・slotごとに、そのslotをbin終了時に占めているwalkerと、そのbinの各sample時点でslotの占有walkerが最後に訪れた端がhot（slot 0）・cold（最終slot）のどちらだったかを積算した回数 |
+| `walker` | walkerごとに、測定区間内で完了したhot→cold→hotの往復回数と、実行終了時に占めていたslot |
+| `ladder` | ladderごとに1行。交換用乱数streamのseedと、そのladderが失敗したかどうか |
+| `cost` | ladderごとの4種類のworker秒（warmup、測定sweep、測定交換、測定observable計算） |
+
+`cost`行は1つのladder自身のworker時間であり、jobのwall時間やnode-hourでは
+ありません。複数のladderを同時に走らせている場合、`cost`行を単純に足し合わせて
+実際のwall時間を推定してはいけません。往復は、測定区間の内部で完全に
+hot slot→最も冷たいslot→hot slotの順に完了した場合だけを数えます。
+
+`field_init=uniform`は、通常の各site乱数draw（実行され、その後捨てられるため
+乱数streamは`field_init=random`と同一のまま）の後に、全Hubbard–Stratonovich場を
+`+1`に上書きします。PTの有無にかかわらず使え、初期配置だけを変えます。
+
+全`+1`の場は、数値的なスケールが最大の配置でもあります。この場では、
+上向きスピンの積`B_{L-1}...B_0`の最大スケールがおよそ
+`exp(Ltr*lambda + beta*w)`になります（`lambda = acosh(exp(dtau*U/2))`、
+`w`はホッピング行列の最大固有値で、周期境界の正方格子では`4|t|`、
+周期境界のchainでは`2|t|`）。
+この指数が倍精度の上限`ln(DBL_MAX) ≈ 709.78`をO(1)程度超えると（下の4x4の例では
+710.8では開始でき、711.2以上で失敗）、sweepを1回も行わないうちに初期化で失敗します。
+stderrには`udv_lmul_work non-finite matrix at stage=qr_raw`に続いて
+`dqmc_init failed`が出て、非zeroで終了します。例として、周期境界の4x4正方格子、
+`U=8`、`dtau=0.0125`では、`beta=24`（`Ltr=1920`）の指数は708.2で上限より
+約1.6 e-fold小さく、正常に開始します。同じ`dtau`の`beta=24.5`・`25`・`26`は
+初期化で失敗します。PTでは最も低温のslot（`beta_k`と`dtau_k`が最大）が
+この上限を決めます。入力をこの上限と事前に照合する検査はなく、失敗は即座に
+明示的に起こります。`field_init=random`はこのスケールより十分小さい配置から
+始まります。
+
+PT実装の検証（cross-weight検査、厳密列挙samplingテスト、本番用の選択肢の組を
+使った統合ladder driverの厳密列挙回帰、PT前baselineとのbyte同一性、
+`serial`/`omp`/`mpi`/`hybrid`の一致、失敗経路と失敗メッセージのテスト、
+独立chainと厳密対角化に対する有限サイズ正当性検証）は
+[VALIDATION.md](VALIDATION.md)に記録しています。
+PTは1つのladderのslotを複数のMPI rankへ分配せず、
+`beta_list`の温度配置を交換受理率などから自動最適化する機能もなく、
+上記の診断fileやprofilerにも対応していません。本計算を行う前に
+[既知の制約](docs/limitations.md)を確認してください。
+
 ## 検証と制約
+
+CLIテストと条件付きbin解析にはPython 3.10以降が必要です。
+任意実行の独立Fock空間参照generatorはNumPyとSciPyも使います。
+`python3`が古いinterpreterを指す場合は、たとえば
+`make PYTHON=python3.12 test`のように明示してください。条件付きCLI testが
+起動する解析subprocessにも同じinterpreterを使います。
 
 ```sh
 make test

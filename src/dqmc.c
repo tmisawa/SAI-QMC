@@ -34,6 +34,59 @@ static void dqmc_invalidate_carried(Dqmc *D)
     D->carried_suffix_valid = 0;
 }
 
+int dqmc_enable_conditional_measure(Dqmc *D, int enabled)
+{
+    if (D == NULL || (enabled != 0 && enabled != 1)) {
+        return 1;
+    }
+    if (enabled) {
+        if (D->status || !D->use_ph || !D->m->half_filling ||
+            !D->m->ph_symmetric || !isfinite(D->m->U) || D->m->U < 0.0 ||
+            !isfinite(D->m->dtau) || D->m->dtau <= 0.0) {
+            return 1;
+        }
+        for (int i = 0; i < D->n; i++) {
+            if (D->m->K[i + i * D->n] + D->m->mu != 0.0) {
+                return 1;
+            }
+            for (int j = 0; j < D->n; j++) {
+                if (i != j && D->m->K[i + j * D->n] != 0.0 &&
+                    D->m->bipart[i] * D->m->bipart[j] != -1) {
+                    return 1;
+                }
+            }
+        }
+    }
+    memset(&D->conditional, 0, sizeof D->conditional);
+    D->conditional.enabled = enabled;
+    if (enabled) {
+        const double x = D->m->dtau * D->m->U / 2.0;
+        D->conditional.lower_D = x > 0.0 ? -0.5 / expm1(x) : -INFINITY;
+        D->conditional.upper_D = 0.5 / (exp(x) + 1.0);
+    }
+    return 0;
+}
+
+static int dqmc_conditional_record(Dqmc *D, int site, double Ru, double Rd)
+{
+    double d, k;
+    ConditionalMeasure *c = &D->conditional;
+    if (conditional_measure_local(D->m, &D->Gu, site, Ru, Rd, &d, &k) ||
+        D->sign != 1.0) {
+        return 1;
+    }
+    const double tol = 1e-7;
+    if (d > c->upper_D + tol * (1.0 + fabs(c->upper_D)) ||
+        d < c->lower_D - tol * (1.0 + fabs(c->lower_D)) ||
+        !isfinite(c->sum_D + d) || !isfinite(c->sum_K + k)) {
+        return 1;
+    }
+    c->sum_D += d;
+    c->sum_K += k;
+    c->count++;
+    return 0;
+}
+
 static void dqmc_udv_lmul(Dqmc *D, UDV *s, const double *B, LinalgWork *w)
 {
     if (D->green_rebuild_mode == GREEN_REBUILD_CENTERED) {
@@ -498,8 +551,80 @@ void dqmc_init(Dqmc *D, Model *m, Field *f, Rng *rng, int stab_interval,
                          DQMC_SWEEP_FORWARD);
 }
 
+int dqmc_enable_global_site_diag(Dqmc *D, int enabled)
+{
+    if (D == NULL) {
+        return 1;
+    }
+    if (!enabled) {
+        free(D->site_diag);
+        free(D->site_diag_sums);
+        free(D->site_diag_p);
+        free(D->site_diag_d);
+        D->site_diag = NULL;
+        D->site_diag_sums = NULL;
+        D->site_diag_p = NULL;
+        D->site_diag_d = NULL;
+        return 0;
+    }
+    if (D->site_diag != NULL) {
+        return 0;
+    }
+    D->site_diag = calloc(1, sizeof(GlobalSiteDiag));
+    D->site_diag_sums = malloc((size_t)D->n * sizeof(int));
+    D->site_diag_p = malloc((size_t)D->n * sizeof(double));
+    D->site_diag_d = malloc((size_t)D->n * sizeof(double));
+    if (D->site_diag == NULL || D->site_diag_sums == NULL ||
+        D->site_diag_p == NULL || D->site_diag_d == NULL) {
+        (void)dqmc_enable_global_site_diag(D, 0);
+        return 1;
+    }
+    return 0;
+}
+
+int dqmc_set_global_site_select(Dqmc *D, int polarized, double alpha)
+{
+    if (D == NULL) {
+        return 1;
+    }
+    free(D->site_select_sums);
+    free(D->site_select_p);
+    free(D->site_select_d);
+    free(D->site_select_w);
+    free(D->site_select_cum);
+    D->site_select_sums = NULL;
+    D->site_select_p = NULL;
+    D->site_select_d = NULL;
+    D->site_select_w = NULL;
+    D->site_select_cum = NULL;
+    D->site_select_polarized = 0;
+    D->site_select_power = 0.0;
+    if (!polarized) {
+        return 0;
+    }
+    if (!isfinite(alpha) || alpha < 0.0) {
+        return 1;
+    }
+    D->site_select_sums = malloc((size_t)D->n * sizeof(int));
+    D->site_select_p = malloc((size_t)D->n * sizeof(double));
+    D->site_select_d = malloc((size_t)D->n * sizeof(double));
+    D->site_select_w = malloc((size_t)D->n * sizeof(double));
+    D->site_select_cum = malloc((size_t)D->n * sizeof(double));
+    if (D->site_select_sums == NULL || D->site_select_p == NULL ||
+        D->site_select_d == NULL || D->site_select_w == NULL ||
+        D->site_select_cum == NULL) {
+        (void)dqmc_set_global_site_select(D, 0, 0.0);
+        return 1;
+    }
+    D->site_select_polarized = 1;
+    D->site_select_power = alpha;
+    return 0;
+}
+
 void dqmc_free(Dqmc *D)
 {
+    (void)dqmc_enable_global_site_diag(D, 0);
+    (void)dqmc_set_global_site_select(D, 0, 0.0);
     if (D->stab_drift.allocated) {
         if (!D->use_ph) {
             green_free(&D->stab_drift.Gd_ref);
@@ -666,6 +791,15 @@ static void dqmc_sweep_forward(Dqmc *D, int carry_prefix)
                                         : green_delay_ratio_N(&D->Gd, i, Nd);
             const double R = Ru * Rd;
 
+            if (D->conditional.enabled && dqmc_conditional_record(D, i, Ru, Rd)) {
+                fprintf(stderr, "ERROR: invalid conditional local measurement "
+                        "(sweep=%llu slice=%d site=%d)\n",
+                        D->sweep_count + 1ULL, l, i);
+                D->status = 1;
+                dqmc_invalidate_carried(D);
+                PROF_END(D->prof, PROF_DQMC_SWEEP, t_sweep);
+                return;
+            }
             D->accept_attempts++;
             if (rng_double(D->rng) < fabs(R)) {
                 D->accept_accepted++;
@@ -887,6 +1021,15 @@ static void dqmc_sweep_backward(Dqmc *D)
             const double Rd = green_ph_down_ratio_N(&D->Gu, i, Nd);
             const double R = Ru * Rd;
 
+            if (D->conditional.enabled && dqmc_conditional_record(D, i, Ru, Rd)) {
+                fprintf(stderr, "ERROR: invalid conditional local measurement "
+                        "(sweep=%llu slice=%d site=%d)\n",
+                        D->sweep_count + 1ULL, l, i);
+                D->status = 1;
+                dqmc_invalidate_carried(D);
+                PROF_END(D->prof, PROF_DQMC_SWEEP, t_sweep);
+                return;
+            }
             D->accept_attempts++;
             if (rng_double(D->rng) < fabs(R)) {
                 D->accept_accepted++;
@@ -953,6 +1096,11 @@ static void dqmc_sweep_backward(Dqmc *D)
 
 void dqmc_sweep(Dqmc *D)
 {
+    if (D->conditional.enabled) {
+        D->conditional.count = 0;
+        D->conditional.sum_D = 0.0;
+        D->conditional.sum_K = 0.0;
+    }
     if (D->sweep_mode != DQMC_SWEEP_ALTERNATING) {
         dqmc_sweep_forward(D, 0);
         return;
@@ -1035,6 +1183,24 @@ int dqmc_global_site_step(Dqmc *D, int i, double u, double *logw, int *sign,
     return 0;
 }
 
+/* Rebuilds Gu/Gd/sign at l=0 from the current field (end of a global move). */
+static int dqmc_rebuild_at_zero(Dqmc *D)
+{
+    const int rcu = green_from_scratch(&D->Gu, 0);
+    const int rcd = D->use_ph ? 0 : green_from_scratch(&D->Gd, 0);
+    if (rcu != 0 || rcd != 0 || D->Gu.det_sign == 0 ||
+        (!D->use_ph && D->Gd.det_sign == 0)) {
+        return 1;
+    }
+    if (D->use_ph) {
+        dqmc_map_ph_down(D);
+        D->sign = 1.0;
+    } else {
+        D->sign = (double)(D->Gu.det_sign * D->Gd.det_sign);
+    }
+    return 0;
+}
+
 int dqmc_global_site_pass(Dqmc *D)
 {
     if (D == NULL || D->status) {
@@ -1044,28 +1210,87 @@ int dqmc_global_site_pass(Dqmc *D)
     double logw = 0.0;
     int sgn = 0;
     int rc = dqmc_log_weight(D, &logw, &sgn);
-    for (int i = 0; rc == 0 && i < D->n; i++) {
-        const double u = rng_double(D->rng); /* always one draw per site */
+    if (rc == 0 && D->site_select_polarized) {
+        /* spec 3.1: the p-weights are invariant under any world-line flip, so the
+           cumulative sums of this pass are computed once, before the first draw. */
+        field_site_sums(D->f, D->site_select_sums);
+        rc = global_site_indicators(D->site_select_sums, D->m->bipart, D->n, D->L,
+                                    D->site_select_p, D->site_select_d);
+        if (rc == 0) {
+            rc = global_site_weights_p(D->site_select_p, D->n,
+                                       global_site_weight_scale(D->f->lambda),
+                                       D->site_select_power, D->site_select_w,
+                                       D->site_select_cum);
+            if (rc != 0) {
+                /* the replica reports a generic numerical breakdown; name the cause */
+                fprintf(stderr,
+                        "ERROR: polarized site weights are not usable "
+                        "(non-finite, lost increment, relative weight below 2^-52, "
+                        "or unreachable RNG interval; "
+                        "global_site_power=%g)\n",
+                        D->site_select_power);
+            }
+        }
+    }
+    for (int k = 0; rc == 0 && k < D->n; k++) {
+        int i = k;
+        if (D->site_select_polarized) {
+            const double us = rng_double(D->rng);       /* draw 1: the site */
+            i = global_site_select_index(D->site_select_cum, D->n, us);
+            if (i < 0) {
+                rc = 1;
+                break;
+            }
+        }
+        double pi = 0.0, di = 0.0;
+        if (D->site_diag != NULL) {
+            field_site_sums(D->f, D->site_diag_sums);
+            (void)global_site_indicators(D->site_diag_sums, D->m->bipart, D->n,
+                                         D->L, D->site_diag_p, D->site_diag_d);
+            pi = D->site_diag_p[i];
+            di = D->site_diag_d[i];
+        }
+        const double u = rng_double(D->rng); /* fixed: the only draw per site; polarized: draw 2 */
         int accepted = 0;
         rc = dqmc_global_site_step(D, i, u, &logw, &sgn, &accepted);
+        if (rc == 0 && D->site_diag != NULL) {
+            global_site_diag_add(D->site_diag, pi, di, accepted);
+        }
     }
     if (rc == 0) {
-        const int rcu = green_from_scratch(&D->Gu, 0);
-        const int rcd = D->use_ph ? 0 : green_from_scratch(&D->Gd, 0);
-        if (rcu != 0 || rcd != 0 || D->Gu.det_sign == 0 ||
-            (!D->use_ph && D->Gd.det_sign == 0)) {
-            rc = 1;
-        } else if (D->use_ph) {
-            dqmc_map_ph_down(D);
-            D->sign = 1.0;
-        } else {
-            D->sign = (double)(D->Gu.det_sign * D->Gd.det_sign);
-        }
+        rc = dqmc_rebuild_at_zero(D);
     }
     dqmc_invalidate_carried(D);
     if (rc != 0) {
         D->status = 1;
     }
     PROF_END(D->prof, PROF_DQMC_GLOBAL, t_global);
+    return rc;
+}
+
+int dqmc_log_weight_of(Dqmc *D, const signed char *s, double *logw, int *sign)
+{
+    if (D == NULL || D->f == NULL || s == NULL || logw == NULL || sign == NULL) {
+        return 1;
+    }
+    signed char *own = D->f->s;
+    /* green_logdet_full only reads the field; the pointer is restored below */
+    D->f->s = (signed char *)s;
+    const int rc = dqmc_log_weight(D, logw, sign);
+    D->f->s = own;
+    return rc;
+}
+
+int dqmc_replace_field(Dqmc *D, const signed char *s)
+{
+    if (D == NULL || D->f == NULL || s == NULL || D->status) {
+        return 1;
+    }
+    memcpy(D->f->s, s, (size_t)D->L * (size_t)D->n);
+    const int rc = dqmc_rebuild_at_zero(D);
+    dqmc_invalidate_carried(D);
+    if (rc != 0) {
+        D->status = 1;
+    }
     return rc;
 }

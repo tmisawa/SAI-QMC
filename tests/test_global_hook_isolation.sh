@@ -23,6 +23,7 @@ seed=81
 global_update=site
 global_interval=1
 replica_bin_file=bins.tsv
+global_site_diag_file=site_diag.tsv
 INPUT
 run() {
   case "$mode" in
@@ -32,10 +33,11 @@ run() {
 }
 (cd "$tmp" && OMP_NUM_THREADS=2 run > reference.out)
 cp "$tmp/bins.tsv" "$tmp/reference.bins"
-for hook in AFQMC_TEST_GLOBAL_FAIL_AT AFQMC_TEST_GLOBAL_FAIL_BETA AFQMC_TEST_BIN_WRITE_FAIL AFQMC_TEST_BIN_CLOSE_FAIL; do
+cp "$tmp/site_diag.tsv" "$tmp/reference.site_diag"
+for hook in AFQMC_TEST_GLOBAL_FAIL_AT AFQMC_TEST_GLOBAL_FAIL_BETA AFQMC_TEST_BIN_WRITE_FAIL AFQMC_TEST_BIN_CLOSE_FAIL AFQMC_TEST_DIAG_WRITE_FAIL AFQMC_TEST_DIAG_CLOSE_FAIL; do
   (
     cd "$tmp"
-    unset AFQMC_TEST_GLOBAL_FAIL_AT AFQMC_TEST_GLOBAL_FAIL_BETA AFQMC_TEST_BIN_WRITE_FAIL AFQMC_TEST_BIN_CLOSE_FAIL
+    unset AFQMC_TEST_GLOBAL_FAIL_AT AFQMC_TEST_GLOBAL_FAIL_BETA AFQMC_TEST_BIN_WRITE_FAIL AFQMC_TEST_BIN_CLOSE_FAIL AFQMC_TEST_DIAG_WRITE_FAIL AFQMC_TEST_DIAG_CLOSE_FAIL
     export OMP_NUM_THREADS=2
     case "$hook" in
       AFQMC_TEST_GLOBAL_FAIL_AT) export AFQMC_TEST_GLOBAL_FAIL_AT=2 ;;
@@ -46,5 +48,6 @@ for hook in AFQMC_TEST_GLOBAL_FAIL_AT AFQMC_TEST_GLOBAL_FAIL_BETA AFQMC_TEST_BIN
   )
   cmp "$tmp/reference.out" "$tmp/actual.out"
   cmp "$tmp/reference.bins" "$tmp/bins.tsv"
+  cmp "$tmp/reference.site_diag" "$tmp/site_diag.tsv"
 done
 printf 'OK production hook isolation (%s)\n' "$mode"
