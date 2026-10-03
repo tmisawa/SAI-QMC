@@ -1,8 +1,9 @@
 ---
 date: 2026-10-03
-datetime: 2026-10-03 08:43 JST
+datetime: 2026-10-03 11:56 JST
 model: OpenAI GPT-6 (Codex); OpenAI GPT-5.6 Luna (Codex; 2026-10-02 directional boundaries); OpenAI GPT-6 (Codex; 2026-10-03 metadata update)
 summary: |
+  Adds guidance for the four pull-request CI configurations.
   Covers directional periodic, antiperiodic and open boundaries with spin momentum selectors.
   User guide for SAI-QMC 0.1, a finite-temperature determinant QMC code.
   Describes input syntax, output columns, build commands, validation, and development records.
@@ -462,6 +463,10 @@ as appropriate for a different MPI implementation.
 Tests cover Green-function updates and stabilization, independent noninteracting
 references, spin sum rules, particle-hole symmetry, output compatibility,
 replica aggregation, and parallel consistency. Slow tests are separate.
+
+The [pull-request CI](docs/ci.md) uses four Linux/macOS configurations,
+covering GCC/Clang, OpenMP/MPI/hybrid execution and frozen-data reanalysis.
+The final required-check candidate is `ci-gate`; no scheduled runs are configured.
 
 Read [known limitations](docs/limitations.md) before production use. In particular:
 

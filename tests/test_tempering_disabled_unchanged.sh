@@ -1,18 +1,21 @@
 #!/bin/sh
-# tempering=none runs must stay byte-identical to 3215eee built with the same toolchain.
+# tempering=none runs must stay byte-identical to cb077b2 built with the same toolchain.
 set -eu
 root="$(cd "$(dirname "$0")/.." && pwd)"
 fix="$root/tests/fixtures/global_baseline"
-base=3215eee700b9b6359242e228e515cf83a5a53732
+base=cb077b2f4acfec138a9ad275248761ebdac5ab85
 work="$(mktemp -d)"
-trap 'rm -rf "$work"' EXIT
-if ! git -C "$root" cat-file -e "$base^{commit}" 2>/dev/null; then
-  echo "FAIL historical regression requires Git commit $base" >&2
+# shellcheck source=tests/test_cleanup.sh
+. "$root/tests/test_cleanup.sh"
+trap 'test_cleanup "$work"' EXIT
+if ! git -C "$root" merge-base --is-ancestor "$base" HEAD 2>/dev/null; then
+  echo "FAIL historical regression requires ancestor $base; fetch full history" >&2
   exit 1
 fi
 mkdir "$work/base"
 git -C "$root" archive "$base" | tar -xf - -C "$work/base"
-make -C "$work/base" dqmc >/dev/null 2>&1 || { echo "FAIL baseline build"; exit 1; }
+make -C "$work/base" dqmc >"$work/baseline-build.log" 2>&1 || { cat "$work/baseline-build.log"; echo "FAIL baseline build"; exit 1; }
+cat "$work/baseline-build.log"
 fail=0
 run_one() { # binary input extra outdir; success cases must exit 0
   mkdir -p "$4"
@@ -44,8 +47,8 @@ for name in chain square; do
     run_one "$work/base/dqmc" "$fix/$name.in" "$base_extra" "$work/b/$name-$variant"
     run_one "$root/dqmc" "$fix/$name.in" "$extra" "$work/c/$name-$variant"
     # same set of files
-    lb=$(cd "$work/b/$name-$variant" && ls | grep -v '^input.in$' | tr '\n' ' ')
-    lc=$(cd "$work/c/$name-$variant" && ls | grep -v '^input.in$' | tr '\n' ' ')
+    lb=$(cd "$work/b/$name-$variant" && printf '%s\n' * | grep -v '^input.in$' | tr '\n' ' ')
+    lc=$(cd "$work/c/$name-$variant" && printf '%s\n' * | grep -v '^input.in$' | tr '\n' ' ')
     [ "$lb" = "$lc" ] || { echo "FAIL $name-$variant file sets differ: [$lb] vs [$lc]"; fail=1; }
     for f in $lb; do
       if [ "$f" = profile.csv ]; then

@@ -1,8 +1,9 @@
 ---
 date: 2026-10-03
-datetime: 2026-10-03 08:43 JST
+datetime: 2026-10-03 11:56 JST
 model: OpenAI GPT-6 (Codex); OpenAI GPT-5.6 Luna (Codex; 2026-10-02 directional boundaries); OpenAI GPT-6 (Codex; 2026-10-03 metadata update)
 summary: |
+  Adds guidance for the four pull-request CI configurations.
   方向別の周期・反周期・開放境界とspin運動量selectorの対応を含む。
   SAI-QMC 0.1の日本語利用案内。英語READMEに対応する。
   ビルド、入出力、並列実行、検証範囲、開発記録を説明する。
@@ -427,6 +428,10 @@ python3 scripts/verify_reference_data.py
 テストでは、Green関数の更新と安定化、独立な非相互作用の参照値、スピンの総和則、
 粒子・正孔対称性、出力互換性、レプリカの集約、並列実行の整合性を確認します。
 時間のかかるテストは別のターゲットに分けています。
+
+[PRごとのCI](docs/ci.md)はLinux/macOSの4構成で、GCC/Clang、
+OpenMP・MPI・hybrid、保存データの再解析を確認します。
+必須checkの設定候補は`ci-gate`です。定期実行は設定していません。
 
 本計算を行う前に[既知の制約](docs/limitations.md)を確認してください。
 特に次の点に注意が必要です。

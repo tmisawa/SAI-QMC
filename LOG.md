@@ -2,6 +2,90 @@
 
 ---
 date: 2026-10-03
+datetime: 2026-10-03 14:54 JST
+model: OpenAI GPT-6 (Codex)
+summary: |
+  Corrected the tempering compatibility baseline to a commit available in public history.
+  Historical regressions now require their baseline to be an ancestor of the tested revision.
+---
+
+## 2026-10-03: Reproducible historical compatibility tests
+
+The first hosted GCC run passed the serial suite but could not find the
+tempering compatibility baseline. Local checkouts retained the older object,
+so local runs had not exposed its absence from the published history.
+The test now uses `cb077b2`, whose calculation sources, build settings and
+fixtures are identical to the prior baseline; only `LOG.md` differs.
+Historical validation identifiers remain in the original scientific records.
+
+Both legacy scripts now require their baseline commit to be an ancestor of
+the tested revision, so unrelated local objects cannot silently satisfy the
+history requirement. Both compatibility targets pass in a fresh public clone
+that lacks the old object. ShellCheck and shell syntax checks also pass.
+
+---
+date: 2026-10-03
+datetime: 2026-10-03 14:45 JST
+model: OpenAI GPT-6 (Codex)
+summary: |
+  Preserve each failed shell-test invocation in a unique evidence directory.
+  Clarified Linux lint requirements and the scope of dependency-download retries.
+---
+
+## 2026-10-03: CI failure evidence retention
+
+Shell-test cleanup now creates a unique directory for every failed invocation
+and copies its contents, including hidden files, directly into that directory.
+Repeated failures of the same script no longer nest or overwrite prior outputs.
+If archiving fails, cleanup keeps the original outputs, reports their location
+and preserves the test's original exit status even with `set -e` enabled.
+
+The helper regressions now cover three successive failures of the same script
+and an unavailable archive directory. All 13 helper tests pass with Python 3.10
+and 3.12; actionlint, ShellCheck and shell syntax checks also pass. The CI guide
+now states that `ci/lint.sh` requires Linux x86_64 and that its actionlint download
+is the dependency download with explicit retries in the CI scripts.
+
+---
+date: 2026-10-03
+datetime: 2026-10-03 12:01 JST
+model: OpenAI GPT-6 (Codex)
+summary: |
+  Added four pull-request CI configurations and a required-check gate.
+  Covers parallel replica layouts, legacy compatibility and frozen-data reanalysis.
+---
+
+## 2026-10-03: Pull-request continuous integration
+
+The [CI workflow](.github/workflows/ci.yml) defines Linux GCC serial with saved
+validation data, Linux Clang serial, Linux OpenMP/MPI/hybrid, and macOS
+serial/OpenMP jobs. It uses PR events only, bounded build parallelism, single
+BLAS threads, read-only permissions and pinned actions. The final `ci-gate`
+rejects unsuccessful jobs, stale revisions and missing stages or parallel cases.
+
+The new CLI driver compares 44 Linux parallel configurations and 12 macOS
+configurations against serial results, including uneven replica distribution,
+empty ranks and idle threads. It verifies actual rank/team sizes and retains
+per-rank exit status. Existing fixed-rank regressions remain intact. `MPIRUN`
+is consistently one executable path; CI uses an Open MPI wrapper. Build-only
+targets keep compilation parallel and test execution sequential, and serial
+unit tests now reuse common library objects.
+
+Frozen observations and registered scripts are unchanged. CI checks 1,958
+manifest entries and regenerates 22 analysis/report files in independent
+copies, with exact identifiers/verdicts and explicit floating-point tolerances.
+Python 3.10 and 3.12 both reproduce the accepted analysis; their differing
+floating-point output bytes are not treated as changes to the frozen data.
+
+Local validation passed serial, OpenMP, MPI and hybrid suites, both historical
+compatibility targets, the new parallel comparisons, helper negative controls,
+workflow lint and shell lint. These solver runs used Apple Clang/Accelerate;
+Linux GCC/Clang/OpenBLAS and hosted artifact/gate integration await the first
+GitHub Actions run. No additional scientific convergence claim is made.
+See [CI usage and scope](docs/ci.md) for reproduction and required-check setup.
+
+---
+date: 2026-10-03
 datetime: 2026-10-03 11:17 JST
 model: OpenAI GPT-6 (Codex)
 summary: |

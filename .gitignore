@@ -39,3 +39,7 @@ __pycache__/
 
 # local verification and scratch runs
 /.runs/
+
+# CI build products and local results
+/build/ci/
+/ci-results/

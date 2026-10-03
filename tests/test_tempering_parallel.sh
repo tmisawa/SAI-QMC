@@ -4,7 +4,9 @@
 set -eu
 root="$(cd "$(dirname "$0")/.." && pwd)"
 tmp="$(mktemp -d)"
-trap 'rm -rf "$tmp"' EXIT
+# shellcheck source=tests/test_cleanup.sh
+. "$root/tests/test_cleanup.sh"
+trap 'test_cleanup "$tmp"' EXIT
 MPIRUN="${MPIRUN:-mpirun}"
 write_input() { # parallel
   cat > "$tmp/input.in" <<EOT

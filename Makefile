@@ -15,6 +15,7 @@ endif
 
 MPICC ?= mpicc
 MPIRUN ?= mpirun
+export MPIRUN
 MPI_CFLAGS = -DAFQMC_USE_MPI
 
 SRC  = $(wildcard src/*.c)
@@ -66,8 +67,9 @@ dqmc_hybrid: $(HYBRID_OBJ)
 	$(MPICC) $(CFLAGS) $(MPI_CFLAGS) $(OMP_CFLAGS) -o $@ $(HYBRID_OBJ) $(LDLIBS) $(OMP_LDLIBS)
 
 LIBSRC = $(filter-out src/main.c,$(SRC))
-tests/test_%: tests/test_%.c $(LIBSRC) $(HDRS) $(TEST_HDRS)
-	$(CC) $(CFLAGS) -o $@ $< $(LIBSRC) $(LDLIBS)
+LIBOBJ = $(filter-out src/main.o,$(OBJ))
+tests/test_%: tests/test_%.c $(LIBOBJ) $(HDRS) $(TEST_HDRS)
+	$(CC) $(CFLAGS) -o $@ $< $(LIBOBJ) $(LDLIBS)
 
 LIBSRC_OMP = $(filter-out src/main.omp.o,$(OMP_OBJ))
 tests/test_%_omp: tests/test_%.c $(LIBSRC_OMP) $(HDRS) $(TEST_HDRS)
@@ -128,7 +130,7 @@ test_hybrid: $(TESTBIN_HYBRID) test_conditional_parallel test_szz_parallel test_
 	  if [ $$fail -ne 0 ]; then echo "SOME HYBRID TESTS FAILED"; exit 1; fi; echo "ALL HYBRID TESTS PASSED"
 
 clean:
-	rm -f src/*.o src/*.omp.o src/*.mpi.o src/*.hybrid.o dqmc dqmc_omp dqmc_mpi dqmc_hybrid $(TESTBIN) $(SLOW_TESTBIN) $(TESTBIN_OMP) $(TESTBIN_MPI) $(TESTBIN_HYBRID) $(HOOK_OBJ) $(HOOK_OMP_OBJ) $(HOOK_MPI_OBJ) $(HOOK_HYBRID_OBJ) $(HOOK_DIR)/dqmc $(HOOK_DIR)/dqmc_omp $(HOOK_DIR)/dqmc_mpi $(HOOK_DIR)/dqmc_hybrid
+	rm -f src/*.o src/*.omp.o src/*.mpi.o src/*.hybrid.o dqmc dqmc_omp dqmc_mpi dqmc_hybrid $(TESTBIN) $(SLOW_TESTBIN) $(TESTBIN_OMP) $(TESTBIN_MPI) $(TESTBIN_HYBRID) $(HOOK_OBJ) $(HOOK_OMP_OBJ) $(HOOK_MPI_OBJ) $(HOOK_HYBRID_OBJ) $(HOOK_DIR)/dqmc $(HOOK_DIR)/dqmc_omp $(HOOK_DIR)/dqmc_mpi $(HOOK_DIR)/dqmc_hybrid build/ci/probe_omp build/ci/probe_mpi build/ci/probe_hybrid
 
 .PHONY: test test_szz test_sperp test_scalar test_dat test_dat_parallel test_scalar_parallel test_szz_parallel test_sperp_parallel test_slow test_omp test_mpi test_hybrid clean
 
@@ -229,3 +231,21 @@ test_bc_default: dqmc
 	@printf "%-40s " tests/test_bc_default_unchanged.sh; sh tests/test_bc_default_unchanged.sh
 
 .PHONY: test_bc_default
+
+# Build-only targets allow bounded compilation without concurrent test execution.
+test_build: $(TESTBIN) dqmc $(HOOK_DIR)/dqmc
+test_build_omp: $(TESTBIN_OMP) dqmc_omp $(HOOK_DIR)/dqmc_omp
+test_build_mpi: $(TESTBIN_MPI) dqmc_mpi $(HOOK_DIR)/dqmc_mpi
+test_build_hybrid: $(TESTBIN_HYBRID) dqmc_hybrid $(HOOK_DIR)/dqmc_hybrid
+
+build/ci/probe_omp: ci/parallel_probe.c
+	@mkdir -p build/ci
+	$(CC) $(CFLAGS) $(OMP_CFLAGS) -o $@ $< $(OMP_LDLIBS)
+build/ci/probe_mpi: ci/parallel_probe.c
+	@mkdir -p build/ci
+	$(MPICC) $(CFLAGS) $(MPI_CFLAGS) -o $@ $<
+build/ci/probe_hybrid: ci/parallel_probe.c
+	@mkdir -p build/ci
+	$(MPICC) $(CFLAGS) $(MPI_CFLAGS) $(OMP_CFLAGS) -o $@ $< $(OMP_LDLIBS)
+
+.PHONY: test_build test_build_omp test_build_mpi test_build_hybrid
