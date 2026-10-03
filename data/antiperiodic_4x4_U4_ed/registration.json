@@ -1,0 +1,300 @@
+{
+  "created": "2026-10-03T10:40:49+0900",
+  "source_commit": "4384c37c1b9740016bdeea1bdd8f6b48078b051e",
+  "source_tree": "7a626a411ce0c302d6008540928e2961a1da724c",
+  "binary_sha256": "d685f060cc9e1f88547868b5fabeeda0245c284c5a218923d6d6e3d52ed5ce4f",
+  "cases": [
+    {
+      "name": "b4/dt0.1/r00",
+      "beta": 4,
+      "dtau": "0.1",
+      "series": 0,
+      "seed": 4000346385732975098,
+      "input_sha256": "4b3f2289dcc045805f9647f093e20145e6c3205bb06430c992300b42c90af6f8"
+    },
+    {
+      "name": "b4/dt0.1/r01",
+      "beta": 4,
+      "dtau": "0.1",
+      "series": 1,
+      "seed": 18057010855429504598,
+      "input_sha256": "783160dba2d1302f662f062c3699cb4588789af7bacb59806a1292e46b05323c"
+    },
+    {
+      "name": "b4/dt0.1/r02",
+      "beta": 4,
+      "dtau": "0.1",
+      "series": 2,
+      "seed": 14801403179829933817,
+      "input_sha256": "bbb67e2fd620d1c4270c2213a8384a73c6d562c5462f81bb0a8a94bcbf7964b2"
+    },
+    {
+      "name": "b4/dt0.1/r03",
+      "beta": 4,
+      "dtau": "0.1",
+      "series": 3,
+      "seed": 10404129282694287992,
+      "input_sha256": "2602fa312ab07b9e7ea8de1c58c6206650c187db6bafde71da1fef74235c39f7"
+    },
+    {
+      "name": "b4/dt0.05/r00",
+      "beta": 4,
+      "dtau": "0.05",
+      "series": 0,
+      "seed": 10176337054646461920,
+      "input_sha256": "301a42256293a4c091cf5eb858a730fef503d6a0406807a348d7aba589c1933b"
+    },
+    {
+      "name": "b4/dt0.05/r01",
+      "beta": 4,
+      "dtau": "0.05",
+      "series": 1,
+      "seed": 16558510989283459241,
+      "input_sha256": "3675cf3c29c3cebf13d9bda98dadf4dacbbbb7cb9dedd9324fcd9c58cf0b1c11"
+    },
+    {
+      "name": "b4/dt0.05/r02",
+      "beta": 4,
+      "dtau": "0.05",
+      "series": 2,
+      "seed": 2135175930950696589,
+      "input_sha256": "5bbb5b1476505bc4e9f4b3a2ccff345db56c5a127aaec5a93b19cfd0a569c50a"
+    },
+    {
+      "name": "b4/dt0.05/r03",
+      "beta": 4,
+      "dtau": "0.05",
+      "series": 3,
+      "seed": 7541357446772540881,
+      "input_sha256": "965cc0830243463a1f134bc1dd7e43275075502e505973c5e7ad116a23d52534"
+    },
+    {
+      "name": "b4/dt0.025/r00",
+      "beta": 4,
+      "dtau": "0.025",
+      "series": 0,
+      "seed": 5780019872462973432,
+      "input_sha256": "7ff2960b2d94cac3e5459291e2252339b628b751ad9b48410e85b60c2cd5978a"
+    },
+    {
+      "name": "b4/dt0.025/r01",
+      "beta": 4,
+      "dtau": "0.025",
+      "series": 1,
+      "seed": 8072976573779384887,
+      "input_sha256": "808cb751cb1e999c4e0c06210663b397cc4b7d5dd0121d03e43f5ff4f54edc40"
+    },
+    {
+      "name": "b4/dt0.025/r02",
+      "beta": 4,
+      "dtau": "0.025",
+      "series": 2,
+      "seed": 14640964742169170494,
+      "input_sha256": "54f811fda059050c1f25ad700dbe9cae8d130df9bb3ba2187bbf046655e8ef1f"
+    },
+    {
+      "name": "b4/dt0.025/r03",
+      "beta": 4,
+      "dtau": "0.025",
+      "series": 3,
+      "seed": 15887250648255888354,
+      "input_sha256": "2703c56886e29a8c506203106870db4d6ba0574199c25788092f0b0b02675863"
+    },
+    {
+      "name": "b8/dt0.1/r00",
+      "beta": 8,
+      "dtau": "0.1",
+      "series": 0,
+      "seed": 5060231017710924075,
+      "input_sha256": "e74094bee8a9414d98991a3086789fdadecf622a83d41a166759c1f435356540"
+    },
+    {
+      "name": "b8/dt0.1/r01",
+      "beta": 8,
+      "dtau": "0.1",
+      "series": 1,
+      "seed": 4281580843358485413,
+      "input_sha256": "438a5f9d2bc1454323d841267f1a96edf22b1525224c08abe77c3613f26e3866"
+    },
+    {
+      "name": "b8/dt0.1/r02",
+      "beta": 8,
+      "dtau": "0.1",
+      "series": 2,
+      "seed": 2962508328459779219,
+      "input_sha256": "a196d97225348de838ca23872bc53c7e0391ff7387ed4973e4ce6c2bd63ec077"
+    },
+    {
+      "name": "b8/dt0.1/r03",
+      "beta": 8,
+      "dtau": "0.1",
+      "series": 3,
+      "seed": 12801187692563073527,
+      "input_sha256": "5b1a9960dfca07f2fab59854a1792f4accadefad963556aab6cdcfb5d1fb5bf4"
+    },
+    {
+      "name": "b8/dt0.05/r00",
+      "beta": 8,
+      "dtau": "0.05",
+      "series": 0,
+      "seed": 16340242564217869159,
+      "input_sha256": "816181f88cd388cd60aee39833d61c773575bf94c9310dda95c7577ed02c041d"
+    },
+    {
+      "name": "b8/dt0.05/r01",
+      "beta": 8,
+      "dtau": "0.05",
+      "series": 1,
+      "seed": 5669516359073308044,
+      "input_sha256": "65f0c07eecc18b46e9d94b4fed65b7195d3bcef9ba1fcafb2eaeddbad91fea48"
+    },
+    {
+      "name": "b8/dt0.05/r02",
+      "beta": 8,
+      "dtau": "0.05",
+      "series": 2,
+      "seed": 16040929486537789177,
+      "input_sha256": "6cbad9ad71406aa16c1346abb1562d25e87228b268eaf3a721395fbb815ae247"
+    },
+    {
+      "name": "b8/dt0.05/r03",
+      "beta": 8,
+      "dtau": "0.05",
+      "series": 3,
+      "seed": 1453800944945509802,
+      "input_sha256": "5f64df81ca5173c284bbe6435030b25e22e683421e52c6183c0ac68c5ecc07e8"
+    },
+    {
+      "name": "b8/dt0.025/r00",
+      "beta": 8,
+      "dtau": "0.025",
+      "series": 0,
+      "seed": 6040465081985720546,
+      "input_sha256": "9fb1ff2494ac6e1fad41a7485be5883ba4a22462c52460a5c11fdec052db58e9"
+    },
+    {
+      "name": "b8/dt0.025/r01",
+      "beta": 8,
+      "dtau": "0.025",
+      "series": 1,
+      "seed": 15086388192218486182,
+      "input_sha256": "d74a6fe68bcdff46ce1aac316837950d6f6098e5261c81390959d4f9eeb52f15"
+    },
+    {
+      "name": "b8/dt0.025/r02",
+      "beta": 8,
+      "dtau": "0.025",
+      "series": 2,
+      "seed": 8962212171324766089,
+      "input_sha256": "28719dff5124fe460ac5e14cfdef89ef8736389231d6b65d5d642d3318e12aec"
+    },
+    {
+      "name": "b8/dt0.025/r03",
+      "beta": 8,
+      "dtau": "0.025",
+      "series": 3,
+      "seed": 9462151184122787927,
+      "input_sha256": "f33d2369385ff09fc6fd4e693d1c9b2995188f007e3d930e90ee6c46b3811eb3"
+    },
+    {
+      "name": "b16/dt0.1/r00",
+      "beta": 16,
+      "dtau": "0.1",
+      "series": 0,
+      "seed": 13367636489413835987,
+      "input_sha256": "13a3c23fa25f627a8f8ee017551430a946c402008af109ecf90dbb67a5ef5424"
+    },
+    {
+      "name": "b16/dt0.1/r01",
+      "beta": 16,
+      "dtau": "0.1",
+      "series": 1,
+      "seed": 11758692974626609750,
+      "input_sha256": "c3c67929bb04b3cf7471cb05169b8be884651cd8e565987a11b60a5379e5bff0"
+    },
+    {
+      "name": "b16/dt0.1/r02",
+      "beta": 16,
+      "dtau": "0.1",
+      "series": 2,
+      "seed": 16245438322630167309,
+      "input_sha256": "523c82e92831fbfd1eba7e6df3505ea348d8dc63bf359cbb3669aa31507ec1f5"
+    },
+    {
+      "name": "b16/dt0.1/r03",
+      "beta": 16,
+      "dtau": "0.1",
+      "series": 3,
+      "seed": 419422924609538775,
+      "input_sha256": "a9e9575bc8ceff4d10ffccec2bf6bc4074681de3a1bec540a3163d779432a807"
+    },
+    {
+      "name": "b16/dt0.05/r00",
+      "beta": 16,
+      "dtau": "0.05",
+      "series": 0,
+      "seed": 14120150640275718461,
+      "input_sha256": "f2130bfc5ae7415220083f24c751bc2bdaf5bcc717b2380dae13b56de6355dde"
+    },
+    {
+      "name": "b16/dt0.05/r01",
+      "beta": 16,
+      "dtau": "0.05",
+      "series": 1,
+      "seed": 1888874076266045188,
+      "input_sha256": "2e6a7bcc35a871ceb09ce027b9df82690d314f60242e9ba8ff96c95c2411df17"
+    },
+    {
+      "name": "b16/dt0.05/r02",
+      "beta": 16,
+      "dtau": "0.05",
+      "series": 2,
+      "seed": 3983156361833077362,
+      "input_sha256": "07caf8ae7edf3523b3fc26f71b2e957b5506a9ab63350fa80ee724db5a86b5dd"
+    },
+    {
+      "name": "b16/dt0.05/r03",
+      "beta": 16,
+      "dtau": "0.05",
+      "series": 3,
+      "seed": 13827579510352260762,
+      "input_sha256": "7ad2fc3a05a15b703b47e86c7cb0ab509065b5901e852fc7096628ed703d3459"
+    },
+    {
+      "name": "b16/dt0.025/r00",
+      "beta": 16,
+      "dtau": "0.025",
+      "series": 0,
+      "seed": 13365266839724982825,
+      "input_sha256": "8e99bdf571086c5d7bb2c3aec4dc3acc5b9d54df78c1738145917d06e58252a8"
+    },
+    {
+      "name": "b16/dt0.025/r01",
+      "beta": 16,
+      "dtau": "0.025",
+      "series": 1,
+      "seed": 17900417765664474405,
+      "input_sha256": "3c2195544bec125e6cd6c4edd6a255cb998ded9f54e536b18ad7457b74f2a950"
+    },
+    {
+      "name": "b16/dt0.025/r02",
+      "beta": 16,
+      "dtau": "0.025",
+      "series": 2,
+      "seed": 15628009234340624715,
+      "input_sha256": "69b0445624ad2c295c4e44df5081c82a6fee82af5a57020e54bd0b09f1401577"
+    },
+    {
+      "name": "b16/dt0.025/r03",
+      "beta": 16,
+      "dtau": "0.025",
+      "series": 3,
+      "seed": 3487238369802422096,
+      "input_sha256": "42edb1426182c202fb5b12fe7021f04796ee572b17ad29b94f506387b4782ccf"
+    }
+  ],
+  "workers": 4,
+  "purpose": "Exploratory low-temperature comparison to canonical ground-state ED",
+  "analysis": "Equal-weight independent seed means and SE; preserve paired spin covariance. Fit each beta with a+b*dtau^2 and absolute errors; compare beta 8 and 16. Also report pooled-bin SE and reblocking diagnostics. No data exclusion or tuning to ED.",
+  "limitations": "Finite-temperature grand-canonical QMC is not canonical ground-state ED. Four seeds give limited precision of the uncertainty estimate. No claim of formal validation from a short exploratory calculation."
+}

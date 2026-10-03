@@ -1,0 +1,12 @@
+model = "Hubbard"
+method = "CG"
+lattice = "square"
+W = 4
+L = 4
+t = 1.0
+U = 4.0
+nelec = 16
+2Sz = 0
+phase0 = 180.0
+phase1 = 0.0
+LanczosEps = 14

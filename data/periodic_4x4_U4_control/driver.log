@@ -1,0 +1,37 @@
+{"case": "b4/dt0.1/r03", "exit_code": 0, "elapsed_seconds": 13.379876852035522, "finished": "2026-10-03T10:58:00+0900", "outputs": 7}
+{"case": "b4/dt0.1/r00", "exit_code": 0, "elapsed_seconds": 13.481376886367798, "finished": "2026-10-03T10:58:00+0900", "outputs": 7}
+{"case": "b4/dt0.1/r01", "exit_code": 0, "elapsed_seconds": 13.599560976028442, "finished": "2026-10-03T10:58:00+0900", "outputs": 7}{"case": "b4/dt0.1/r02", "exit_code": 0, "elapsed_seconds": 13.599574565887451, "finished": "2026-10-03T10:58:00+0900", "outputs": 7}
+
+{"case": "b4/dt0.05/r00", "exit_code": 0, "elapsed_seconds": 23.570131063461304, "finished": "2026-10-03T10:58:23+0900", "outputs": 7}
+{"case": "b4/dt0.05/r01", "exit_code": 0, "elapsed_seconds": 23.547101259231567, "finished": "2026-10-03T10:58:23+0900", "outputs": 7}
+{"case": "b4/dt0.05/r03", "exit_code": 0, "elapsed_seconds": 23.494792938232422, "finished": "2026-10-03T10:58:23+0900", "outputs": 7}
+{"case": "b4/dt0.05/r02", "exit_code": 0, "elapsed_seconds": 23.6108500957489, "finished": "2026-10-03T10:58:24+0900", "outputs": 7}
+{"case": "b4/dt0.025/r03", "exit_code": 0, "elapsed_seconds": 57.307321071624756, "finished": "2026-10-03T10:59:21+0900", "outputs": 7}
+{"case": "b4/dt0.025/r00", "exit_code": 0, "elapsed_seconds": 57.59907007217407, "finished": "2026-10-03T10:59:21+0900", "outputs": 7}
+{"case": "b4/dt0.025/r02", "exit_code": 0, "elapsed_seconds": 57.5130820274353, "finished": "2026-10-03T10:59:21+0900", "outputs": 7}
+{"case": "b4/dt0.025/r01", "exit_code": 0, "elapsed_seconds": 57.62835502624512, "finished": "2026-10-03T10:59:21+0900", "outputs": 7}
+{"case": "b8/dt0.1/r00", "exit_code": 0, "elapsed_seconds": 24.793574333190918, "finished": "2026-10-03T10:59:46+0900", "outputs": 7}
+{"case": "b8/dt0.1/r01", "exit_code": 0, "elapsed_seconds": 24.85970711708069, "finished": "2026-10-03T10:59:46+0900", "outputs": 7}
+{"case": "b8/dt0.1/r03", "exit_code": 0, "elapsed_seconds": 24.979308128356934, "finished": "2026-10-03T10:59:46+0900", "outputs": 7}
+{"case": "b8/dt0.1/r02", "exit_code": 0, "elapsed_seconds": 25.068803071975708, "finished": "2026-10-03T10:59:46+0900", "outputs": 7}
+{"case": "b8/dt0.05/r00", "exit_code": 0, "elapsed_seconds": 55.950110912323, "finished": "2026-10-03T11:00:42+0900", "outputs": 7}
+{"case": "b8/dt0.05/r03", "exit_code": 0, "elapsed_seconds": 55.898876905441284, "finished": "2026-10-03T11:00:42+0900", "outputs": 7}
+{"case": "b8/dt0.05/r01", "exit_code": 0, "elapsed_seconds": 56.25868487358093, "finished": "2026-10-03T11:00:42+0900", "outputs": 7}
+{"case": "b8/dt0.05/r02", "exit_code": 0, "elapsed_seconds": 56.20240902900696, "finished": "2026-10-03T11:00:42+0900", "outputs": 7}
+{"case": "b8/dt0.025/r01", "exit_code": 0, "elapsed_seconds": 100.83938479423523, "finished": "2026-10-03T11:02:23+0900", "outputs": 7}
+{"case": "b8/dt0.025/r03", "exit_code": 0, "elapsed_seconds": 100.69830298423767, "finished": "2026-10-03T11:02:23+0900", "outputs": 7}
+{"case": "b8/dt0.025/r02", "exit_code": 0, "elapsed_seconds": 100.98413896560669, "finished": "2026-10-03T11:02:23+0900", "outputs": 7}
+{"case": "b8/dt0.025/r00", "exit_code": 0, "elapsed_seconds": 101.44328117370605, "finished": "2026-10-03T11:02:23+0900", "outputs": 7}
+{"case": "b16/dt0.1/r00", "exit_code": 0, "elapsed_seconds": 44.74867606163025, "finished": "2026-10-03T11:03:07+0900", "outputs": 7}
+{"case": "b16/dt0.1/r03", "exit_code": 0, "elapsed_seconds": 44.54146480560303, "finished": "2026-10-03T11:03:08+0900", "outputs": 7}
+{"case": "b16/dt0.1/r01", "exit_code": 0, "elapsed_seconds": 44.9590380191803, "finished": "2026-10-03T11:03:08+0900", "outputs": 7}
+{"case": "b16/dt0.1/r02", "exit_code": 0, "elapsed_seconds": 44.870203256607056, "finished": "2026-10-03T11:03:08+0900", "outputs": 7}
+{"case": "b16/dt0.05/r02", "exit_code": 0, "elapsed_seconds": 95.22973585128784, "finished": "2026-10-03T11:04:43+0900", "outputs": 7}
+{"case": "b16/dt0.05/r01", "exit_code": 0, "elapsed_seconds": 95.52319598197937, "finished": "2026-10-03T11:04:43+0900", "outputs": 7}
+{"case": "b16/dt0.05/r00", "exit_code": 0, "elapsed_seconds": 95.71594500541687, "finished": "2026-10-03T11:04:43+0900", "outputs": 7}
+{"case": "b16/dt0.05/r03", "exit_code": 0, "elapsed_seconds": 95.47318696975708, "finished": "2026-10-03T11:04:43+0900", "outputs": 7}
+{"case": "b16/dt0.025/r01", "exit_code": 0, "elapsed_seconds": 190.33721709251404, "finished": "2026-10-03T11:07:53+0900", "outputs": 7}
+{"case": "b16/dt0.025/r00", "exit_code": 0, "elapsed_seconds": 190.45120286941528, "finished": "2026-10-03T11:07:54+0900", "outputs": 7}
+{"case": "b16/dt0.025/r02", "exit_code": 0, "elapsed_seconds": 190.42185378074646, "finished": "2026-10-03T11:07:54+0900", "outputs": 7}
+{"case": "b16/dt0.025/r03", "exit_code": 0, "elapsed_seconds": 190.36909699440002, "finished": "2026-10-03T11:07:54+0900", "outputs": 7}
+{"runs": 36, "failures": 0, "elapsed_seconds": 607.4444808959961}
