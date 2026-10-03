@@ -1,11 +1,12 @@
 ---
 date: 2026-10-03
-datetime: 2026-10-03 14:45 JST
+datetime: 2026-10-03 14:53 JST
 model: OpenAI GPT-6 (Codex)
 summary: |
   Four pull-request CI configurations cover compilers, operating systems,
   replica parallelism, historical compatibility and frozen-data analysis.
   Clarified lint platform requirements, download retries and failure evidence retention.
+  Historical comparisons require baseline commits reachable from the checked-out history.
 ---
 
 # Continuous integration
@@ -70,8 +71,10 @@ the published spin-convergence limitations; a green CI does not establish new
 physical convergence.
 
 The GCC job fetches full history for the boundary (`a614a8f`) and tempering
-(`3215eee`) compatibility tests. Both old and current builds use the same
-compiler and link flags. The older global-default target refers to an object
+(`cb077b2`) compatibility tests. Both baselines must be ancestors of the tested
+revision; an unrelated object retained locally is insufficient. Both old and
+current builds use the same compiler and link flags. The older global-default
+target refers to an object
 absent from the public history and is excluded explicitly. Slow tests,
 sanitizers, alternative MPI implementations and additional platforms are also
 outside this initial PR matrix.

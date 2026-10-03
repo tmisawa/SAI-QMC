@@ -11,8 +11,8 @@ work="$(mktemp -d)"
 # shellcheck source=tests/test_cleanup.sh
 . "$root/tests/test_cleanup.sh"
 trap 'test_cleanup "$work"' EXIT
-if ! git -C "$root" cat-file -e "$base^{commit}" 2>/dev/null; then
-  echo "FAIL historical regression requires Git commit $base" >&2
+if ! git -C "$root" merge-base --is-ancestor "$base" HEAD 2>/dev/null; then
+  echo "FAIL historical regression requires ancestor $base; fetch full history" >&2
   exit 1
 fi
 mkdir "$work/base"

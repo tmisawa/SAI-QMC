@@ -1,15 +1,15 @@
 #!/bin/sh
-# tempering=none runs must stay byte-identical to 3215eee built with the same toolchain.
+# tempering=none runs must stay byte-identical to cb077b2 built with the same toolchain.
 set -eu
 root="$(cd "$(dirname "$0")/.." && pwd)"
 fix="$root/tests/fixtures/global_baseline"
-base=3215eee700b9b6359242e228e515cf83a5a53732
+base=cb077b2f4acfec138a9ad275248761ebdac5ab85
 work="$(mktemp -d)"
 # shellcheck source=tests/test_cleanup.sh
 . "$root/tests/test_cleanup.sh"
 trap 'test_cleanup "$work"' EXIT
-if ! git -C "$root" cat-file -e "$base^{commit}" 2>/dev/null; then
-  echo "FAIL historical regression requires Git commit $base" >&2
+if ! git -C "$root" merge-base --is-ancestor "$base" HEAD 2>/dev/null; then
+  echo "FAIL historical regression requires ancestor $base; fetch full history" >&2
   exit 1
 fi
 mkdir "$work/base"
