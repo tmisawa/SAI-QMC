@@ -1,0 +1,2 @@
+# Analysis self-tests only; production code has no Python dependency.
+numpy==2.2.6

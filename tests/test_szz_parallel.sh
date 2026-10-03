@@ -1,9 +1,15 @@
 #!/bin/sh
 set -eu
+MPIRUN="${MPIRUN:-mpirun}"
 
-repo_dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+repo_dir=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 run_dir=$(mktemp -d /tmp/afqmc-szz-parallel.XXXXXX)
-trap 'rm -rf "$run_dir"' EXIT HUP INT TERM
+# shellcheck source=tests/test_cleanup.sh
+. "$repo_dir/tests/test_cleanup.sh"
+trap 'test_cleanup "$run_dir"' EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 for mode in omp mpi2 mpi4 hybrid; do
     mkdir "$run_dir/$mode"
@@ -12,13 +18,13 @@ done
 (cd "$run_dir/omp" && OMP_NUM_THREADS=2 \
     "$repo_dir/dqmc_omp" \
     "$repo_dir/input/1d_L4_U0_szz_all_omp.txt" > stdout.txt)
-(cd "$run_dir/mpi2" && mpirun -np 2 \
+(cd "$run_dir/mpi2" && "$MPIRUN" -np 2 \
     "$repo_dir/dqmc_mpi" \
     "$repo_dir/input/1d_L4_U0_szz_all_mpi.txt" > stdout.txt)
-(cd "$run_dir/mpi4" && mpirun -np 4 \
+(cd "$run_dir/mpi4" && "$MPIRUN" -np 4 \
     "$repo_dir/dqmc_mpi" \
     "$repo_dir/input/1d_L4_U0_szz_all_mpi.txt" > stdout.txt)
-(cd "$run_dir/hybrid" && OMP_NUM_THREADS=2 mpirun -np 2 \
+(cd "$run_dir/hybrid" && OMP_NUM_THREADS=2 "$MPIRUN" -np 2 \
     "$repo_dir/dqmc_hybrid" \
     "$repo_dir/input/1d_L4_U0_szz_all_hybrid.txt" > stdout.txt)
 
@@ -44,7 +50,7 @@ printf '%s\n' \
     'dtau=0.1' 'beta_list=2' 'nwarm=2' 'nmeas=8' 'nbin=2' \
     'stab=2' 'parallel=mpi' 'nrep=3' 'szz_q=3:0,0:0' \
     'szz_file=selected.dat' 'seed=17' > "$run_dir/selected/input.txt"
-(cd "$run_dir/selected" && mpirun -np 4 \
+(cd "$run_dir/selected" && "$MPIRUN" -np 4 \
     "$repo_dir/dqmc_mpi" input.txt > stdout.txt)
 test "$(awk '!/^#/ {n++} END {print n+0}' \
     "$run_dir/selected/selected.dat")" = 2

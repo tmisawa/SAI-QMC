@@ -8,14 +8,17 @@ root="$(cd "$(dirname "$0")/.." && pwd)"
 fix="$root/tests/fixtures/global_baseline"
 base=a614a8f68062f5543c1a58476b4b31a33e7f606a
 work="$(mktemp -d)"
-trap 'rm -rf "$work"' EXIT
+# shellcheck source=tests/test_cleanup.sh
+. "$root/tests/test_cleanup.sh"
+trap 'test_cleanup "$work"' EXIT
 if ! git -C "$root" cat-file -e "$base^{commit}" 2>/dev/null; then
   echo "FAIL historical regression requires Git commit $base" >&2
   exit 1
 fi
 mkdir "$work/base"
 git -C "$root" archive "$base" | tar -xf - -C "$work/base"
-make -C "$work/base" dqmc >/dev/null 2>&1 || { echo "FAIL baseline build"; exit 1; }
+make -C "$work/base" dqmc >"$work/baseline-build.log" 2>&1 || { cat "$work/baseline-build.log"; echo "FAIL baseline build"; exit 1; }
+cat "$work/baseline-build.log"
 fail=0
 elapsed='^# tempering solver_elapsed_seconds='
 
@@ -61,8 +64,8 @@ compare_file() { # name baseline_file current_file
 }
 
 compare_dirs() { # baseline_dir current_dir
-  lb=$(cd "$1" && ls | grep -v '^input.in$' | tr '\n' ' ')
-  lc=$(cd "$2" && ls | grep -v '^input.in$' | tr '\n' ' ')
+  lb=$(cd "$1" && printf '%s\n' * | grep -v '^input.in$' | tr '\n' ' ')
+  lc=$(cd "$2" && printf '%s\n' * | grep -v '^input.in$' | tr '\n' ' ')
   if [ "$lb" != "$lc" ]; then
     echo "FAIL $2 file sets differ: [$lb] vs [$lc]"; fail=1; return
   fi
