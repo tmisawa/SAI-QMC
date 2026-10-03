@@ -1,8 +1,9 @@
 ---
-date: 2026-09-30
-datetime: 2026-09-30 13:30 JST
-model: OpenAI GPT-6 (Codex)
+date: 2026-10-03
+datetime: 2026-10-03 08:43 JST
+model: OpenAI GPT-6 (Codex); OpenAI GPT-5.6 Luna (Codex; 2026-10-02 directional boundaries); OpenAI GPT-6 (Codex; 2026-10-03 metadata update)
 summary: |
+  Includes directional boundary keys and resolved boundary labels for built-in lattices.
   Input/output reference for SAI-QMC 0.1, including defaults and file schemas.
   Documents scalar and spin conventions, output paths, and optional diagnostics.
 ---
@@ -32,8 +33,9 @@ and invalid combinations are errors. See [the examples](../input/) and
 | --- | --- | --- |
 | `lattice` | `chain` | `chain`, `square`, or `file` |
 | `Lx`, `Ly` | `4`, `1` | Built-in lattice lengths; positive integers |
-| `pbc` | `1` | `1`: periodic; `0`: open |
+| `pbc` | `1` | Both directions: `1`: periodic; `0`: open |
 | `bc` | Same as `pbc` | Alias: `periodic` / `pbc` / `1`, or `open` / `obc` / `0` |
+| `bc_x`, `bc_y` | Unset | One direction: `periodic`, `antiperiodic`, or `open`; an omitted direction is periodic. Not combined with `pbc`/`bc`; `bc_y` needs `lattice=square` |
 | `latfile` | Unset | Hopping file, required for `lattice=file` |
 | `t`, `U` | `-1.0`, `4.0` | Built-in hopping amplitude and repulsive interaction (`U>=0`) |
 | `dtau` | `0.1` | Positive imaginary-time step |
@@ -69,8 +71,25 @@ inverse temperature when comparing results. Temperature is `T=1/beta`, with
 ## Geometry and hopping files
 
 Use `lattice=chain` with `Lx`, or `lattice=square` with `Lx` and `Ly`.
-For periodic built-in lattices, each length greater than one must be even
-to preserve bipartiteness. Open boundaries also support odd lengths.
+`pbc` (or its alias `bc`) sets both directions. To set them separately, use
+`bc_x` and `bc_y` instead, each `periodic`, `antiperiodic`, or `open`. An
+omitted direction is periodic, so `bc_x=antiperiodic` alone gives
+x-antiperiodic, y-periodic boundaries. `bc_y` requires `lattice=square`, and
+neither key can be combined with `pbc` or `bc`.
+
+A periodic direction closes with a bond of amplitude `t` from its last site to
+its first (`x=Lx-1` to `x=0`, `y=Ly-1` to `y=0`). An antiperiodic direction
+uses `-t` for that bond and leaves all other bonds unchanged; an open direction
+has no closing bond. Closed (periodic or antiperiodic) directions longer than
+one must have even length to preserve bipartiteness; open directions also
+support odd lengths. An antiperiodic direction needs an even length of at
+least 4, because at length 2 its closing bond would cancel the ordinary bond.
+A periodic direction of length 2 connects the same pair twice (amplitude `2t`).
+
+Output metadata records the boundary as `pbc=1` or `pbc=0` when both
+directions are periodic or both are open, as before. Otherwise the resolved
+values replace that token, for example `bc_x=antiperiodic bc_y=periodic`
+(chains: `bc_x=antiperiodic`), and the scalar header line carries them too.
 
 For `lattice=file`, the first value in `latfile` is the number of sites,
 followed by the real symmetric hopping matrix in row order, separated by
@@ -87,7 +106,8 @@ hopping matrix is:
 Do not include comment lines in a hopping file. Non-bipartite hopping graphs
 are rejected. `hopping_used.txt` records the constructed matrix in this same
 format. Spin momentum selectors require built-in chain or square geometry;
-they do not support `lattice=file`.
+they do not support `lattice=file`. For antiperiodic boundaries, use
+`bc_x`/`bc_y` rather than a hopping file so that the selectors stay available.
 
 ## Scalar output
 
@@ -133,6 +153,10 @@ Select momenta separately with `szz_q` and `sperp_q`:
 
 Momenta are `qx=2*pi*mx/Lx`, `qy=2*pi*my/Ly`. For open boundaries, these are
 Fourier sampling points, not translation-symmetry quantum numbers.
+Antiperiodic directions use the same integer momenta because spin correlations
+carry no boundary phase; `af` still selects `pi` along each direction longer
+than one. The values generally differ from those with periodic boundaries,
+because the antiperiodic bond changes the model.
 To disable a channel, set its selector to `none`; `szz_file=none` or
 `sperp_file=none` is rejected when that channel is enabled.
 Use distinct paths for all outputs.

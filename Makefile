@@ -107,7 +107,7 @@ test_szz_parallel: dqmc dqmc_omp dqmc_mpi dqmc_hybrid
 test_sperp_parallel: dqmc dqmc_omp dqmc_mpi dqmc_hybrid
 	@printf "%-35s " tests/test_sperp_parallel.sh; sh tests/test_sperp_parallel.sh
 
-test: $(TESTBIN) test_conditional_output test_szz test_sperp test_scalar test_dat test_global_disabled test_global_output test_global_hook_isolation test_tempering_output test_tempering_failure
+test: $(TESTBIN) test_conditional_output test_szz test_sperp test_scalar test_dat test_global_disabled test_global_output test_global_hook_isolation test_tempering_output test_tempering_failure test_bc_output
 	@fail=0; for t in $(TESTBIN); do printf "%-28s " $$t; ./$$t || fail=1; done; \
 	  if [ $$fail -ne 0 ]; then echo "SOME TESTS FAILED"; exit 1; fi; echo "ALL TESTS PASSED"
 
@@ -123,7 +123,7 @@ test_mpi: $(TESTBIN_MPI)
 	@fail=0; for t in $(TESTBIN_MPI); do printf "%-32s " $$t; $(MPIRUN) -np 1 ./$$t || fail=1; done; \
 	  if [ $$fail -ne 0 ]; then echo "SOME MPI TESTS FAILED"; exit 1; fi; echo "ALL MPI TESTS PASSED"
 
-test_hybrid: $(TESTBIN_HYBRID) test_conditional_parallel test_szz_parallel test_sperp_parallel test_scalar_parallel test_dat_parallel test_global_parallel test_tempering_parallel test_tempering_mpi_failure
+test_hybrid: $(TESTBIN_HYBRID) test_conditional_parallel test_szz_parallel test_sperp_parallel test_scalar_parallel test_dat_parallel test_global_parallel test_tempering_parallel test_tempering_mpi_failure test_bc_parallel
 	@fail=0; for t in $(TESTBIN_HYBRID); do printf "%-35s " $$t; $(MPIRUN) -np 1 ./$$t || fail=1; done; \
 	  if [ $$fail -ne 0 ]; then echo "SOME HYBRID TESTS FAILED"; exit 1; fi; echo "ALL HYBRID TESTS PASSED"
 
@@ -214,3 +214,18 @@ test_conditional_parallel: dqmc dqmc_omp dqmc_mpi dqmc_hybrid
 	MPIRUN="$(MPIRUN)" $(PYTHON) tests/test_conditional_output.py --parallel
 
 .PHONY: test_conditional_output test_conditional_parallel
+
+test_bc_output: dqmc
+	@printf "%-40s " tests/test_bc_output.sh; sh tests/test_bc_output.sh
+
+.PHONY: test_bc_output
+
+test_bc_parallel: dqmc dqmc_omp dqmc_mpi dqmc_hybrid
+	@printf "%-40s " tests/test_bc_parallel.sh; MPIRUN="$(MPIRUN)" sh tests/test_bc_parallel.sh
+
+.PHONY: test_bc_parallel
+
+test_bc_default: dqmc
+	@printf "%-40s " tests/test_bc_default_unchanged.sh; sh tests/test_bc_default_unchanged.sh
+
+.PHONY: test_bc_default

@@ -1,12 +1,21 @@
 #ifndef IO_H
 #define IO_H
 
+#include <stddef.h>
+
+#include "lattice.h"
+
 typedef struct {
     char lattice[16];
     char latfile[256];
     int Lx;
     int Ly;
     int pbc;
+    int pbc_given;                 /* 1 when pbc= or bc= appears */
+    LatBoundary bc_x;              /* resolved boundary of each built-in direction */
+    LatBoundary bc_y;
+    int bc_x_given;
+    int bc_y_given;
     double thop;
     double U;
     double dtau;
@@ -52,5 +61,10 @@ typedef struct {
 } Params;
 
 int params_read(Params *p, const char *path);
+/* 1 when the legacy pbc key describes the boundary (always for lattice=file). */
+int params_boundary_is_legacy(const Params *p);
+/* Header token: "pbc=0"/"pbc=1" when legacy, else "bc_x=<name>" (chain) or
+   "bc_x=<name> bc_y=<name>" (square). Returns 1 when out is too small. */
+int params_boundary_label(const Params *p, char *out, size_t size);
 
 #endif

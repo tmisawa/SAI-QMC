@@ -23,8 +23,81 @@ static void add_bond(Lattice *L, int i, int j, double thop)
     L->t[j + i * L->n] += thop;
 }
 
-void lattice_chain(Lattice *L, int Lx, double thop, int pbc)
+static void lattice_set_empty(Lattice *L)
 {
+    L->n = 0;
+    L->t = NULL;
+    L->bipart = NULL;
+    L->is_bipartite = 0;
+    L->type = LAT_NONE;
+    L->Lx = 0;
+    L->Ly = 0;
+    L->has_coordinates = 0;
+}
+
+static int boundary_is_valid(LatBoundary bc)
+{
+    return bc == LAT_BC_OPEN || bc == LAT_BC_PERIODIC ||
+           bc == LAT_BC_ANTIPERIODIC;
+}
+
+/* Length 2 would cancel the antiperiodic bond against the ordinary one, and
+   odd lengths are not bipartite. */
+static int boundary_length_ok(LatBoundary bc, int len)
+{
+    return bc != LAT_BC_ANTIPERIODIC || (len >= 4 && len % 2 == 0);
+}
+
+static int boundary_closes(LatBoundary bc, int len)
+{
+    return bc != LAT_BC_OPEN && len > 1;
+}
+
+static double closing_amplitude(LatBoundary bc, double thop)
+{
+    return bc == LAT_BC_ANTIPERIODIC ? -thop : thop;
+}
+
+static int closed_odd(LatBoundary bc, int len)
+{
+    return boundary_closes(bc, len) && len % 2 != 0;
+}
+
+const char *lattice_boundary_name(LatBoundary bc)
+{
+    switch (bc) {
+    case LAT_BC_OPEN:
+        return "open";
+    case LAT_BC_PERIODIC:
+        return "periodic";
+    case LAT_BC_ANTIPERIODIC:
+        return "antiperiodic";
+    }
+    return NULL;
+}
+
+int lattice_boundary_parse(const char *name, LatBoundary *out)
+{
+    static const LatBoundary all[] = {LAT_BC_OPEN, LAT_BC_PERIODIC,
+                                      LAT_BC_ANTIPERIODIC};
+    if (name == NULL || out == NULL) {
+        return 1;
+    }
+    for (size_t k = 0; k < sizeof all / sizeof all[0]; k++) {
+        if (strcmp(name, lattice_boundary_name(all[k])) == 0) {
+            *out = all[k];
+            return 0;
+        }
+    }
+    return 1;
+}
+
+int lattice_chain_bc(Lattice *L, int Lx, double thop, LatBoundary bc_x)
+{
+    if (!boundary_is_valid(bc_x) || !boundary_length_ok(bc_x, Lx)) {
+        lattice_set_empty(L);
+        return 1;
+    }
     lattice_alloc(L, Lx);
     L->type = LAT_CHAIN;
     L->Lx = Lx;
@@ -34,17 +107,29 @@ void lattice_chain(Lattice *L, int Lx, double thop, int pbc)
         const int xr = x + 1;
         if (xr < Lx) {
             add_bond(L, x, xr, thop);
-        } else if (pbc && Lx > 1) {
-            add_bond(L, x, 0, thop);
+        } else if (boundary_closes(bc_x, Lx)) {
+            add_bond(L, x, 0, closing_amplitude(bc_x, thop));
         }
         L->bipart[x] = (x % 2 == 0) ? 1 : -1;
     }
 
-    L->is_bipartite = (pbc && Lx > 1 && (Lx % 2 != 0)) ? 0 : 1;
+    L->is_bipartite = closed_odd(bc_x, Lx) ? 0 : 1;
+    return 0;
 }
 
-void lattice_square(Lattice *L, int Lx, int Ly, double thop, int pbc)
+void lattice_chain(Lattice *L, int Lx, double thop, int pbc)
 {
+    (void)lattice_chain_bc(L, Lx, thop, pbc ? LAT_BC_PERIODIC : LAT_BC_OPEN);
+}
+
+int lattice_square_bc(Lattice *L, int Lx, int Ly, double thop,
+                      LatBoundary bc_x, LatBoundary bc_y)
+{
+    if (!boundary_is_valid(bc_x) || !boundary_is_valid(bc_y) ||
+        !boundary_length_ok(bc_x, Lx) || !boundary_length_ok(bc_y, Ly)) {
+        lattice_set_empty(L);
+        return 1;
+    }
     const int n = Lx * Ly;
     lattice_alloc(L, n);
     L->type = LAT_SQUARE;
@@ -61,14 +146,14 @@ void lattice_square(Lattice *L, int Lx, int Ly, double thop, int pbc)
 
             if (xr < Lx) {
                 add_bond(L, i, IDX(xr, y), thop);
-            } else if (pbc && Lx > 1) {
-                add_bond(L, i, IDX(0, y), thop);
+            } else if (boundary_closes(bc_x, Lx)) {
+                add_bond(L, i, IDX(0, y), closing_amplitude(bc_x, thop));
             }
 
             if (yr < Ly) {
                 add_bond(L, i, IDX(x, yr), thop);
-            } else if (pbc && Ly > 1) {
-                add_bond(L, i, IDX(x, 0), thop);
+            } else if (boundary_closes(bc_y, Ly)) {
+                add_bond(L, i, IDX(x, 0), closing_amplitude(bc_y, thop));
             }
 
             L->bipart[i] = ((x + y) % 2 == 0) ? 1 : -1;
@@ -76,9 +161,14 @@ void lattice_square(Lattice *L, int Lx, int Ly, double thop, int pbc)
     }
 #undef IDX
 
-    const int odd_pbc_dir = (pbc && Lx > 1 && (Lx % 2 != 0)) ||
-                            (pbc && Ly > 1 && (Ly % 2 != 0));
-    L->is_bipartite = odd_pbc_dir ? 0 : 1;
+    L->is_bipartite = (closed_odd(bc_x, Lx) || closed_odd(bc_y, Ly)) ? 0 : 1;
+    return 0;
+}
+
+void lattice_square(Lattice *L, int Lx, int Ly, double thop, int pbc)
+{
+    const LatBoundary bc = pbc ? LAT_BC_PERIODIC : LAT_BC_OPEN;
+    (void)lattice_square_bc(L, Lx, Ly, thop, bc, bc);
 }
 
 static void detect_bipartite_from_hopping(Lattice *L)

@@ -25,9 +25,9 @@ int replica_bin_write(FILE *fp, const ReplicaBinView *v,
                 "sum_sign_D is per site\n"
                 "# Szz/Sperp: N^-1 sum_ij exp[-iq.(ri-rj)] <..>; Q is the "
                 "staggered momentum, 0 is q=0; nan = q not measured\n"
-                "# lattice=%s Lx=%d Ly=%d n=%d pbc=%d U=%.17g dtau=%.17g "
+                "# lattice=%s Lx=%d Ly=%d n=%d %s U=%.17g dtau=%.17g "
                 "nwarm=%d nmeas=%d nbin=%d global_update=%s global_interval=%d\n",
-                m->lattice, m->Lx, m->Ly, m->nsite, m->pbc, m->U, m->dtau,
+                m->lattice, m->Lx, m->Ly, m->nsite, m->boundary, m->U, m->dtau,
                 m->nwarm, m->nmeas, m->nbin, m->global_update,
                 m->global_interval);
         if (m->tempering) {

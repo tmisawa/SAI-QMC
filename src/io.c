@@ -75,6 +75,11 @@ static void defaults(Params *p)
     p->Lx = 4;
     p->Ly = 1;
     p->pbc = 1;
+    p->pbc_given = 0;
+    p->bc_x = LAT_BC_PERIODIC;
+    p->bc_y = LAT_BC_PERIODIC;
+    p->bc_x_given = 0;
+    p->bc_y_given = 0;
     p->thop = -1.0;
     p->U = 4.0;
     p->dtau = 0.1;
@@ -177,7 +182,53 @@ static int is_strict_string_key(const char *key)
            strcmp(key, "tempering_ltr") == 0 ||
            strcmp(key, "tempering_interval") == 0 ||
            strcmp(key, "tempering_file") == 0 ||
-           strcmp(key, "field_init") == 0;
+           strcmp(key, "field_init") == 0 ||
+           strcmp(key, "bc_x") == 0 || strcmp(key, "bc_y") == 0;
+}
+
+/* Resolves bc_x/bc_y from pbc/bc or from the directional keys and reports the
+   first violation in this order: key combination, lattice type, chain bc_y,
+   antiperiodic length in x, then in y. */
+static int resolve_boundaries(Params *p)
+{
+    const int directional = p->bc_x_given || p->bc_y_given;
+    if (p->pbc_given && directional) {
+        fprintf(stderr, "ERROR: pbc/bc cannot be combined with bc_x/bc_y\n");
+        return 1;
+    }
+    if (directional && strcmp(p->lattice, "file") == 0) {
+        fprintf(stderr,
+                "ERROR: bc_x/bc_y require lattice=chain or lattice=square\n");
+        return 1;
+    }
+    if (p->bc_y_given && strcmp(p->lattice, "chain") == 0) {
+        fprintf(stderr, "ERROR: bc_y requires lattice=square\n");
+        return 1;
+    }
+    if (!directional) {
+        p->bc_x = p->pbc ? LAT_BC_PERIODIC : LAT_BC_OPEN;
+        p->bc_y = p->bc_x;
+    } else {
+        if (!p->bc_x_given) {
+            p->bc_x = LAT_BC_PERIODIC;
+        }
+        if (!p->bc_y_given) {
+            p->bc_y = LAT_BC_PERIODIC;
+        }
+    }
+    if (p->bc_x == LAT_BC_ANTIPERIODIC && (p->Lx < 4 || p->Lx % 2 != 0)) {
+        fprintf(stderr,
+                "ERROR: bc_x=antiperiodic requires an even Lx >= 4 (got Lx=%d)\n",
+                p->Lx);
+        return 1;
+    }
+    if (p->bc_y == LAT_BC_ANTIPERIODIC && (p->Ly < 4 || p->Ly % 2 != 0)) {
+        fprintf(stderr,
+                "ERROR: bc_y=antiperiodic requires an even Ly >= 4 (got Ly=%d)\n",
+                p->Ly);
+        return 1;
+    }
+    return 0;
 }
 
 int params_read(Params *p, const char *path)
@@ -246,7 +297,9 @@ int params_read(Params *p, const char *path)
             if (parse_int_value(val, &p->pbc)) {
                 FAIL("ERROR: pbc must be 0 or 1 (got %s)\n", val);
             }
+            p->pbc_given = 1;
         } else if (strcmp(key, "bc") == 0) {
+            p->pbc_given = 1;
             if (strcmp(val, "periodic") == 0 || strcmp(val, "pbc") == 0 ||
                 strcmp(val, "1") == 0) {
                 p->pbc = 1;
@@ -257,6 +310,18 @@ int params_read(Params *p, const char *path)
                 FAIL("ERROR: bc must be periodic/open/pbc/obc/1/0 (got %s)\n",
                      val);
             }
+        } else if (strcmp(key, "bc_x") == 0) {
+            if (lattice_boundary_parse(val, &p->bc_x) != 0) {
+                FAIL("ERROR: bc_x must be periodic, antiperiodic, or open "
+                     "(got %s)\n", val);
+            }
+            p->bc_x_given = 1;
+        } else if (strcmp(key, "bc_y") == 0) {
+            if (lattice_boundary_parse(val, &p->bc_y) != 0) {
+                FAIL("ERROR: bc_y must be periodic, antiperiodic, or open "
+                     "(got %s)\n", val);
+            }
+            p->bc_y_given = 1;
         } else if (strcmp(key, "t") == 0) {
             if (parse_double_value(val, &p->thop)) {
                 FAIL("ERROR: t must be numeric (got %s)\n", val);
@@ -437,6 +502,9 @@ int params_read(Params *p, const char *path)
         fprintf(stderr, "ERROR: pbc must be 0 or 1\n");
         return 1;
     }
+    if (resolve_boundaries(p) != 0) {
+        return 1;
+    }
     if (p->U < 0.0) {
         fprintf(stderr, "ERROR: U must be >= 0\n");
         return 1;
@@ -605,4 +673,32 @@ int params_read(Params *p, const char *path)
         return 1;
     }
     return 0;
+}
+
+int params_boundary_is_legacy(const Params *p)
+{
+    if (strcmp(p->lattice, "file") == 0) {
+        return 1;
+    }
+    if (strcmp(p->lattice, "chain") == 0) {
+        return p->bc_x != LAT_BC_ANTIPERIODIC;
+    }
+    return p->bc_x == p->bc_y && p->bc_x != LAT_BC_ANTIPERIODIC;
+}
+
+int params_boundary_label(const Params *p, char *out, size_t size)
+{
+    int n;
+    if (strcmp(p->lattice, "file") == 0) {
+        n = snprintf(out, size, "pbc=%d", p->pbc);
+    } else if (params_boundary_is_legacy(p)) {
+        n = snprintf(out, size, "pbc=%d", p->bc_x == LAT_BC_PERIODIC ? 1 : 0);
+    } else if (strcmp(p->lattice, "chain") == 0) {
+        n = snprintf(out, size, "bc_x=%s", lattice_boundary_name(p->bc_x));
+    } else {
+        n = snprintf(out, size, "bc_x=%s bc_y=%s",
+                     lattice_boundary_name(p->bc_x),
+                     lattice_boundary_name(p->bc_y));
+    }
+    return (n < 0 || (size_t)n >= size) ? 1 : 0;
 }

@@ -1,8 +1,9 @@
 ---
-date: 2026-09-23
-datetime: 2026-09-23 15:12 JST
-model: OpenAI GPT-6 (Codex)
+date: 2026-10-03
+datetime: 2026-10-03 08:43 JST
+model: OpenAI GPT-6 (Codex); OpenAI GPT-5.6 Luna (Codex; 2026-10-02 directional boundaries); OpenAI GPT-5.6 Sol (Codex; 2026-10-02 validation); OpenAI GPT-6 (Codex; 2026-10-03 metadata update)
 summary: |
+  Limits interacting antiperiodic validation to the 4x2, U=4, beta<=4 ED comparison.
   Supported scope and known numerical/statistical limitations of the initial source snapshot.
   Separates passing implementation tests from unresolved production convergence checks.
   Clarifies input syntax and supported geometry for spin measurements.
@@ -21,7 +22,12 @@ Compare finite-temperature results with grand-canonical ED at the same chemical
 potential. The mean particle number equals the site count at half filling,
 but this does not make a finite system equivalent to canonical ED at finite
 temperature. Match hopping/boundary conventions, especially small periodic
-lattices. Finite `dtau` bias requires an extrapolation or separate estimate.
+lattices. Antiperiodic boundaries are built in through `bc_x`/`bc_y` for even
+lengths of at least 4; hopping files still have no spin momentum selectors.
+Their validation covers U=0 exact results and a 4x2, U=4, beta<=4
+finite-temperature ED comparison (VALIDATION.md section 12, verdict PASS),
+not larger interacting lattices.
+Finite `dtau` bias requires an extrapolation or separate estimate.
 
 ## Low-temperature stability
 

@@ -1,0 +1,16 @@
+lattice=square
+Lx=4
+Ly=2
+bc_x=antiperiodic
+bc_y=periodic
+t=-1.0
+U=4
+dtau=0.025
+beta_list=2,4
+seed=2026100203
+nwarm=0
+nmeas=2
+nbin=2
+nrep=16
+parallel=serial
+replica_bin_file=bins.tsv

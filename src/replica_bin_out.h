@@ -18,7 +18,8 @@ typedef struct {
     double beta_requested, beta_effective, U, dtau;
     int nwarm, nmeas, nbin;
     const char *lattice;
-    int Lx, Ly, pbc;
+    int Lx, Ly;
+    char boundary[64];  /* params_boundary_label: "pbc=1", "bc_x=antiperiodic bc_y=periodic", ... */
     const char *global_update;
     int global_interval;
     int szz_Q_index, szz_0_index, sperp_Q_index; /* -1: not measured */

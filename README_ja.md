@@ -1,8 +1,9 @@
 ---
-date: 2026-09-30
-datetime: 2026-09-30 13:30 JST
-model: OpenAI GPT-6 (Codex)
+date: 2026-10-03
+datetime: 2026-10-03 08:43 JST
+model: OpenAI GPT-6 (Codex); OpenAI GPT-5.6 Luna (Codex; 2026-10-02 directional boundaries); OpenAI GPT-6 (Codex; 2026-10-03 metadata update)
 summary: |
+  方向別の周期・反周期・開放境界とspin運動量selectorの対応を含む。
   SAI-QMC 0.1の日本語利用案内。英語READMEに対応する。
   ビルド、入出力、並列実行、検証範囲、開発記録を説明する。
 ---
@@ -78,8 +79,11 @@ seed=1
 化学ポテンシャルは`mu=U/2`に固定されており、`mu`という入力キーはありません。
 
 長方形の正方格子には`lattice=square`と`Lx`、`Ly`を指定します。
-`pbc=1`が周期境界、`pbc=0`が開放境界です。周期境界では、二部格子を保つため、
-長さが1より大きい各方向のサイズを偶数にする必要があります。
+`pbc=1`が周期境界、`pbc=0`が開放境界です。方向ごとに指定するときは、`pbc`の代わりに
+`bc_x`と`bc_y`（`periodic`、`antiperiodic`、`open`）を使います。例えば
+`bc_x=antiperiodic`でx方向反周期・y方向周期になります。周期境界・反周期境界では、
+二部格子を保つため、長さが1より大きい各方向のサイズを偶数にする必要があり、
+反周期境界の方向には長さ4以上が必要です。
 省略した設定の既定値は[入出力リファレンス](docs/usage_ja.md)に記載しています。
 
 ## 模型と観測量
