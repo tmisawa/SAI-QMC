@@ -125,7 +125,46 @@ class Helpers(unittest.TestCase):
                                      str(work), str(status)], env=dict(os.environ, CI_FAILURE_DIR=str(saved)))
             self.assertEqual(result.returncode, status)
             self.assertFalse(work.exists())
-            self.assertEqual((saved / "fixture.sh/evidence").exists(), status != 0)
+            copies = list(saved.glob("fixture.sh.*"))
+            self.assertEqual(len(copies), int(status != 0))
+            if copies:
+                self.assertEqual((copies[0] / "evidence").read_text(), "retained failure")
+
+    def test_repeated_shell_failures_keep_separate_evidence(self):
+        saved = self.root / "saved failures"
+        work = self.root / "same work directory"
+        statuses = (7, 9, 11)
+        for status in statuses:
+            work.mkdir()
+            (work / "evidence").write_text(str(status))
+            (work / ".hidden").write_text(str(status))
+            script = '''. "$1"; trap 'test_cleanup "$2"' EXIT; exit "$3"'''
+            result = subprocess.run(["sh", "-eu", "-c", script, "fixture.sh",
+                                     str(ROOT / "tests/test_cleanup.sh"), str(work), str(status)],
+                                    env=dict(os.environ, CI_FAILURE_DIR=str(saved)))
+            self.assertEqual(result.returncode, status)
+            self.assertFalse(work.exists())
+        copies = list(saved.glob("fixture.sh.*"))
+        self.assertEqual(len(copies), len(statuses))
+        self.assertEqual({(copy / "evidence").read_text() for copy in copies},
+                         {str(status) for status in statuses})
+        for copy in copies:
+            self.assertEqual({path.name for path in copy.iterdir()}, {"evidence", ".hidden"})
+            self.assertEqual((copy / ".hidden").read_text(), (copy / "evidence").read_text())
+
+    def test_failed_evidence_archive_keeps_original_and_exit(self):
+        work = self.root / "work"
+        work.mkdir()
+        (work / "evidence").write_text("retained failure")
+        saved = self.root / "not a directory"
+        saved.write_text("existing file")
+        script = '''. "$1"; trap 'test_cleanup "$2"' EXIT; exit 7'''
+        result = subprocess.run(["sh", "-eu", "-c", script, "fixture.sh",
+                                 str(ROOT / "tests/test_cleanup.sh"), str(work)],
+                                env=dict(os.environ, CI_FAILURE_DIR=str(saved)), capture_output=True)
+        self.assertEqual(result.returncode, 7)
+        self.assertEqual((work / "evidence").read_text(), "retained failure")
+        self.assertEqual(saved.read_text(), "existing file")
 
     def test_launcher_preserves_arguments_and_exit(self):
         launcher = self.root / "launcher with spaces"

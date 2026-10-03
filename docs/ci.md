@@ -1,10 +1,11 @@
 ---
 date: 2026-10-03
-datetime: 2026-10-03 11:56 JST
+datetime: 2026-10-03 14:45 JST
 model: OpenAI GPT-6 (Codex)
 summary: |
   Four pull-request CI configurations cover compilers, operating systems,
   replica parallelism, historical compatibility and frozen-data analysis.
+  Clarified lint platform requirements, download retries and failure evidence retention.
 ---
 
 # Continuous integration
@@ -108,15 +109,22 @@ python3 ci/verify_validation_data.py --output ci-results/data
 python3 -m unittest discover -s ci -p 'test_*.py' -v
 ```
 
+`sh ci/lint.sh` is for Linux x86_64 only: it downloads the Linux amd64
+actionlint binary and requires `sha256sum` and ShellCheck.
+
 ## Results and required check
 
 Each job records source and PR-head revisions, selected environment versions,
 binary hashes/linkage, commands, durations, exit codes and logs. The short
 parallel cases also retain inputs, outputs and rank exit codes. Selected legacy
 and parallel shell tests preserve temporary outputs on failure when
-`CI_FAILURE_DIR` is set. Artifacts are retained for 14 days. Command timeouts
+`CI_FAILURE_DIR` is set, using a separate `<script>.XXXXXX` directory for each
+failed invocation. If archiving fails, the original temporary outputs and test
+exit code are retained, and their location is reported in the log.
+Artifacts are retained for 14 days. Command timeouts
 terminate local process groups; failed stochastic tests are not retried with
-new seeds. Dependency downloads may retry network failures.
+new seeds. Only the actionlint download in `ci/lint.sh` has explicit retry
+handling (`curl --retry 2`) in these CI scripts.
 
 The final check is **`ci-gate`**. It requires all four jobs, the expected stages
 and the full case lists to succeed for the same source and PR-head revisions.

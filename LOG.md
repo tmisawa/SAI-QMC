@@ -2,6 +2,29 @@
 
 ---
 date: 2026-10-03
+datetime: 2026-10-03 14:45 JST
+model: OpenAI GPT-6 (Codex)
+summary: |
+  Preserve each failed shell-test invocation in a unique evidence directory.
+  Clarified Linux lint requirements and the scope of dependency-download retries.
+---
+
+## 2026-10-03: CI failure evidence retention
+
+Shell-test cleanup now creates a unique directory for every failed invocation
+and copies its contents, including hidden files, directly into that directory.
+Repeated failures of the same script no longer nest or overwrite prior outputs.
+If archiving fails, cleanup keeps the original outputs, reports their location
+and preserves the test's original exit status even with `set -e` enabled.
+
+The helper regressions now cover three successive failures of the same script
+and an unavailable archive directory. All 13 helper tests pass with Python 3.10
+and 3.12; actionlint, ShellCheck and shell syntax checks also pass. The CI guide
+now states that `ci/lint.sh` requires Linux x86_64 and that its actionlint download
+is the dependency download with explicit retries in the CI scripts.
+
+---
+date: 2026-10-03
 datetime: 2026-10-03 12:01 JST
 model: OpenAI GPT-6 (Codex)
 summary: |
