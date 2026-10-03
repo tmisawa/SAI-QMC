@@ -2,6 +2,56 @@
 
 ---
 date: 2026-10-03
+datetime: 2026-10-03 11:17 JST
+model: OpenAI GPT-6 (Codex)
+summary: |
+  Completed 36 P/P control runs with the same seeds and settings as the AP/P study.
+  Spin residuals occur in both boundaries; covariance-aware boundary differences remain diagnostic.
+---
+
+## 2026-10-03: Matched periodic-boundary control
+
+The [P/P control](data/periodic_4x4_U4_control/README.md) changes only bc_x
+from the frozen 4x4 AP/P dataset. All 36 runs and 720-bin integrity checks
+passed. At beta=16 after time-step extrapolation, S(Q) differs from its own
+ED by -2.98 nominal SE for P/P and -3.72 for AP/P. P/P also has a 3.09-SE
+SU(2) discrepancy at beta=8. Paired-seed analysis retains a 3.19-SE boundary
+SU(2) difference at beta=16; uncertainty-method sensitivity and thermal
+convergence limits are recorded rather than assigning a formal physics pass.
+The AP/P 382-file snapshot and QMC C source are unchanged. Independent raw-bin
+aggregation and matrix least squares reproduce both the P/P and paired results.
+
+These apparent SU(2) violations are considered in the context of the known
+low-temperature sampling and mixing problem motivating parallel tempering
+(see [spin statistics](docs/limitations.md#spin-statistics) and
+[PT validation](VALIDATION.md), section 10). The underlying model retains
+SU(2) symmetry. All 72 comparison runs use `tempering=none`, so this study
+does not establish how much PT improves these particular conditions.
+
+---
+date: 2026-10-03
+datetime: 2026-10-03 10:51 JST
+model: OpenAI GPT-6 (Codex)
+summary: |
+  Added 36 local 4x4 AP/P U=4 DQMC runs and a ground-state ED comparison.
+  Extrapolated energy and doublon agree at beta=16; spin agreement remains unresolved.
+---
+
+## 2026-10-03: Exploratory 4x4 antiperiodic ED comparison
+
+The [new dataset](data/antiperiodic_4x4_U4_ed/README.md) retains all inputs,
+raw bins, spin/scalar outputs, signed hopping matrices and executable bindings.
+All 36 runs and integrity checks passed. Three time steps at beta=4,8,16 were
+compared with an archived HΦ ground-state ED reference using four independent
+seeds per point. E/N and D at beta=16 agree with ED after time-step extrapolation.
+S(Q) differs by 3.72 nominal SE and paired extrapolated SU(2) by 3.17 SE;
+all-q and half-run diagnostics also flag limited spin statistics. This is an
+exploratory result, not a full interacting 4x4 validation. No QMC source changes
+or data exclusions were made. Numerical reanalysis and an independent matrix
+least-squares check reproduce the reported estimates.
+
+---
+date: 2026-10-03
 datetime: 2026-10-03 08:43 JST
 model: OpenAI GPT-6 (Codex)
 summary: |
