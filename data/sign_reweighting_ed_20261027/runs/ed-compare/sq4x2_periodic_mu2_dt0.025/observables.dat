@@ -1,0 +1,5 @@
+# lattice=square n=8 U=4 mu=2 dtau=0.025 bipartite=0 green_rebuild=combine parallel=omp nrep=8 bins=160 szz_file=szz.dat szz_nq=8 tprime=-0.20000000000000001 ph_symmetric=0 estimator=pooled_ratio sign_file=sign.dat
+# T  E_hub dE_hub  E_gc dE_gc  E_ph dE_ph  ntot dN  doublon dD  sign  acceptance dAcceptance
+1 -8.3265677 0.00581 -23.677391 0.00557 -15.677391 0.00557 7.67541 0.00041 0.13744941 5.9e-05 1 0.83434502 9.38e-05
+0.5 -10.814759 0.00611 -25.647715 0.00599 -17.647715 0.00599 7.41648 0.00076 0.12435523 7.3e-05 0.999862 0.83565407 7.04e-05
+0.25 -11.521899 0.00675 -26.103148 0.00635 -18.103148 0.00635 7.29062 0.0014 0.11704128 9.4e-05 0.974675 0.83330576 7.56e-05

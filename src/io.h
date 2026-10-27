@@ -17,7 +17,11 @@ typedef struct {
     int bc_x_given;
     int bc_y_given;
     double thop;
+    double tprime;                 /* lattice=square next-nearest hopping element; 0 when omitted */
+    int tprime_given;
     double U;
+    double mu;                     /* resolved chemical potential; U/2 when omitted */
+    int mu_given;
     double dtau;
     double beta_list[64];
     int nbeta;
@@ -57,6 +61,8 @@ typedef struct {
     char sperp_q[256];
     char sperp_file[256];
     char spin_consistency_file[256];
+    char sign_file[256];           /* none (default) | per-beta sign statistics table */
+    int sign_file_given;           /* 1 when sign_file is explicit, including none */
     unsigned long long seed;
 } Params;
 
@@ -66,5 +72,17 @@ int params_boundary_is_legacy(const Params *p);
 /* Header token: "pbc=0"/"pbc=1" when legacy, else "bc_x=<name>" (chain) or
    "bc_x=<name> bc_y=<name>" (square). Returns 1 when out is too small. */
 int params_boundary_label(const Params *p, char *out, size_t size);
+/* 1 when mu is omitted or equals U/2 exactly (no tolerance): the half-filling
+   candidate that becomes particle-hole symmetric on a bipartite lattice. */
+int params_mu_is_half(const Params *p);
+/* 1 when sign_file names an output. */
+int params_sign_output_enabled(const Params *p);
+/* 1 when mu, tprime or sign_file is given (including sign_file=none). Such
+   inputs use the exact bipartite test for hopping files and extended schema. */
+int params_new_keys(const Params *p);
+/* 1 when the extended output schema applies: params_new_keys, or a model
+   without particle-hole symmetry. Inputs without any of these keep the
+   legacy headers and columns. */
+int params_extended_schema(const Params *p, int ph_symmetric);
 
 #endif

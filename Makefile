@@ -109,7 +109,7 @@ test_szz_parallel: dqmc dqmc_omp dqmc_mpi dqmc_hybrid
 test_sperp_parallel: dqmc dqmc_omp dqmc_mpi dqmc_hybrid
 	@printf "%-35s " tests/test_sperp_parallel.sh; sh tests/test_sperp_parallel.sh
 
-test: $(TESTBIN) test_conditional_output test_szz test_sperp test_scalar test_dat test_global_disabled test_global_output test_global_hook_isolation test_tempering_output test_tempering_failure test_bc_output
+test: $(TESTBIN) test_conditional_output test_szz test_sperp test_scalar test_dat test_global_disabled test_global_output test_global_hook_isolation test_tempering_output test_tempering_failure test_bc_output test_sign_output
 	@fail=0; for t in $(TESTBIN); do printf "%-28s " $$t; ./$$t || fail=1; done; \
 	  if [ $$fail -ne 0 ]; then echo "SOME TESTS FAILED"; exit 1; fi; echo "ALL TESTS PASSED"
 
@@ -125,7 +125,7 @@ test_mpi: $(TESTBIN_MPI)
 	@fail=0; for t in $(TESTBIN_MPI); do printf "%-32s " $$t; $(MPIRUN) -np 1 ./$$t || fail=1; done; \
 	  if [ $$fail -ne 0 ]; then echo "SOME MPI TESTS FAILED"; exit 1; fi; echo "ALL MPI TESTS PASSED"
 
-test_hybrid: $(TESTBIN_HYBRID) test_conditional_parallel test_szz_parallel test_sperp_parallel test_scalar_parallel test_dat_parallel test_global_parallel test_tempering_parallel test_tempering_mpi_failure test_bc_parallel
+test_hybrid: $(TESTBIN_HYBRID) test_conditional_parallel test_szz_parallel test_sperp_parallel test_scalar_parallel test_dat_parallel test_global_parallel test_tempering_parallel test_tempering_mpi_failure test_bc_parallel test_sign_parallel
 	@fail=0; for t in $(TESTBIN_HYBRID); do printf "%-35s " $$t; $(MPIRUN) -np 1 ./$$t || fail=1; done; \
 	  if [ $$fail -ne 0 ]; then echo "SOME HYBRID TESTS FAILED"; exit 1; fi; echo "ALL HYBRID TESTS PASSED"
 
@@ -231,6 +231,23 @@ test_bc_default: dqmc
 	@printf "%-40s " tests/test_bc_default_unchanged.sh; sh tests/test_bc_default_unchanged.sh
 
 .PHONY: test_bc_default
+
+test_sign_output: dqmc $(HOOK_DIR)/dqmc
+	@printf "%-40s " tests/test_sign_output.py; $(PYTHON) tests/test_sign_output.py
+
+test_sign_parallel: dqmc dqmc_omp dqmc_mpi dqmc_hybrid $(HOOK_DIR)/dqmc $(HOOK_DIR)/dqmc_mpi $(HOOK_DIR)/dqmc_hybrid
+	@printf "%-40s " tests/test_sign_output.py; MPIRUN="$(MPIRUN)" $(PYTHON) tests/test_sign_output.py --parallel
+
+# Historical regression against the base of the sign-reweighting extension
+# (needs Git history); the parallel variant also compares the OpenMP/MPI/hybrid
+# builds and requires the same compilers on both sides.
+test_sign_default: dqmc
+	@printf "%-40s " tests/test_sign_default_unchanged.sh; sh tests/test_sign_default_unchanged.sh
+
+test_sign_default_parallel: dqmc dqmc_omp dqmc_mpi dqmc_hybrid
+	@printf "%-40s " tests/test_sign_default_unchanged.sh; MPIRUN="$(MPIRUN)" sh tests/test_sign_default_unchanged.sh parallel
+
+.PHONY: test_sign_output test_sign_parallel test_sign_default test_sign_default_parallel
 
 # Build-only targets allow bounded compilation without concurrent test execution.
 test_build: $(TESTBIN) dqmc $(HOOK_DIR)/dqmc

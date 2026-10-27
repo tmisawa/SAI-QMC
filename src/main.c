@@ -11,6 +11,7 @@
 #include "replica_run.h"
 #include "scalar_output.h"
 #include "replica_bin_out.h"
+#include "sign_ratio.h"
 #include "structure_factor.h"
 #include "tempering_out.h"
 #include "tempering_run.h"
@@ -70,7 +71,8 @@ static const char *output_conflict(const Params *p, const char *input_path,
         {"replica_bin_file", p->replica_bin_file},
         {"global_site_diag_file", p->global_site_diag_file},
         {"tempering_file", strcmp(p->tempering, "dtau_ladder") == 0
-                               ? p->tempering_file : NULL}
+                               ? p->tempering_file : NULL},
+        {"sign_file", params_sign_output_enabled(p) ? p->sign_file : NULL}
     };
     for (size_t k = 0; k < sizeof outputs / sizeof outputs[0]; k++) {
         /* Same string, same existing file (inode), or same resolved path:
@@ -131,7 +133,8 @@ static int validate_scalar_output_path(const Params *p, const char *input_path)
         {"global_site_diag_file", p->global_site_diag_file[0]
             ? p->global_site_diag_file : NULL},
         {"tempering_file", strcmp(p->tempering, "dtau_ladder") == 0 &&
-            p->tempering_file[0] ? p->tempering_file : NULL}
+            p->tempering_file[0] ? p->tempering_file : NULL},
+        {"sign_file", params_sign_output_enabled(p) ? p->sign_file : NULL}
     };
     for (size_t i = 0; i < sizeof occupied / sizeof occupied[0]; i++) {
         if (occupied[i].path != NULL && occupied[i].path[0] != '\0' &&
@@ -271,6 +274,29 @@ static int array_is_finite(const double *x, int n)
     return 1;
 }
 
+/* One scalar row: 14 columns, plus the two global-update columns when enabled.
+   NaN values keep their column (printed as nan). */
+static int print_scalar_row(FILE *scalar_fp, double T, double Eh, double Ehe,
+                            double Eg, double Ege, double Ep, double Epe,
+                            double Nm, double Ne, double Dm, double De,
+                            double Sm, double Am, double Ae, int global_enabled,
+                            double global_acceptance,
+                            unsigned long long global_attempts)
+{
+    int failed = scalar_output_printf(scalar_fp,
+           "%.6g %.8g %.3g %.8g %.3g %.8g %.3g %.6g %.2g %.8g %.2g %.6g %.8g %.3g",
+           T, Eh, Ehe, Eg, Ege, Ep, Epe, Nm, Ne, Dm, De, Sm, Am, Ae);
+    if (!global_enabled) {
+        failed |= scalar_output_printf(scalar_fp, "\n");
+    } else if (global_attempts == 0ULL) {
+        failed |= scalar_output_printf(scalar_fp, " nan 0\n");
+    } else {
+        failed |= scalar_output_printf(scalar_fp, " %.8g %llu\n", global_acceptance, global_attempts);
+    }
+    failed |= scalar_output_flush(scalar_fp);
+    return failed;
+}
+
 static int jackknife_and_print(FILE *scalar_fp, Profiler *prof,
                                int total_bins, double T,
                                double *Ehub, double *Egc, double *Eph,
@@ -312,18 +338,38 @@ static int jackknife_and_print(FILE *scalar_fp, Profiler *prof,
         fprintf(stderr, "ERROR: non-finite jackknife output at T=%.17g\n", T);
         return 1;
     }
-    int failed = scalar_output_printf(scalar_fp,
-           "%.6g %.8g %.3g %.8g %.3g %.8g %.3g %.6g %.2g %.8g %.2g %.6g %.8g %.3g",
-           T, Eh, Ehe, Eg, Ege, Ep, Epe, Nm, Ne, Dm, De, Sm, Am, Ae);
-    if (!global_enabled) {
-        failed |= scalar_output_printf(scalar_fp, "\n");
-    } else if (global_attempts == 0ULL) {
-        failed |= scalar_output_printf(scalar_fp, " nan 0\n");
-    } else {
-        failed |= scalar_output_printf(scalar_fp, " %.8g %llu\n", global_acceptance, global_attempts);
-    }
-    failed |= scalar_output_flush(scalar_fp);
-    return failed;
+    return print_scalar_row(scalar_fp, T, Eh, Ehe, Eg, Ege, Ep, Epe, Nm, Ne,
+                            Dm, De, Sm, Am, Ae, global_enabled,
+                            global_acceptance, global_attempts);
+}
+
+/* One row of szz_file, sperp_file or spin_consistency_file. */
+static void write_q_row(FILE *fp, const StructureFactorPlan *plan, int q,
+                        double beta_requested, double beta, double T,
+                        double mean, double err)
+{
+    const int folded_mx =
+        plan->Lx > 1 && plan->mx[q] > plan->Lx / 2
+            ? plan->mx[q] - plan->Lx
+            : plan->mx[q];
+    const int folded_my =
+        plan->Ly > 1 && plan->my[q] > plan->Ly / 2
+            ? plan->my[q] - plan->Ly
+            : plan->my[q];
+    const double qx = plan->Lx > 1
+                          ? 2.0 * (double)plan->mx[q] / plan->Lx
+                          : 0.0;
+    const double qy = plan->Ly > 1
+                          ? 2.0 * (double)plan->my[q] / plan->Ly
+                          : 0.0;
+    const double qx_folded =
+        plan->Lx > 1 ? 2.0 * (double)folded_mx / plan->Lx : 0.0;
+    const double qy_folded =
+        plan->Ly > 1 ? 2.0 * (double)folded_my / plan->Ly : 0.0;
+    fprintf(fp,
+            "%.17g %.17g %.17g %d %d %d %.17g %.17g %.17g %.17g %.17g %.17g\n",
+            beta_requested, beta, T, q, plan->mx[q], plan->my[q], qx,
+            qy, qx_folded, qy_folded, mean, err);
 }
 
 static int write_q_beta(FILE *fp, Profiler *prof,
@@ -349,28 +395,7 @@ static int write_q_beta(FILE *fp, Profiler *prof,
         if (!isfinite(mean) || !isfinite(err)) {
             return 1;
         }
-        const int folded_mx =
-            plan->Lx > 1 && plan->mx[q] > plan->Lx / 2
-                ? plan->mx[q] - plan->Lx
-                : plan->mx[q];
-        const int folded_my =
-            plan->Ly > 1 && plan->my[q] > plan->Ly / 2
-                ? plan->my[q] - plan->Ly
-                : plan->my[q];
-        const double qx = plan->Lx > 1
-                              ? 2.0 * (double)plan->mx[q] / plan->Lx
-                              : 0.0;
-        const double qy = plan->Ly > 1
-                              ? 2.0 * (double)plan->my[q] / plan->Ly
-                              : 0.0;
-        const double qx_folded =
-            plan->Lx > 1 ? 2.0 * (double)folded_mx / plan->Lx : 0.0;
-        const double qy_folded =
-            plan->Ly > 1 ? 2.0 * (double)folded_my / plan->Ly : 0.0;
-        fprintf(fp,
-                "%.17g %.17g %.17g %d %d %d %.17g %.17g %.17g %.17g %.17g %.17g\n",
-                beta_requested, beta, T, q, plan->mx[q], plan->my[q], qx,
-                qy, qx_folded, qy_folded, mean, err);
+        write_q_row(fp, plan, q, beta_requested, beta, T, mean, err);
     }
     if (fflush(fp) != 0 || ferror(fp)) {
         return 1;
@@ -411,28 +436,7 @@ static int write_spin_consistency_beta(
             free(delta_bins);
             return 1;
         }
-        const int folded_mx =
-            plan->Lx > 1 && plan->mx[q] > plan->Lx / 2
-                ? plan->mx[q] - plan->Lx
-                : plan->mx[q];
-        const int folded_my =
-            plan->Ly > 1 && plan->my[q] > plan->Ly / 2
-                ? plan->my[q] - plan->Ly
-                : plan->my[q];
-        const double qx = plan->Lx > 1
-                              ? 2.0 * (double)plan->mx[q] / plan->Lx
-                              : 0.0;
-        const double qy = plan->Ly > 1
-                              ? 2.0 * (double)plan->my[q] / plan->Ly
-                              : 0.0;
-        const double qx_folded =
-            plan->Lx > 1 ? 2.0 * (double)folded_mx / plan->Lx : 0.0;
-        const double qy_folded =
-            plan->Ly > 1 ? 2.0 * (double)folded_my / plan->Ly : 0.0;
-        fprintf(fp,
-                "%.17g %.17g %.17g %d %d %d %.17g %.17g %.17g %.17g %.17g %.17g\n",
-                beta_requested, beta, T, q, plan->mx[q], plan->my[q], qx,
-                qy, qx_folded, qy_folded, mean, err);
+        write_q_row(fp, plan, q, beta_requested, beta, T, mean, err);
     }
     free(delta_bins);
     return (fflush(fp) != 0 || ferror(fp)) ? 1 : 0;
@@ -516,6 +520,14 @@ static void fill_bin_meta(ReplicaBinMeta *meta, const Params *p,
     meta->szz_Q_index = has_Q ? plan_q_index(szz_plan, Qx, Qy) : -1;
     meta->szz_0_index = is_file ? -1 : plan_q_index(szz_plan, 0, 0);
     meta->sperp_Q_index = has_Q ? plan_q_index(sperp_plan, Qx, Qy) : -1;
+    const int ph = model_ph_symmetric(L, params_mu_is_half(p));
+    meta->schema = params_extended_schema(p, ph) ? 2 : 1;
+    meta->mu = p->mu;
+    meta->tprime = p->tprime;
+    meta->ph_symmetric = ph;
+    meta->estimator = ph ? "bin_ratio" : "pooled_ratio";
+    meta->nrep = p->nrep;
+    meta->nbeta = p->nbeta;
 }
 
 static void fill_site_diag_meta(GlobalSiteDiagMeta *meta, const Params *p,
@@ -694,10 +706,431 @@ static int write_gathered_bins(FILE *fp, const ReplicaBin *bins,
 }
 #endif
 
+/* Streams and settings shared by every beta point. NULL streams are skipped
+   (disabled outputs); a NULL scalar_fp still writes the scalar row to stdout. */
+typedef struct {
+    const Params *p;
+    const Lattice *L;
+    Profiler *prof;
+    FILE *scalar_fp, *szz_fp, *sperp_fp, *consistency_fp, *sign_fp;
+    const StructureFactorPlan *szz_plan, *sperp_plan;
+    int consistency_enabled, global_enabled, ph_symmetric;
+} BetaSinks;
+
+typedef struct {
+    int beta_index, Ltr;
+    double beta_requested, beta_effective, T, dtau;
+} BetaPoint;
+
+/* Validated sign statistics of the flat replica-bin blocks (replica-major).
+   S and count must hold nrep * nbin entries. */
+static int sign_blocks_or_error(const BetaSinks *o, const BetaPoint *bp,
+                                const ReplicaBin *bins, double *S, int *count,
+                                SignRatioBlocks *blk)
+{
+    const Params *p = o->p;
+    const int nblock = p->nrep * p->nbin;
+    const int per = p->nmeas / p->nbin;
+    for (int k = 0; k < nblock; k++) {
+        S[k] = bins[k].sum_sign;
+        count[k] = bins[k].count;
+    }
+    if (sign_ratio_blocks_init(blk, S, count, p->nrep, p->nbin, per) != 0) {
+        const int bad = sign_ratio_first_invalid_block(S, count, nblock, per);
+        fprintf(stderr,
+                "ERROR: invalid replica-bin sign sums or counts at beta=%.17g "
+                "(flat_bin=%d replica=%d bin=%d count=%d expected=%d "
+                "sum_sign=%.17g)\n",
+                bp->beta_requested, bad, bad >= 0 ? bad / p->nbin : -1,
+                bad >= 0 ? bad % p->nbin : -1, bad >= 0 ? count[bad] : -1, per,
+                bad >= 0 ? S[bad] : NAN);
+        return 1;
+    }
+    return 0;
+}
+
+static int write_sign_row(FILE *fp, const SignRatioBlocks *blk,
+                          int ph_symmetric, const BetaPoint *bp)
+{
+    if (fp == NULL) {
+        return 0;
+    }
+    fprintf(fp,
+            "%d %.17g %.17g %.17g %d %.17g %.17g %.17g %.17g %.17g %.17g %.17g "
+            "%d %d %lld %.17g %lld %d %d %d %s %d %d\n",
+            bp->beta_index, bp->beta_requested, bp->beta_effective, bp->T,
+            bp->Ltr, bp->dtau, blk->sign, blk->dsign, blk->f_neg, blk->df_neg,
+            blk->replica_sign_mean, blk->replica_sign_se, blk->nrep, blk->nbin,
+            blk->count_total, blk->S_total, blk->negative_count,
+            blk->n_replica_nonpositive, blk->n_bins_nonpositive,
+            blk->n_loo_nonpositive, sign_ratio_status_name(blk->status),
+            blk->sign_unresolved,
+            (!ph_symmetric && blk->negative_count == 0) ? 1 : 0);
+    int failed = fflush(fp) != 0 || ferror(fp);
+#ifdef AFQMC_TEST_HOOKS
+    failed |= getenv("AFQMC_TEST_SIGN_WRITE_FAIL") != NULL;
+#endif
+    if (failed) {
+        fprintf(stderr, "ERROR: failed to write sign_file at beta_index=%d\n",
+                bp->beta_index);
+        return 1;
+    }
+    return 0;
+}
+
+/* sign_file row of a beta point finalized by the per-bin (PH) estimator. */
+static int write_sign_row_from_bins(const BetaSinks *o, const BetaPoint *bp,
+                                    const ReplicaBin *bins)
+{
+    if (o->sign_fp == NULL) {
+        return 0;
+    }
+    const size_t nblock = (size_t)o->p->nrep * (size_t)o->p->nbin;
+    double *S = malloc(nblock * sizeof *S);
+    int *count = malloc(nblock * sizeof *count);
+    SignRatioBlocks blk;
+    int failed = S == NULL || count == NULL;
+    if (failed) {
+        fprintf(stderr, "ERROR: failed to allocate sign statistics\n");
+    } else {
+        failed = sign_blocks_or_error(o, bp, bins, S, count, &blk) ||
+                 write_sign_row(o->sign_fp, &blk, o->ph_symmetric, bp);
+    }
+    free(S);
+    free(count);
+    return failed;
+}
+
+/* Linear sum rule of the raw block sums, valid for any sign sum (also zero):
+   sum_q A_b(q) = prefactor * (A_N,b - 2 nsite A_D,b). The tolerance scales
+   with the measured magnitudes, not only with the cancelled values. */
+static int pooled_sum_rule_failed(const char *name,
+                                  const StructureFactorPlan *plan,
+                                  double prefactor, const double *raw,
+                                  const ReplicaBin *bins, int nblock, int nsite,
+                                  double beta)
+{
+    for (int b = 0; b < nblock; b++) {
+        const double *v = raw + (size_t)b * (size_t)plan->nq;
+        double lhs = 0.0;
+        double magnitude = 0.0;
+        for (int q = 0; q < plan->nq; q++) {
+            lhs += v[q];
+            magnitude += fabs(v[q]);
+        }
+        const double rhs = prefactor * (bins[b].sum_sign_N -
+                                        2.0 * (double)nsite * bins[b].sum_sign_D);
+        const double count = (double)bins[b].count;
+        const double scale =
+            fmax(count * fmax(1.0, 0.5 * (double)nsite), magnitude + fabs(rhs));
+        const double tol = 1e-12 * count + 1e-10 * scale;
+        if (!isfinite(lhs) || !isfinite(rhs) || !(fabs(lhs - rhs) <= tol)) {
+            fprintf(stderr,
+                    "ERROR: %s raw sum rule failed at beta=%.17g flat_bin=%d "
+                    "lhs=%.17g rhs=%.17g diff=%.17g tol=%.17g sum_sign=%.17g\n",
+                    name, beta, b, lhs, rhs, lhs - rhs, tol, bins[b].sum_sign);
+            return 1;
+        }
+    }
+    return 0;
+}
+
+/* Rows of one q file from raw block sums; with minus != NULL the numerator is
+   0.5 * raw - minus (the SU(2) residual) under the same blocks. */
+static int write_pooled_q(FILE *fp, const char *name,
+                          const StructureFactorPlan *plan,
+                          const SignRatioBlocks *blk, const BetaPoint *bp,
+                          const double *raw, const double *minus, double *work)
+{
+    const int nq = plan->nq;
+    const int nblock = blk->nblock;
+    for (int q = 0; q < nq; q++) {
+        const double *num = raw + q;
+        size_t stride = (size_t)nq;
+        if (minus != NULL) {
+            for (int b = 0; b < nblock; b++) {
+                const size_t k = (size_t)b * (size_t)nq + (size_t)q;
+                work[b] = 0.5 * raw[k] - minus[k];
+            }
+            num = work;
+            stride = 1;
+        }
+        double mean = NAN;
+        double err = NAN;
+        if (sign_ratio_estimate(blk, num, stride, &mean, &err) != 0) {
+            fprintf(stderr,
+                    "ERROR: non-finite raw %s sum or ratio overflow at "
+                    "beta=%.17g q=%d (incomplete MPI receive?)\n",
+                    name, bp->beta_requested, q);
+            return 1;
+        }
+        write_q_row(fp, plan, q, bp->beta_requested, bp->beta_effective, bp->T,
+                    mean, err);
+    }
+    if (fflush(fp) != 0 || ferror(fp)) {
+        fprintf(stderr, "ERROR: failed to write %s at beta=%.17g\n", name,
+                bp->beta_requested);
+        return 1;
+    }
+    return 0;
+}
+
+/* Non-PH finalization of one beta point from the raw replica-bin sums: one
+   pooled ratio and delete-one-block jackknife for the scalar observables,
+   Szz, Sperp and their SU(2) residual, sharing one ratio_status. A
+   non-positive total or leave-one-out sign sum makes the observables NaN
+   (WARNING, run continues); invalid raw data is an ERROR. bins, szz and
+   sperp are flat over blocks (replica-major); szz/sperp hold nq values per
+   block or are NULL when not measured. */
+static int finalize_pooled_beta(const BetaSinks *o, const BetaPoint *bp,
+                                const ReplicaBin *bins, const double *szz,
+                                const double *sperp)
+{
+    const Params *p = o->p;
+    const int nblock = p->nrep * p->nbin;
+    const int nsite = o->L->n;
+    double *S = malloc((size_t)nblock * sizeof *S);
+    int *count = malloc((size_t)nblock * sizeof *count);
+    double *A = malloc((size_t)nblock * sizeof *A);
+    int failed = S == NULL || count == NULL || A == NULL;
+    SignRatioBlocks blk;
+    if (failed) {
+        fprintf(stderr, "ERROR: failed to allocate pooled-ratio arrays\n");
+        goto done;
+    }
+    if (sign_blocks_or_error(o, bp, bins, S, count, &blk) != 0) {
+        failed = 1;
+        goto done;
+    }
+    profiler_phase_set(o->prof, PROF_PHASE_FINALIZE);
+    if (o->szz_plan->enabled && o->szz_plan->is_all &&
+        pooled_sum_rule_failed("Szz", o->szz_plan, 0.25, szz, bins, nblock,
+                               nsite, bp->beta_requested)) {
+        failed = 1;
+        goto done;
+    }
+    if (o->sperp_plan->enabled && o->sperp_plan->is_all &&
+        pooled_sum_rule_failed("Sperp", o->sperp_plan, 0.5, sperp, bins,
+                               nblock, nsite, bp->beta_requested)) {
+        failed = 1;
+        goto done;
+    }
+    if (blk.status != SIGN_RATIO_OK) {
+        fprintf(stderr,
+                "WARNING: sign-reweighted ratio not evaluable at beta=%.17g "
+                "(ratio_status=%s sum_sign=%.17g count=%lld "
+                "n_loo_nonpositive=%d); observables and errors are NaN\n",
+                bp->beta_requested, sign_ratio_status_name(blk.status),
+                blk.S_total, blk.count_total, blk.n_loo_nonpositive);
+    }
+
+    static const char *const names[5] = {"Ehub", "Egc", "Eph", "N", "D"};
+    double mean[5];
+    double err[5];
+    PROF_BEGIN(o->prof, t_pooled);
+    for (int k = 0; k < 5 && !failed; k++) {
+        for (int b = 0; b < nblock; b++) {
+            const ReplicaBin *x = &bins[b];
+            A[b] = k == 0 ? x->sum_sign_Ehub : k == 1 ? x->sum_sign_Egc
+                 : k == 2 ? x->sum_sign_Eph : k == 3 ? x->sum_sign_N
+                          : x->sum_sign_D;
+        }
+        if (sign_ratio_estimate(&blk, A, 1, &mean[k], &err[k]) != 0) {
+            fprintf(stderr,
+                    "ERROR: non-finite raw sum_sign_%s or ratio overflow at "
+                    "beta=%.17g\n",
+                    names[k], bp->beta_requested);
+            failed = 1;
+        }
+    }
+    PROF_END(o->prof, PROF_JACKKNIFE, t_pooled);
+    if (failed) {
+        goto done;
+    }
+    /* acceptance is a per-attempt statistic: never sign-reweighted */
+    for (int b = 0; b < nblock; b++) {
+        A[b] = replica_bin_acceptance(&bins[b]);
+    }
+    double Am = NAN;
+    double Ae = NAN;
+    if (!array_is_finite(A, nblock)) {
+        fprintf(stderr, "ERROR: non-finite acceptance at beta=%.17g\n",
+                bp->beta_requested);
+        failed = 1;
+        goto done;
+    }
+    jackknife(A, nblock, &Am, &Ae);
+    unsigned long long global_attempts = 0ULL;
+    const double global_acceptance =
+        replica_bins_global_acceptance(bins, nblock, &global_attempts);
+    if (print_scalar_row(o->scalar_fp, bp->T, mean[0], err[0], mean[1], err[1],
+                         mean[2], err[2], mean[3], err[3], mean[4], err[4],
+                         blk.sign, Am, Ae, o->global_enabled,
+                         global_acceptance, global_attempts) != 0) {
+        fprintf(stderr, "ERROR: failed to write scalar output at beta=%.17g\n",
+                bp->beta_requested);
+        failed = 1;
+        goto done;
+    }
+    if (o->szz_fp != NULL && o->szz_plan->enabled &&
+        write_pooled_q(o->szz_fp, "szz_file", o->szz_plan, &blk, bp, szz, NULL,
+                       A) != 0) {
+        failed = 1;
+        goto done;
+    }
+    if (o->sperp_fp != NULL && o->sperp_plan->enabled &&
+        write_pooled_q(o->sperp_fp, "sperp_file", o->sperp_plan, &blk, bp,
+                       sperp, NULL, A) != 0) {
+        failed = 1;
+        goto done;
+    }
+    if (o->consistency_fp != NULL && o->consistency_enabled &&
+        write_pooled_q(o->consistency_fp, "spin_consistency_file", o->szz_plan,
+                       &blk, bp, sperp, szz, A) != 0) {
+        failed = 1;
+        goto done;
+    }
+    failed = write_sign_row(o->sign_fp, &blk, o->ph_symmetric, bp);
+
+done:
+    free(S);
+    free(count);
+    free(A);
+    return failed;
+}
+
+#ifdef AFQMC_TEST_HOOKS
+/* Test builds only. AFQMC_TEST_POOLED_INJECT=<kind>:<beta_index>:<flat>[,...]
+   edits flat blocks of one beta point just before the pooled finalization:
+   flip negates every signed sum of the block (as if each measured sign were
+   reversed), nan makes its sum_sign_Ehub NaN, count adds one measurement. */
+static void test_hook_pooled_inject(int beta_index, ReplicaBin *bins,
+                                    double *szz, int nz, double *sperp, int np,
+                                    int nblock)
+{
+    const char *env = getenv("AFQMC_TEST_POOLED_INJECT");
+    char kind[8];
+    int target = -1;
+    int offset = 0;
+    if (env == NULL ||
+        sscanf(env, "%7[a-z]:%d:%n", kind, &target, &offset) != 2 ||
+        target != beta_index) {
+        return;
+    }
+    const char *list = env + offset;
+    while (*list != '\0') {
+        char *end = NULL;
+        const long k = strtol(list, &end, 10);
+        if (end == list) {
+            break;
+        }
+        if (k >= 0 && k < nblock) {
+            ReplicaBin *x = &bins[k];
+            if (strcmp(kind, "flip") == 0) {
+                x->sum_sign = -x->sum_sign;
+                x->sum_sign_Ehub = -x->sum_sign_Ehub;
+                x->sum_sign_Egc = -x->sum_sign_Egc;
+                x->sum_sign_Eph = -x->sum_sign_Eph;
+                x->sum_sign_N = -x->sum_sign_N;
+                x->sum_sign_D = -x->sum_sign_D;
+                for (int q = 0; szz != NULL && q < nz; q++) {
+                    szz[(size_t)k * (size_t)nz + (size_t)q] *= -1.0;
+                }
+                for (int q = 0; sperp != NULL && q < np; q++) {
+                    sperp[(size_t)k * (size_t)np + (size_t)q] *= -1.0;
+                }
+            } else if (strcmp(kind, "nan") == 0) {
+                x->sum_sign_Ehub = NAN;
+            } else if (strcmp(kind, "count") == 0) {
+                x->count += 1;
+            }
+        }
+        list = (*end == ',') ? end + 1 : end;
+    }
+}
+#endif
+
+/* finalize_pooled_beta for the in-process replica results. */
+static int finalize_pooled_results(const BetaSinks *o, const BetaPoint *bp,
+                                   const ReplicaResult *results)
+{
+    const Params *p = o->p;
+    const size_t nbin = (size_t)p->nbin;
+    const size_t nblock = (size_t)p->nrep * nbin;
+    const int nz = o->szz_plan->enabled ? o->szz_plan->nq : 0;
+    const int np = o->sperp_plan->enabled ? o->sperp_plan->nq : 0;
+    if (nblock > SIZE_MAX / sizeof(ReplicaBin) ||
+        (nz > 0 && nblock > SIZE_MAX / sizeof(double) / (size_t)nz) ||
+        (np > 0 && nblock > SIZE_MAX / sizeof(double) / (size_t)np)) {
+        fprintf(stderr, "ERROR: pooled-ratio dimensions overflow\n");
+        return 1;
+    }
+    ReplicaBin *bins = malloc(nblock * sizeof *bins);
+    double *szz = nz > 0 ? malloc(nblock * (size_t)nz * sizeof *szz) : NULL;
+    double *sperp = np > 0 ? malloc(nblock * (size_t)np * sizeof *sperp) : NULL;
+    int failed = bins == NULL || (nz > 0 && szz == NULL) ||
+                 (np > 0 && sperp == NULL);
+    for (int r = 0; !failed && r < p->nrep; r++) {
+        if (results[r].bins == NULL || results[r].nbin != p->nbin ||
+            results[r].szz.nq != nz || results[r].sperp.nq != np) {
+            fprintf(stderr, "ERROR: incomplete result of replica %d\n", r);
+            failed = 1;
+            break;
+        }
+        const size_t offset = (size_t)r * nbin;
+        memcpy(bins + offset, results[r].bins, nbin * sizeof *bins);
+        if (nz > 0) {
+            memcpy(szz + offset * (size_t)nz, results[r].szz.sum_sign_values,
+                   nbin * (size_t)nz * sizeof *szz);
+        }
+        if (np > 0) {
+            memcpy(sperp + offset * (size_t)np,
+                   results[r].sperp.sum_sign_values,
+                   nbin * (size_t)np * sizeof *sperp);
+        }
+    }
+    if (bins == NULL || (nz > 0 && szz == NULL) || (np > 0 && sperp == NULL)) {
+        fprintf(stderr, "ERROR: failed to allocate pooled-ratio blocks\n");
+    }
+    if (!failed) {
+#ifdef AFQMC_TEST_HOOKS
+        test_hook_pooled_inject(bp->beta_index, bins, szz, nz, sperp, np,
+                                (int)nblock);
+#endif
+        failed = finalize_pooled_beta(o, bp, bins, szz, sperp);
+    }
+    free(bins);
+    free(szz);
+    free(sperp);
+    return failed;
+}
+
+/* write_sign_row_from_bins for the in-process replica results. */
+static int write_sign_row_from_results(const BetaSinks *o, const BetaPoint *bp,
+                                       const ReplicaResult *results)
+{
+    if (o->sign_fp == NULL) {
+        return 0;
+    }
+    const size_t nbin = (size_t)o->p->nbin;
+    ReplicaBin *bins = malloc((size_t)o->p->nrep * nbin * sizeof *bins);
+    if (bins == NULL) {
+        fprintf(stderr, "ERROR: failed to allocate sign statistics\n");
+        return 1;
+    }
+    for (int r = 0; r < o->p->nrep; r++) {
+        memcpy(bins + (size_t)r * nbin, results[r].bins, nbin * sizeof *bins);
+    }
+    const int failed = write_sign_row_from_bins(o, bp, bins);
+    free(bins);
+    return failed;
+}
+
 static int close_outputs(const MpiEnv *env, FILE **scalar_fp,
                          FILE **replica_fp, FILE **szz_fp,
                          FILE **sperp_fp, FILE **consistency_fp,
-                         FILE **bin_fp, FILE **site_diag_fp, Profiler *prof)
+                         FILE **bin_fp, FILE **site_diag_fp, FILE **sign_fp,
+                         Profiler *prof)
 {
     int failed = 0;
     profiler_set_current(NULL);
@@ -754,6 +1187,17 @@ static int close_outputs(const MpiEnv *env, FILE **scalar_fp,
                 fprintf(stderr,
                         "ERROR: failed to close global_site_diag_file\n");
                 failed |= 1;
+            }
+        }
+        if (sign_fp != NULL && *sign_fp != NULL) {
+            int close_rc = fclose(*sign_fp);
+            *sign_fp = NULL;
+#ifdef AFQMC_TEST_HOOKS
+            close_rc |= getenv("AFQMC_TEST_SIGN_CLOSE_FAIL") != NULL;
+#endif
+            if (close_rc != 0) {
+                fprintf(stderr, "ERROR: failed to close sign_file\n");
+                failed = 1;
             }
         }
         profiler_close(prof);
@@ -1282,6 +1726,19 @@ int main(int argc, char **argv)
             return 1;
         }
     }
+    if (params_sign_output_enabled(&p)) {
+        const char *conflict = output_conflict(&p, argv[1], p.sign_file,
+                                               "sign_file");
+        if (mpi_any_failed(&mpi_env, conflict != NULL)) {
+            if (mpi_is_root(&mpi_env)) {
+                fprintf(stderr, "ERROR: output path collision: sign_file and %s both use %s\n",
+                        conflict != NULL ? conflict : "an output on another rank",
+                        p.sign_file);
+            }
+            mpi_finalize_if_enabled(&mpi_env);
+            return 1;
+        }
+    }
     const int global_enabled = strcmp(p.global_update, "site") == 0;
     Lattice L;
     if (strcmp(p.lattice, "file") == 0) {
@@ -1300,11 +1757,38 @@ int main(int argc, char **argv)
             mpi_finalize_if_enabled(&mpi_env);
             return 1;
         }
+        /* Inputs with the newer keys decide particle-hole symmetry from the
+           matrix that is propagated: no tolerance hides a small element.
+           The propagator reads one triangle, so the file must be exactly
+           symmetric. Legacy inputs keep the 1e-12 tolerances. */
+        if (params_new_keys(&p)) {
+            int exact_failed = 0;
+            if (!lattice_is_exactly_symmetric(&L)) {
+                if (mpi_is_root(&mpi_env)) {
+                    fprintf(stderr,
+                            "ERROR: latfile %s is not exactly symmetric; inputs "
+                            "with mu or sign_file need t_ij == t_ji\n",
+                            p.latfile);
+                }
+                exact_failed = 1;
+            } else if (lattice_apply_exact_bipartite(&L) != 0) {
+                if (mpi_is_root(&mpi_env)) {
+                    fprintf(stderr, "ERROR: failed to allocate the bipartite test\n");
+                }
+                exact_failed = 1;
+            }
+            if (exact_failed) {
+                lattice_free(&L);
+                mpi_finalize_if_enabled(&mpi_env);
+                return 1;
+            }
+        }
     } else if (strcmp(p.lattice, "square") == 0 ||
                strcmp(p.lattice, "chain") == 0) {
         const int bad_boundary =
             strcmp(p.lattice, "square") == 0
-                ? lattice_square_bc(&L, p.Lx, p.Ly, p.thop, p.bc_x, p.bc_y)
+                ? lattice_square_tprime_bc(&L, p.Lx, p.Ly, p.thop, p.tprime,
+                                           p.bc_x, p.bc_y)
                 : lattice_chain_bc(&L, p.Lx, p.thop, p.bc_x);
         if (bad_boundary) {
             if (mpi_is_root(&mpi_env)) {
@@ -1321,23 +1805,44 @@ int main(int argc, char **argv)
         mpi_finalize_if_enabled(&mpi_env);
         return 1;
     }
+    /* Same rule as model_init: the PH fast path needs mu = U/2 exactly and a
+       bipartite hopping matrix. Without it the sampler uses both spins and
+       the sign may be negative; the extended schema and the pooled estimator
+       then apply. */
+    const int ph_symmetric = model_ph_symmetric(&L, params_mu_is_half(&p));
+    const int extended_schema = params_extended_schema(&p, ph_symmetric);
+    const char *estimator = ph_symmetric ? "bin_ratio" : "pooled_ratio";
+    if (!ph_symmetric) {
+        const char *forbidden =
+            use_pt ? "tempering=dtau_ladder"
+            : strcmp(p.sweep_order, "alternating") == 0
+                ? "sweep_order=alternating"
+                : p.conditional_measure ? "conditional_measure=1" : NULL;
+        if (forbidden != NULL) {
+            if (mpi_is_root(&mpi_env)) {
+                fprintf(stderr,
+                        "ERROR: %s requires a particle-hole symmetric model "
+                        "(mu=U/2 on a bipartite lattice); got ph_symmetric=0 "
+                        "(mu=%.17g tprime=%.17g bipartite=%d)\n",
+                        forbidden, p.mu, p.tprime, L.is_bipartite);
+            }
+            lattice_free(&L);
+            mpi_finalize_if_enabled(&mpi_env);
+            return 1;
+        }
+        if (mpi_is_root(&mpi_env)) {
+            fprintf(stderr,
+                    "INFO: ph_symmetric=0 (mu=%.17g, tprime=%.17g, "
+                    "bipartite=%d); sign problem possible\n",
+                    p.mu, p.tprime, L.is_bipartite);
+        }
+    }
+
     if (mpi_is_root(&mpi_env)) {
         (void)lattice_dump(&L, "hopping_used.txt");
     }
 
-    if (!L.is_bipartite) {
-        if (mpi_is_root(&mpi_env)) {
-            fprintf(stderr,
-                    "ERROR: non-bipartite lattice is outside v1 scope; sign "
-                    "column would be only relative without determinant-sign "
-                    "initialization\n");
-        }
-        lattice_free(&L);
-        mpi_finalize_if_enabled(&mpi_env);
-        return 1;
-    }
-
-    const double mu = p.U / 2.0;
+    const double mu = p.mu;
 
 #ifndef AFQMC_USE_MPI
     if (parallel_uses_mpi(p.parallel)) {
@@ -1546,7 +2051,20 @@ int main(int argc, char **argv)
         snprintf(dtau_label17, sizeof dtau_label17, "%.17g", p.dtau);
     }
 
+    /* extended schema: full-precision mu and the model/estimator metadata;
+       legacy inputs keep their headers byte for byte */
+    char mu_label[64];
+    char model_label[256];
+    snprintf(mu_label, sizeof mu_label, extended_schema ? "%.17g" : "%g", mu);
+    model_label[0] = '\0';
+    if (extended_schema) {
+        snprintf(model_label, sizeof model_label,
+                 " tprime=%.17g ph_symmetric=%d estimator=%s", p.tprime,
+                 ph_symmetric, estimator);
+    }
+
     FILE *scalar_fp = NULL;
+    FILE *sign_fp = NULL;
     Profiler prof;
     int setup_failed = 0;
     if (mpi_is_root(&mpi_env)) {
@@ -1562,8 +2080,8 @@ int main(int argc, char **argv)
     profiler_set_current(&prof);
 
     if (mpi_is_root(&mpi_env)) {
-        setup_failed |= scalar_output_printf(scalar_fp, "# lattice=%s n=%d U=%g mu=%g dtau=%s bipartite=%d green_rebuild=%s parallel=%s nrep=%d bins=%d",
-               p.lattice, L.n, p.U, mu, dtau_label, L.is_bipartite,
+        setup_failed |= scalar_output_printf(scalar_fp, "# lattice=%s n=%d U=%g mu=%s dtau=%s bipartite=%d green_rebuild=%s parallel=%s nrep=%d bins=%d",
+               p.lattice, L.n, p.U, mu_label, dtau_label, L.is_bipartite,
                p.green_rebuild, p.parallel, p.nrep, p.nrep * p.nbin);
         if (!params_boundary_is_legacy(&p)) {
             setup_failed |= scalar_output_printf(scalar_fp, " %s", boundary_label);
@@ -1596,6 +2114,12 @@ int main(int argc, char **argv)
                                                  p.tempering_ltr, p.tempering_interval);
             if (p.tempering_file[0] != '\0') {
                 setup_failed |= scalar_output_printf(scalar_fp, " tempering_file=%s", p.tempering_file);
+            }
+        }
+        if (extended_schema) {
+            setup_failed |= scalar_output_printf(scalar_fp, "%s", model_label);
+            if (params_sign_output_enabled(&p)) {
+                setup_failed |= scalar_output_printf(scalar_fp, " sign_file=%s", p.sign_file);
             }
         }
         setup_failed |= scalar_output_printf(scalar_fp, "\n");
@@ -1660,9 +2184,9 @@ int main(int argc, char **argv)
             fprintf(szz_fp,
                     "# spin_operator=Szi=(n_up-n_down)/2 factor3_applied=0\n");
             fprintf(szz_fp,
-                    "# lattice=%s Lx=%d Ly=%d n=%d %s t=%.17g U=%.17g mu=%.17g dtau=%s\n",
+                    "# lattice=%s Lx=%d Ly=%d n=%d %s t=%.17g U=%.17g mu=%.17g dtau=%s%s\n",
                     p.lattice, L.Lx, L.Ly, L.n, boundary_label, p.thop, p.U, mu,
-                    dtau_label17);
+                    dtau_label17, model_label);
             fprintf(szz_fp,
                     "# szz_q=%s seed=%llu parallel=%s nrep=%d bins=%d nbeta=%d\n",
                     p.szz_q, p.seed, p.parallel, p.nrep, p.nrep * p.nbin,
@@ -1692,9 +2216,9 @@ int main(int argc, char **argv)
             fprintf(sperp_fp,
                     "# hs_caveat=individual spin-channel-HS samples select the z axis; equality is restored by ensemble averaging\n");
             fprintf(sperp_fp,
-                    "# lattice=%s Lx=%d Ly=%d n=%d %s t=%.17g U=%.17g mu=%.17g dtau=%s\n",
+                    "# lattice=%s Lx=%d Ly=%d n=%d %s t=%.17g U=%.17g mu=%.17g dtau=%s%s\n",
                     p.lattice, L.Lx, L.Ly, L.n, boundary_label, p.thop, p.U, mu,
-                    dtau_label17);
+                    dtau_label17, model_label);
             fprintf(sperp_fp,
                     "# sperp_q=%s seed=%llu parallel=%s nrep=%d bins=%d nbeta=%d\n",
                     p.sperp_q, p.seed, p.parallel, p.nrep, p.nrep * p.nbin,
@@ -1721,9 +2245,9 @@ int main(int argc, char **argv)
             fprintf(consistency_fp,
                     "# error=paired jackknife over the same sign-reweighted replica/bin samples\n");
             fprintf(consistency_fp,
-                    "# lattice=%s Lx=%d Ly=%d n=%d %s t=%.17g U=%.17g mu=%.17g dtau=%s\n",
+                    "# lattice=%s Lx=%d Ly=%d n=%d %s t=%.17g U=%.17g mu=%.17g dtau=%s%s\n",
                     p.lattice, L.Lx, L.Ly, L.n, boundary_label, p.thop, p.U, mu,
-                    dtau_label17);
+                    dtau_label17, model_label);
             fprintf(consistency_fp,
                     "# szz_q=%s sperp_q=%s seed=%llu parallel=%s nrep=%d bins=%d nbeta=%d\n",
                     p.szz_q, p.sperp_q, p.seed, p.parallel, p.nrep,
@@ -1738,9 +2262,48 @@ int main(int argc, char **argv)
         }
     }
 
+    if (params_sign_output_enabled(&p) && mpi_is_root(&mpi_env)) {
+        sign_fp = fopen(p.sign_file, "w");
+        if (sign_fp == NULL) {
+            fprintf(stderr, "ERROR: cannot open sign_file %s\n", p.sign_file);
+            setup_failed = 1;
+        } else {
+            fprintf(sign_fp,
+                    "# sign_file_schema=1\n"
+                    "# sign = sum_sign_total / count_total over every replica-bin "
+                    "block; dsign = delete-one-block jackknife error\n"
+                    "# f_neg = (1 - sign) / 2 = fraction of measured configurations "
+                    "with negative sign; df_neg = dsign / 2; neither is clipped\n"
+                    "# replica_sign_mean = mean of sum_sign_r / count_r over every "
+                    "replica (non-positive included); replica_sign_se = sample "
+                    "standard error (nan for nrep=1)\n"
+                    "# ratio_status: ok | nonpositive_total (sum_sign_total <= 0) | "
+                    "nonpositive_loo (a delete-one-block sign sum <= 0); "
+                    "observables are NaN unless ok\n"
+                    "# sign_unresolved=1: 0 < sign <= 2 dsign; "
+                    "no_negative_observed=1: ph_symmetric=0 and negative_count=0 "
+                    "(finite sample, not a sign-free model)\n"
+                    "# lattice=%s Lx=%d Ly=%d n=%d %s t=%.17g U=%.17g mu=%.17g "
+                    "dtau=%s%s bipartite=%d nwarm=%d nmeas=%d nbin=%d nrep=%d "
+                    "seed=%llu parallel=%s\n"
+                    "# columns: beta_index beta_requested beta_effective T Ltr dtau "
+                    "sign dsign f_neg df_neg replica_sign_mean replica_sign_se nrep "
+                    "nbin count_total sum_sign_total negative_count "
+                    "n_replica_nonpositive n_bins_nonpositive n_loo_nonpositive "
+                    "ratio_status sign_unresolved no_negative_observed\n",
+                    p.lattice, L.Lx, L.Ly, L.n, boundary_label, p.thop, p.U, mu,
+                    dtau_label17, model_label, L.is_bipartite, p.nwarm, p.nmeas,
+                    p.nbin, p.nrep, p.seed, p.parallel);
+            if (fflush(sign_fp) != 0 || ferror(sign_fp)) {
+                fprintf(stderr, "ERROR: failed to write sign_file header\n");
+                setup_failed = 1;
+            }
+        }
+    }
+
     if (mpi_any_failed(&mpi_env, setup_failed)) {
         (void)close_outputs(&mpi_env, &scalar_fp, &replica_fp, &szz_fp, &sperp_fp,
-                            &consistency_fp, &bin_fp, &site_diag_fp, &prof);
+                            &consistency_fp, &bin_fp, &site_diag_fp, &sign_fp, &prof);
         free_structure_plans(&szz_plan, &sperp_plan_storage, plans_shared);
         lattice_free(&L);
         mpi_finalize_if_enabled(&mpi_env);
@@ -1755,13 +2318,16 @@ int main(int argc, char **argv)
         run_tempering_ladders(&p, &L, mu, &mpi_env, &szz_plan, sperp_plan,
                               &pt) != 0) {
         (void)close_outputs(&mpi_env, &scalar_fp, &replica_fp, &szz_fp, &sperp_fp,
-                            &consistency_fp, &bin_fp, &site_diag_fp, &prof);
+                            &consistency_fp, &bin_fp, &site_diag_fp, &sign_fp, &prof);
         free_structure_plans(&szz_plan, &sperp_plan_storage, plans_shared);
         lattice_free(&L);
         mpi_finalize_if_enabled(&mpi_env);
         return 1;
     }
 
+    const BetaSinks sinks = {&p, &L, &prof, scalar_fp, szz_fp, sperp_fp,
+                             consistency_fp, sign_fp, &szz_plan, sperp_plan,
+                             consistency_enabled, global_enabled, ph_symmetric};
     for (int b = 0; b < p.nbeta; b++) {
         const double beta = p.beta_list[b];
         const int Ltr = use_pt ? p.tempering_ltr : (int)lround(beta / p.dtau);
@@ -1774,7 +2340,7 @@ int main(int argc, char **argv)
                         beta, p.dtau, beta / p.dtau);
             }
             (void)close_outputs(&mpi_env, &scalar_fp, &replica_fp, &szz_fp, &sperp_fp,
-                                &consistency_fp, &bin_fp, &site_diag_fp, &prof);
+                                &consistency_fp, &bin_fp, &site_diag_fp, &sign_fp, &prof);
             free_structure_plans(&szz_plan, &sperp_plan_storage,
                                  plans_shared);
             lattice_free(&L);
@@ -1783,6 +2349,7 @@ int main(int argc, char **argv)
         }
         const double beta_eff = Ltr * dtau_b;
         const double T = 1.0 / beta_eff;
+        const BetaPoint bp = {b, Ltr, beta, beta_eff, T, dtau_b};
         profiler_beta_begin(&prof, beta, T, dtau_b, Ltr);
         if (parallel_uses_mpi(p.parallel)) {
             profiler_set_mpi_metadata(&prof, p.nrep, p.parallel,
@@ -1806,7 +2373,7 @@ int main(int argc, char **argv)
             free_replica_arrays(seeds, results, replica_profs, replica_failed,
                                 p.nrep);
             (void)close_outputs(&mpi_env, &scalar_fp, &replica_fp, &szz_fp, &sperp_fp,
-                                &consistency_fp, &bin_fp, &site_diag_fp, &prof);
+                                &consistency_fp, &bin_fp, &site_diag_fp, &sign_fp, &prof);
             free_structure_plans(&szz_plan, &sperp_plan_storage,
                                  plans_shared);
             lattice_free(&L);
@@ -1826,7 +2393,7 @@ int main(int argc, char **argv)
             free_replica_arrays(seeds, results, replica_profs, replica_failed,
                                 p.nrep);
             (void)close_outputs(&mpi_env, &scalar_fp, &replica_fp, &szz_fp, &sperp_fp,
-                                &consistency_fp, &bin_fp, &site_diag_fp, &prof);
+                                &consistency_fp, &bin_fp, &site_diag_fp, &sign_fp, &prof);
             free_structure_plans(&szz_plan, &sperp_plan_storage,
                                  plans_shared);
             lattice_free(&L);
@@ -2228,7 +2795,8 @@ int main(int argc, char **argv)
                 if (!root_post_failed) {
                     replica_mpi_unpack_bins(all_values, all_counts,
                                             total_bins, global_bins);
-                    for (int out = 0; out < total_bins; out++) {
+                    /* non-PH: raw sums go to finalize_pooled_beta unchanged */
+                    for (int out = 0; ph_symmetric && out < total_bins; out++) {
                         if (replica_bin_values(&global_bins[out], &Ehub[out],
                                                &Egc[out], &Eph[out],
                                                &Nbin[out], &Dbin[out],
@@ -2370,24 +2938,40 @@ int main(int argc, char **argv)
                 }
             }
 
+            if (mpi_env.rank == 0 && !ph_symmetric) {
+#ifdef AFQMC_TEST_HOOKS
+                test_hook_pooled_inject(b, global_bins,
+                                        szz_plan.enabled ? all_szz : NULL,
+                                        szz_plan.enabled ? szz_plan.nq : 0,
+                                        sperp_plan->enabled ? all_sperp : NULL,
+                                        sperp_plan->enabled ? sperp_plan->nq : 0,
+                                        total_bins);
+#endif
+                root_post_failed = finalize_pooled_beta(
+                    &sinks, &bp, global_bins, szz_plan.enabled ? all_szz : NULL,
+                    sperp_plan->enabled ? all_sperp : NULL);
+            }
             if (mpi_env.rank == 0) {
                 unsigned long long global_attempts = 0ULL;
                 const double global_acceptance = replica_bins_global_acceptance(
                     global_bins, total_bins, &global_attempts);
-                root_post_failed = jackknife_and_print(
-                    scalar_fp, &prof, total_bins, T, Ehub, Egc, Eph, Nbin, Dbin, Sbin,
-                    Accbin, global_enabled, global_acceptance, global_attempts);
-                if (!root_post_failed && szz_plan.enabled) {
+                if (ph_symmetric) {
+                    root_post_failed = jackknife_and_print(
+                        scalar_fp, &prof, total_bins, T, Ehub, Egc, Eph, Nbin,
+                        Dbin, Sbin, Accbin, global_enabled, global_acceptance,
+                        global_attempts);
+                }
+                if (ph_symmetric && !root_post_failed && szz_plan.enabled) {
                     root_post_failed = write_q_beta(
                         szz_fp, &prof, &szz_plan, beta, beta_eff, T, szz_bins,
                         total_bins);
                 }
-                if (!root_post_failed && sperp_plan->enabled) {
+                if (ph_symmetric && !root_post_failed && sperp_plan->enabled) {
                     root_post_failed = write_q_beta(
                         sperp_fp, &prof, sperp_plan, beta, beta_eff, T,
                         sperp_bins, total_bins);
                 }
-                if (!root_post_failed && consistency_enabled) {
+                if (ph_symmetric && !root_post_failed && consistency_enabled) {
                     root_post_failed = write_spin_consistency_beta(
                         consistency_fp, &prof, &szz_plan, beta, beta_eff, T,
                         szz_bins, sperp_bins, total_bins);
@@ -2417,6 +3001,10 @@ int main(int argc, char **argv)
                     }
                     free(diags);
                     free(ids);
+                }
+                if (ph_symmetric && !root_post_failed) {
+                    root_post_failed =
+                        write_sign_row_from_bins(&sinks, &bp, global_bins);
                 }
                 if (p.profile) {
                     profiler_set_mpi_metadata(&prof, p.nrep, p.parallel,
@@ -2468,7 +3056,7 @@ int main(int argc, char **argv)
             if (mpi_any_failed(&mpi_env, mpi_beta_failed)) {
                 (void)close_outputs(&mpi_env, &scalar_fp, &replica_fp, &szz_fp,
                                     &sperp_fp, &consistency_fp, &bin_fp,
-                                    &site_diag_fp, &prof);
+                                    &site_diag_fp, &sign_fp, &prof);
                 free_structure_plans(&szz_plan, &sperp_plan_storage,
                                      plans_shared);
                 lattice_free(&L);
@@ -2549,12 +3137,44 @@ int main(int argc, char **argv)
             free_replica_arrays(seeds, results, replica_profs, replica_failed,
                                 p.nrep);
             (void)close_outputs(&mpi_env, &scalar_fp, &replica_fp, &szz_fp, &sperp_fp,
-                                &consistency_fp, &bin_fp, &site_diag_fp, &prof);
+                                &consistency_fp, &bin_fp, &site_diag_fp, &sign_fp, &prof);
             free_structure_plans(&szz_plan, &sperp_plan_storage,
                                  plans_shared);
             lattice_free(&L);
             mpi_finalize_if_enabled(&mpi_env);
             return 1;
+        }
+
+        if (!ph_symmetric) {
+            /* raw sums to the end: no per-bin ratio is formed */
+            int pooled_failed = finalize_pooled_results(&sinks, &bp, results);
+            if (!pooled_failed &&
+                write_serial_bins(bin_fp, results, &p, &L, b, Ltr, dtau_b,
+                                  &szz_plan, sperp_plan) != 0) {
+                fprintf(stderr, "ERROR: failed to finalize replica bins at beta=%.17g\n", beta);
+                pooled_failed = 1;
+            }
+            if (!pooled_failed &&
+                write_serial_site_diag(site_diag_fp, results, &p, &L, b, Ltr) != 0) {
+                fprintf(stderr,
+                        "ERROR: failed to finalize site diagnostics at beta=%.17g\n",
+                        beta);
+                pooled_failed = 1;
+            }
+            free_replica_arrays(seeds, results, replica_profs, replica_failed,
+                                p.nrep);
+            if (pooled_failed) {
+                (void)close_outputs(&mpi_env, &scalar_fp, &replica_fp, &szz_fp,
+                                    &sperp_fp, &consistency_fp, &bin_fp,
+                                    &site_diag_fp, &sign_fp, &prof);
+                free_structure_plans(&szz_plan, &sperp_plan_storage,
+                                     plans_shared);
+                lattice_free(&L);
+                mpi_finalize_if_enabled(&mpi_env);
+                return 1;
+            }
+            profiler_beta_end(&prof);
+            continue;
         }
 
         double *Ehub = calloc((size_t)total_bins, sizeof(double));
@@ -2576,7 +3196,7 @@ int main(int argc, char **argv)
             free_replica_arrays(seeds, results, replica_profs, replica_failed,
                                 p.nrep);
             (void)close_outputs(&mpi_env, &scalar_fp, &replica_fp, &szz_fp, &sperp_fp,
-                                &consistency_fp, &bin_fp, &site_diag_fp, &prof);
+                                &consistency_fp, &bin_fp, &site_diag_fp, &sign_fp, &prof);
             free_structure_plans(&szz_plan, &sperp_plan_storage,
                                  plans_shared);
             lattice_free(&L);
@@ -2594,7 +3214,7 @@ int main(int argc, char **argv)
                 free_replica_arrays(seeds, results, replica_profs,
                                     replica_failed, p.nrep);
                 (void)close_outputs(&mpi_env, &scalar_fp, &replica_fp, &szz_fp,
-                                    &sperp_fp, &consistency_fp, &bin_fp, &site_diag_fp, &prof);
+                                    &sperp_fp, &consistency_fp, &bin_fp, &site_diag_fp, &sign_fp, &prof);
                 free_structure_plans(&szz_plan, &sperp_plan_storage,
                                      plans_shared);
                 lattice_free(&L);
@@ -2613,7 +3233,7 @@ int main(int argc, char **argv)
                 free_replica_arrays(seeds, results, replica_profs,
                                     replica_failed, p.nrep);
                 (void)close_outputs(&mpi_env, &scalar_fp, &replica_fp, &szz_fp,
-                                    &sperp_fp, &consistency_fp, &bin_fp, &site_diag_fp, &prof);
+                                    &sperp_fp, &consistency_fp, &bin_fp, &site_diag_fp, &sign_fp, &prof);
                 free_structure_plans(&szz_plan, &sperp_plan_storage,
                                      plans_shared);
                 lattice_free(&L);
@@ -2638,7 +3258,7 @@ int main(int argc, char **argv)
                 free_replica_arrays(seeds, results, replica_profs,
                                     replica_failed, p.nrep);
                 (void)close_outputs(&mpi_env, &scalar_fp, &replica_fp, &szz_fp,
-                                    &sperp_fp, &consistency_fp, &bin_fp, &site_diag_fp, &prof);
+                                    &sperp_fp, &consistency_fp, &bin_fp, &site_diag_fp, &sign_fp, &prof);
                 free_structure_plans(&szz_plan, &sperp_plan_storage,
                                      plans_shared);
                 lattice_free(&L);
@@ -2661,7 +3281,7 @@ int main(int argc, char **argv)
                 free_replica_arrays(seeds, results, replica_profs,
                                     replica_failed, p.nrep);
                 (void)close_outputs(&mpi_env, &scalar_fp, &replica_fp, &szz_fp,
-                                    &sperp_fp, &consistency_fp, &bin_fp, &site_diag_fp, &prof);
+                                    &sperp_fp, &consistency_fp, &bin_fp, &site_diag_fp, &sign_fp, &prof);
                 free_structure_plans(&szz_plan, &sperp_plan_storage,
                                      plans_shared);
                 lattice_free(&L);
@@ -2696,7 +3316,7 @@ int main(int argc, char **argv)
                     free_replica_arrays(seeds, results, replica_profs,
                                         replica_failed, p.nrep);
                     (void)close_outputs(&mpi_env, &scalar_fp, &replica_fp, &szz_fp,
-                                        &sperp_fp, &consistency_fp, &bin_fp, &site_diag_fp, &prof);
+                                        &sperp_fp, &consistency_fp, &bin_fp, &site_diag_fp, &sign_fp, &prof);
                     free_structure_plans(&szz_plan, &sperp_plan_storage,
                                          plans_shared);
                     lattice_free(&L);
@@ -2723,7 +3343,7 @@ int main(int argc, char **argv)
                                             replica_failed, p.nrep);
                         (void)close_outputs(&mpi_env, &scalar_fp, &replica_fp, &szz_fp,
                                             &sperp_fp, &consistency_fp, &bin_fp,
-                                            &site_diag_fp, &prof);
+                                            &site_diag_fp, &sign_fp, &prof);
                         free_structure_plans(&szz_plan, &sperp_plan_storage,
                                              plans_shared);
                         lattice_free(&L);
@@ -2750,7 +3370,7 @@ int main(int argc, char **argv)
                                             replica_failed, p.nrep);
                         (void)close_outputs(&mpi_env, &scalar_fp, &replica_fp, &szz_fp,
                                             &sperp_fp, &consistency_fp, &bin_fp,
-                                            &site_diag_fp, &prof);
+                                            &site_diag_fp, &sign_fp, &prof);
                         free_structure_plans(&szz_plan, &sperp_plan_storage,
                                              plans_shared);
                         lattice_free(&L);
@@ -2781,7 +3401,7 @@ int main(int argc, char **argv)
                                             replica_failed, p.nrep);
                         (void)close_outputs(&mpi_env, &scalar_fp, &replica_fp, &szz_fp,
                                             &sperp_fp, &consistency_fp, &bin_fp,
-                                            &site_diag_fp, &prof);
+                                            &site_diag_fp, &sign_fp, &prof);
                         free_structure_plans(&szz_plan, &sperp_plan_storage,
                                              plans_shared);
                         lattice_free(&L);
@@ -2809,7 +3429,7 @@ int main(int argc, char **argv)
                                             replica_failed, p.nrep);
                         (void)close_outputs(&mpi_env, &scalar_fp, &replica_fp, &szz_fp,
                                             &sperp_fp, &consistency_fp, &bin_fp,
-                                            &site_diag_fp, &prof);
+                                            &site_diag_fp, &sign_fp, &prof);
                         free_structure_plans(&szz_plan, &sperp_plan_storage,
                                              plans_shared);
                         lattice_free(&L);
@@ -2844,7 +3464,7 @@ int main(int argc, char **argv)
             free_replica_arrays(seeds, results, replica_profs, replica_failed,
                                 p.nrep);
             (void)close_outputs(&mpi_env, &scalar_fp, &replica_fp, &szz_fp, &sperp_fp,
-                                &consistency_fp, &bin_fp, &site_diag_fp, &prof);
+                                &consistency_fp, &bin_fp, &site_diag_fp, &sign_fp, &prof);
             free_structure_plans(&szz_plan, &sperp_plan_storage,
                                  plans_shared);
             lattice_free(&L);
@@ -2865,7 +3485,7 @@ int main(int argc, char **argv)
             free_replica_arrays(seeds, results, replica_profs, replica_failed,
                                 p.nrep);
             (void)close_outputs(&mpi_env, &scalar_fp, &replica_fp, &szz_fp, &sperp_fp,
-                                &consistency_fp, &bin_fp, &site_diag_fp, &prof);
+                                &consistency_fp, &bin_fp, &site_diag_fp, &sign_fp, &prof);
             free_structure_plans(&szz_plan, &sperp_plan_storage,
                                  plans_shared);
             lattice_free(&L);
@@ -2886,7 +3506,7 @@ int main(int argc, char **argv)
             free_replica_arrays(seeds, results, replica_profs, replica_failed,
                                 p.nrep);
             (void)close_outputs(&mpi_env, &scalar_fp, &replica_fp, &szz_fp, &sperp_fp,
-                                &consistency_fp, &bin_fp, &site_diag_fp, &prof);
+                                &consistency_fp, &bin_fp, &site_diag_fp, &sign_fp, &prof);
             free_structure_plans(&szz_plan, &sperp_plan_storage,
                                  plans_shared);
             lattice_free(&L);
@@ -2910,7 +3530,7 @@ int main(int argc, char **argv)
             free_replica_arrays(seeds, results, replica_profs, replica_failed,
                                 p.nrep);
             (void)close_outputs(&mpi_env, &scalar_fp, &replica_fp, &szz_fp, &sperp_fp,
-                                &consistency_fp, &bin_fp, &site_diag_fp, &prof);
+                                &consistency_fp, &bin_fp, &site_diag_fp, &sign_fp, &prof);
             free_structure_plans(&szz_plan, &sperp_plan_storage,
                                  plans_shared);
             lattice_free(&L);
@@ -2928,7 +3548,7 @@ int main(int argc, char **argv)
             free_measurement_arrays(Ehub, Egc, Eph, Nbin, Dbin, Sbin, Accbin);
             free_replica_arrays(seeds, results, replica_profs, replica_failed, p.nrep);
             (void)close_outputs(&mpi_env, &scalar_fp, &replica_fp, &szz_fp, &sperp_fp,
-                                &consistency_fp, &bin_fp, &site_diag_fp, &prof);
+                                &consistency_fp, &bin_fp, &site_diag_fp, &sign_fp, &prof);
             free_structure_plans(&szz_plan, &sperp_plan_storage, plans_shared);
             lattice_free(&L);
             mpi_finalize_if_enabled(&mpi_env);
@@ -2949,7 +3569,7 @@ int main(int argc, char **argv)
                                 p.nrep);
             (void)close_outputs(&mpi_env, &scalar_fp, &replica_fp, &szz_fp,
                                 &sperp_fp, &consistency_fp, &bin_fp,
-                                &site_diag_fp, &prof);
+                                &site_diag_fp, &sign_fp, &prof);
             free_structure_plans(&szz_plan, &sperp_plan_storage,
                                  plans_shared);
             lattice_free(&L);
@@ -2957,6 +3577,8 @@ int main(int argc, char **argv)
             return 1;
         }
 
+        const int sign_row_failed =
+            write_sign_row_from_results(&sinks, &bp, results);
         free(szz_bins);
         free(szz_values);
         free(sperp_bins);
@@ -2964,6 +3586,16 @@ int main(int argc, char **argv)
         free_measurement_arrays(Ehub, Egc, Eph, Nbin, Dbin, Sbin, Accbin);
         free_replica_arrays(seeds, results, replica_profs, replica_failed,
                             p.nrep);
+        if (sign_row_failed) {
+            (void)close_outputs(&mpi_env, &scalar_fp, &replica_fp, &szz_fp,
+                                &sperp_fp, &consistency_fp, &bin_fp,
+                                &site_diag_fp, &sign_fp, &prof);
+            free_structure_plans(&szz_plan, &sperp_plan_storage,
+                                 plans_shared);
+            lattice_free(&L);
+            mpi_finalize_if_enabled(&mpi_env);
+            return 1;
+        }
         profiler_beta_end(&prof);
     }
     tempering_state_free(&pt, p.nbeta);
@@ -2979,7 +3611,7 @@ int main(int argc, char **argv)
     }
     const int close_failed = elapsed_failed | close_outputs(
         &mpi_env, &scalar_fp, &replica_fp, &szz_fp, &sperp_fp, &consistency_fp,
-        &bin_fp, &site_diag_fp, &prof);
+        &bin_fp, &site_diag_fp, &sign_fp, &prof);
     free_structure_plans(&szz_plan, &sperp_plan_storage, plans_shared);
     lattice_free(&L);
     if (mpi_any_failed(&mpi_env, close_failed)) {

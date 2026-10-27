@@ -152,11 +152,34 @@ Lx=4
 Ly=4
 bc_x=apbc
 $common"
-expect_reject e_odd 'ERROR: non-bipartite lattice is outside v1 scope' "lattice=square
+# A closed odd direction is not bipartite. Since the sign-reweighting
+# extension it runs on the two-spin path with the pooled estimator and the
+# extended header instead of being rejected; PT still requires PH symmetry.
+run e_odd "lattice=square
 Lx=4
 Ly=3
 bc_x=antiperiodic
 $common"
+[ "$rc" -eq 0 ] || bad "E e_odd exit $rc: $(head -1 "$work/e_odd/stderr.txt")"
+grep -qF 'INFO: ph_symmetric=0 (mu=2, tprime=0, bipartite=0); sign problem possible' \
+  "$work/e_odd/stderr.txt" || bad "E e_odd INFO line"
+grep -q '^# lattice=square n=12 U=4 mu=2 .* bipartite=0 .* ph_symmetric=0 estimator=pooled_ratio$' \
+  "$work/e_odd/observables.dat" || bad "E e_odd extended header"
+expect_reject e_odd_pt 'ERROR: tempering=dtau_ladder requires a particle-hole symmetric model' "lattice=square
+Lx=4
+Ly=3
+bc_x=antiperiodic
+t=-1.0
+U=4
+beta_list=1,2
+tempering=dtau_ladder
+tempering_ltr=10
+nwarm=20
+nmeas=40
+nbin=2
+stab=4
+seed=20261002"
+[ ! -e "$work/e_odd_pt/observables.dat" ] || bad "E e_odd_pt opened an output before the gate"
 
 # (F) tempering + conditional measurement + global update with AP/P (no timing compared)
 run f_pt "$ap

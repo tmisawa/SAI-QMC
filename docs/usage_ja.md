@@ -1,8 +1,10 @@
 ---
-date: 2026-10-03
-datetime: 2026-10-03 08:43 JST
-model: OpenAI GPT-6 (Codex); OpenAI GPT-5.6 Luna (Codex; 2026-10-02 directional boundaries); OpenAI GPT-6 (Codex; 2026-10-03 metadata update)
+date: 2026-10-27
+datetime: 2026-10-27 17:05 JST
+model: OpenAI GPT-6 (Codex); OpenAI GPT-5.6 Luna (Codex; 2026-10-02 directional boundaries); OpenAI GPT-6 (Codex; 2026-10-03 metadata update); Claude Opus 5.5 (Claude Code; 2026-10-27 sign reweighting); OpenAI GPT-6 (Codex; 2026-10-27 explicit sign_file and q validation)
 summary: |
+  2026-10-27: explicit sign_file=none selects exact file PH testing and extended headers; unmeasured q requires NaN.
+  2026-10-27: mu・tprime・sign_fileのkey、符号付き合算比の推定量、ratio_status、出力schemaを追加。
   組み込み格子の方向別境界keyと、解決済み境界の出力表記を含む。
   SAI-QMC 0.1の入出力リファレンス。英語版usage.mdに対応する日本語訳。
   入力の既定値、出力列、観測量の規約、追加の診断出力、旧形式との違いを説明する。
@@ -38,6 +40,8 @@ summary: |
 | `bc_x`, `bc_y` | 未設定 | 方向ごとの境界：`periodic`、`antiperiodic`、`open`。省略した方向は周期境界。`pbc`/`bc`とは併用できず、`bc_y`は`lattice=square`のみ |
 | `latfile` | 未設定 | ホッピング行列のファイル。`lattice=file`では必須 |
 | `t`, `U` | `-1.0`, `4.0` | 組み込み格子のホッピング振幅と斥力相互作用（`U>=0`） |
+| `tprime` | `0` | `lattice=square`専用。両対角結合の行列要素。0でない値には`Lx>=2`かつ`Ly>=2`が必要 |
+| `mu` | `U/2` | 化学ポテンシャル（有限の実数）。省略または厳密に`U/2`のときだけ半充填の候補 |
 | `dtau` | `0.1` | 正の虚時間刻み |
 | `beta_list` | `2.0` | 正の逆温度をカンマ区切りで指定。最大64個 |
 | `nwarm`, `nmeas`, `nbin` | `200`, `2000`, `20` | 各レプリカ・各温度のウォームアップスイープ数、測定スイープ数、測定ビン数 |
@@ -56,8 +60,11 @@ summary: |
 | `szz_q`, `sperp_q` | `none` | スピン測定の運動量指定。`none`、`af`、`all`、または`mx:my,...` |
 | `szz_file`, `sperp_file` | `szz.dat`, `sperp.dat` | 有効にしたスピン測定の保存先 |
 | `spin_consistency_file` | `none` | 対応するビンから求めた`Sperp/2-Szz`の保存先。両スピン測定で同じ順序の運動量指定が必要 |
+| `sign_file` | `none` | 温度ごとの符号統計の保存先。[符号reweighting](#符号reweighting)を参照 |
 
-化学ポテンシャルは`mu=U/2`に固定されており、`mu`という入力設定はありません。
+化学ポテンシャルは、`mu`を指定しなければ`mu=U/2`です。指定値は`U/2`へ丸めずにそのまま使います。
+粒子・正孔対称で符号が`+1`になるのは、`mu`が省略または厳密に`U/2`で、ホッピング行列が二部の場合だけです。
+非二部格子では`mu=U/2`でも密度1とは限りません。それ以外の場合は[符号reweighting](#符号reweighting)を参照してください。
 `nwarm>=0`、`nbin>=2`、`nmeas>=nbin`を満たし、`nmeas`は`nbin`で割り切れる必要があります。
 平均値と誤差は`nrep*nbin`個の測定ビンをまとめて求めます。
 レプリカ数は、MPIのランク数やOpenMPのスレッド数とは別の設定です。
@@ -79,10 +86,18 @@ summary: |
 周期境界の方向は、最後のサイトから最初のサイトへの結合（`x=Lx-1`から`x=0`、
 `y=Ly-1`から`y=0`）を振幅`t`で閉じます。反周期境界の方向はこの結合だけを`-t`とし、
 ほかの結合は変えません。開放境界の方向にはこの結合がありません。
-閉じた方向（周期・反周期）の長さが1より大きい場合、二部格子を保つため偶数である必要があり、
-開放境界では奇数のサイズも使用できます。反周期境界の方向には長さ4以上の偶数が必要です。
+閉じた方向（周期・反周期）の長さが1より大きく奇数の場合は二部格子でなくなり、符号reweightingの経路で計算します。
+開放境界はどの長さでも使えます。反周期境界の方向には長さ4以上の偶数が必要です。
 長さ2では、閉じる結合が通常の結合と打ち消し合うためです。
 長さ2の周期境界の方向は、同じサイト対を2回結びます（振幅`2t`）。
+
+`tprime`は`lattice=square`に対角結合`(x,y)-(x+1,y+1)`と`(x,y)-(x+1,y-1)`を行列要素`tprime`で加えます。
+開放境界の方向を越える対角結合は作らず、反周期境界の方向を越えるたびに符号を反転します
+（角を越える結合では両方の符号を掛けます）。長さ2の周期境界の方向では最近接と同じく両方の像を累積します。
+値はホッピング行列の要素であり、物理的な`H = -t sum_NN - t' sum_NNN`の`t=1, t'=0.2`は
+`t=-1`、`tprime=-0.2`です。非ゼロ要素の2色塗り分けが存在するときだけ二部格子とします
+（例: `t=0`かつ`tprime!=0`は`(-1)^x`で塗り分けられる）。微小な非ゼロの`tprime`も無視しません。
+`lattice=chain`と`lattice=file`では、`tprime=0`でも指定するとエラーです。
 
 出力のメタデータには、両方向とも周期境界、または両方向とも開放境界のとき、
 従来どおり`pbc=1`または`pbc=0`と記録します。それ以外の組では、この部分を解決した値、
@@ -101,7 +116,15 @@ summary: |
 ```
 
 ホッピング行列のファイルにはコメント行を入れないでください。
-ホッピングが定めるグラフが二部格子でない場合はエラーになります。
+ホッピングが定めるグラフが二部格子でない場合は符号reweightingの経路で計算します。
+fileの判定は入力によって異なります。
+
+- `mu`または`sign_file`（`sign_file=none`を含む）を指定した入力では、行列が厳密に対称である必要があり
+  （伝播は片側の三角だけを読みます）、全対角要素が厳密に`0`で、どれほど小さくても非ゼロの非対角要素が
+  2色に塗り分けられるときだけ粒子・正孔対称とします。判定はエネルギーの単位によりません。
+- これらのkeyのない入力は従来の挙動と出力を保ちます。読込みは`1e-12`以下の対角要素と非対称性を許し、
+  二部性の判定では`1e-12`以下の要素を無視しますが、その要素は伝播する行列に残ります。このため、
+  粒子・正孔対称でないfileを対称として扱う場合があります。厳密な判定には`sign_file`（または`mu`）を加えてください。
 `hopping_used.txt`には、構築した行列を同じ形式で出力します。
 スピンの運動量指定には組み込みの鎖または正方格子が必要で、`lattice=file`には
 対応していません。反周期境界では、運動量指定を使えるよう、ホッピング行列のファイルではなく
@@ -133,7 +156,8 @@ T E_hub dE_hub E_gc dE_gc E_ph dE_ph ntot dN doublon dD sign acceptance dAccepta
 誤差はビン・ジャックナイフで推定します。有限の時間刻みによる系統誤差は含まず、
 誤差の評価だけで計算の収束が保証されるわけではありません。
 3種類のエネルギーの規約は、`E_hub=<K_hop+U sum n_up n_down>`、
-`E_gc=E_hub-(U/2)*ntot`、`E_ph=E_gc+(U/4)*n_site`です。
+`E_gc=E_hub-mu*ntot`、`E_ph=E_hub-(U/2)*ntot+(U/4)*n_site`です（`mu=U/2`では`E_ph=E_gc+(U/4)*n_site`）。
+粒子・正孔対称性がない場合の推定量・`sign`・`nan`の行は[符号reweighting](#符号reweighting)に従います。列の構成は変わりません。
 
 スカラーファイルはレプリカを集約した結果で、個々の測定値やビンごとの標本は含みません。
 最後の2列`acceptance`と`dAcceptance`は元の12列形式の後に追加したもので、
@@ -182,6 +206,88 @@ Sperpでは最後の2列が`Sperp dSperp`、対応するビンから求める整
 個々の補助場配置で成立する必要はありません。
 `DeltaSU2=Sperp/2-Szz`は対応する測定ビンを用いて求め、ジャックナイフで誤差を評価します。
 これはサンプリングや実装の診断量であり、Trotter誤差を直接推定する量ではありません。
+
+## 符号reweighting
+
+配位は`|W|`で標本化し、各測定は`s=sign(W)=±1`を持ちます。`s`は安定化点と各sweepの終わりに、
+安定化した行列式から厳密に再設定します。
+
+推定量。粒子・正孔対称なら従来の推定量（binごとの比をjackknife）を保持します。それ以外では、
+各温度のスカラー・Szz・Sperp・DeltaSU2を全`B=nrep*nbin`個のreplica binの合算比とします。
+raw和は`C_b`（測定数）、`S_b=sum s`、`A_b=sum s*O`です。
+
+```text
+R = sum_b A_b / sum_b S_b
+R(-b) = (sum A - A_b) / (sum S - S_b)
+err^2 = (B-1)/B * sum_b (R(-b) - mean_b R(-b))^2
+```
+
+符号和にかかわらずbinを除外しません。`DeltaSU2`は両channelに同じbinを使います（対応あり）。
+スカラーの`sign`列は`sum S / sum C`で、`acceptance`は試行当たりの統計なので符号で重み付けしません。
+S(q)の総和則は各binのraw和で検査し、符号和によらず成立します。
+
+温度ごとの`ratio_status`はその温度の全観測量で共通です。
+
+| 条件 | 物理量と誤差 | 符号・受理率・raw和 | 実行 |
+| --- | --- | --- | --- |
+| `sum S > 0`かつ全`sum S - S_b > 0` | 合算比とjackknife | 出力 | `ok` |
+| `sum S <= 0` | `nan` | 出力 | `nonpositive_total`、警告、継続 |
+| `sum S > 0`だが`sum S - S_b <= 0`がある | `nan` | 出力 | `nonpositive_loo`、警告、継続 |
+| raw和の非有限値、count不整合、数値破綻、MPIデータの欠落、I/O失敗 | 認定しない | | エラー、非ゼロ終了 |
+
+符号が誤差の2倍以内で0の場合、符号和が非正のreplicaがある場合、statusが`ok`でない場合は、
+有限な合算比が出ても測定として分解できていません。通常の計算と同様に、平衡化、自己相関（rebin）、
+独立replicaを確認してください。`sign`は物理量が`nan`の場合も計算します。
+
+制限: `tempering=dtau_ladder`、`sweep_order=alternating`、`conditional_measure=1`は粒子・正孔対称性が
+必要で、出力を開く前にエラーになります。forward sweepと、`fixed`・`polarized`のsite選択による
+`global_update=site`は使えます。非二部格子では`global_site_diag_file`のstaggered指標`d`に物理的な意味は
+ありません。標準エラー出力に
+`INFO: ph_symmetric=0 (mu=..., tprime=..., bipartite=...); sign problem possible`を出します。
+
+拡張schema。`mu`・`tprime`・`sign_file`（`sign_file=none`を含む）を指定した入力、粒子・正孔対称性のない模型
+（新keyのない奇数長周期chainを含む）は拡張headerを書きます。scalar headerの1行目とspin fileの
+lattice行で、`mu`を17桁にし、` tprime=... ph_symmetric=... estimator=bin_ratio|pooled_ratio`を加えます。
+列は変わりません。推定量はschemaではなく`ph_symmetric`で決まります。それ以外の入力は従来のheaderを
+byte単位で保持します。
+
+`sign_file`の省略と`sign_file=none`の明示は、どちらも符号fileを出力しません。
+ただし、ほかの新keyもない場合に旧入力の挙動を保つのは省略時だけです。
+`none`を明示すると、保存先を指定した場合と同じ厳密なfile格子のPH判定と拡張headerを使います。
+
+拡張入力の`replica_bin_file`は
+`# replica_bin_schema=2 mu=... tprime=... ph_symmetric=... estimator=... nrep=... nbeta=...`で始まり、既存の全列
+（条件付き測定の列があればその後）の末尾に`sum_sign_N`と`sum_sign_Egc`を加えます。
+`sum_sign_Eph`は`sum_sign_Ehub-(U/2)*sum_sign_N+U*n_site*sum_sign/4`です。この行がなければ従来の形式
+（schema 1）です。
+
+`sign_file`（既定`none`）は`# sign_file_schema=1`、定義、計算条件と、温度ごとに1行の次の列を持ちます。
+
+```text
+beta_index beta_requested beta_effective T Ltr dtau sign dsign f_neg df_neg
+replica_sign_mean replica_sign_se nrep nbin count_total sum_sign_total
+negative_count n_replica_nonpositive n_bins_nonpositive n_loo_nonpositive
+ratio_status sign_unresolved no_negative_observed
+```
+
+（file内では1行）。`f_neg=(1-sign)/2`は測定した配位のうち負符号の割合で、
+`negative_count=(count_total-sum_sign_total)/2`です。どちらもclipしません。`replica_sign_mean`は
+非正のものを含む全replicaの`S_r/C_r`の平均で、`replica_sign_se`は`nrep=1`では`nan`です。
+`sign_unresolved=1`は`0<sign<=2*dsign`、`no_negative_observed=1`は粒子・正孔対称性がなく負符号が
+測定されなかった場合です。粒子・正孔対称なら`sign=1`でcounterは0です。root rankだけが書き、
+出力先の衝突検査に含めます。
+
+`scripts/analyze_sign_bins.py BINS.tsv [--rebin K] [--unit bin|replica] [--json]`は、replica-bin file
+（schema 1または2。ほかのschemaは拒否）から符号統計・status・合算比を再計算します。`--rebin K`は
+各replica内の連続する`K`個のbinをまとめ（`nbin`は`K`の倍数）、`--unit replica`はreplicaを
+jackknifeのblockにします。schema 1のfileには`E_hub`、`doublon`、保存済みのq列だけがあります。
+まとめる前に全行を検査し、違反はエラー（非ゼロ終了）とします（符号和の非正はstatusで、これとは別です）。
+符号・エネルギー・doublon（schema 2では`N`と`E_gc`も）の和は有限であること、q列は`# szz_Q_index=...`が
+測定済みとする列では有限、未測定列ではNaNであること（`inf`・`-inf`は常にエラー）、
+各温度の`beta_requested`・`beta_effective`・`Ltr`が1つであること、
+各replicaのseedが1つで互いに異なり、bin `0..nbin-1`とcount・sweep範囲がそろうこと、replicaと温度が
+`0..nrep-1`・`0..nbeta-1`であることを確認します。空の表もエラーです。schema 2は`nrep`と`nbeta`を記録します。
+schema 1では連続性しか確認できず、最後のreplicaや温度の欠落は`--nrep N --nbeta K`を指定したときだけ検出します。
 
 ## レプリカ情報・時間計測・安定化診断
 

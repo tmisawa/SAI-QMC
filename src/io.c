@@ -81,7 +81,11 @@ static void defaults(Params *p)
     p->bc_x_given = 0;
     p->bc_y_given = 0;
     p->thop = -1.0;
+    p->tprime = 0.0;
+    p->tprime_given = 0;
     p->U = 4.0;
+    p->mu = 0.0;                   /* resolved to U/2 after reading when omitted */
+    p->mu_given = 0;
     p->dtau = 0.1;
     p->nbeta = 0;
     p->nwarm = 200;
@@ -120,6 +124,8 @@ static void defaults(Params *p)
     strcpy(p->sperp_q, "none");
     strcpy(p->sperp_file, "sperp.dat");
     strcpy(p->spin_consistency_file, "none");
+    strcpy(p->sign_file, "none");
+    p->sign_file_given = 0;
     p->seed = 12345ULL;
 }
 
@@ -172,6 +178,7 @@ static int is_strict_string_key(const char *key)
            strcmp(key, "szz_q") == 0 || strcmp(key, "szz_file") == 0 ||
            strcmp(key, "sperp_q") == 0 || strcmp(key, "sperp_file") == 0 ||
            strcmp(key, "spin_consistency_file") == 0 ||
+           strcmp(key, "sign_file") == 0 ||
            strcmp(key, "global_update") == 0 ||
            strcmp(key, "global_interval") == 0 ||
            strcmp(key, "replica_bin_file") == 0 ||
@@ -326,10 +333,20 @@ int params_read(Params *p, const char *path)
             if (parse_double_value(val, &p->thop)) {
                 FAIL("ERROR: t must be numeric (got %s)\n", val);
             }
+        } else if (strcmp(key, "tprime") == 0) {
+            if (parse_double_value(val, &p->tprime)) {
+                FAIL("ERROR: tprime must be a finite number (got %s)\n", val);
+            }
+            p->tprime_given = 1;
         } else if (strcmp(key, "U") == 0) {
             if (parse_double_value(val, &p->U)) {
                 FAIL("ERROR: U must be numeric (got %s)\n", val);
             }
+        } else if (strcmp(key, "mu") == 0) {
+            if (parse_double_value(val, &p->mu)) {
+                FAIL("ERROR: mu must be a finite number (got %s)\n", val);
+            }
+            p->mu_given = 1;
         } else if (strcmp(key, "dtau") == 0) {
             if (parse_double_value(val, &p->dtau)) {
                 FAIL("ERROR: dtau must be numeric (got %s)\n", val);
@@ -453,6 +470,9 @@ int params_read(Params *p, const char *path)
             memcpy(p->sperp_file, val, strlen(val) + 1);
         } else if (strcmp(key, "spin_consistency_file") == 0) {
             memcpy(p->spin_consistency_file, val, strlen(val) + 1);
+        } else if (strcmp(key, "sign_file") == 0) {
+            memcpy(p->sign_file, val, strlen(val) + 1); /* val < 256 by the strict parse */
+            p->sign_file_given = 1;
         } else if (strcmp(key, "seed") == 0) {
             if (parse_ull_value(val, &p->seed)) {
                 FAIL("ERROR: seed must be unsigned integer (got %s)\n", val);
@@ -507,6 +527,20 @@ int params_read(Params *p, const char *path)
     }
     if (p->U < 0.0) {
         fprintf(stderr, "ERROR: U must be >= 0\n");
+        return 1;
+    }
+    if (!p->mu_given) {
+        p->mu = p->U / 2.0;
+    }
+    if (p->tprime_given && strcmp(p->lattice, "square") != 0) {
+        fprintf(stderr, "ERROR: tprime requires lattice=square (got lattice=%s)\n",
+                p->lattice);
+        return 1;
+    }
+    if (p->tprime != 0.0 && (p->Lx < 2 || p->Ly < 2)) {
+        fprintf(stderr,
+                "ERROR: tprime != 0 requires Lx >= 2 and Ly >= 2 (got Lx=%d Ly=%d)\n",
+                p->Lx, p->Ly);
         return 1;
     }
     if (strcmp(p->tempering, "dtau_ladder") != 0 && p->dtau <= 0.0) {
@@ -673,6 +707,26 @@ int params_read(Params *p, const char *path)
         return 1;
     }
     return 0;
+}
+
+int params_mu_is_half(const Params *p)
+{
+    return !p->mu_given || p->mu == p->U / 2.0;
+}
+
+int params_sign_output_enabled(const Params *p)
+{
+    return strcmp(p->sign_file, "none") != 0;
+}
+
+int params_new_keys(const Params *p)
+{
+    return p->mu_given || p->tprime_given || p->sign_file_given;
+}
+
+int params_extended_schema(const Params *p, int ph_symmetric)
+{
+    return params_new_keys(p) || !ph_symmetric;
 }
 
 int params_boundary_is_legacy(const Params *p)

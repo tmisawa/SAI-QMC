@@ -91,7 +91,7 @@ def main():
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=True)
     (output / "verification.json").unlink(missing_ok=True)
-    counts = {"historical": verify_manifest(ROOT / "data", "SHA256SUMS", 1174, ROOT)}
+    counts = {"historical": verify_manifest(ROOT / "data", "SHA256SUMS", 1296, ROOT)}
     counts[APP2] = verify_manifest(ROOT / "data" / APP2, "preregistration.sha256", 12)
     counts[APP4] = verify_manifest(ROOT / "data" / APP4, "SHA256SUMS", 382)
     counts[PP4] = verify_manifest(ROOT / "data" / PP4, "SHA256SUMS", 390)

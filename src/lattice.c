@@ -165,6 +165,124 @@ int lattice_square_bc(Lattice *L, int Lx, int Ly, double thop,
     return 0;
 }
 
+/* 1 when every nonzero off-diagonal element joins opposite labels. */
+static int labels_fit_hopping(const Lattice *L, const int *label)
+{
+    const int n = L->n;
+    for (int j = 0; j < n; j++) {
+        for (int i = 0; i < n; i++) {
+            if (i != j && L->t[i + j * n] != 0.0 &&
+                label[i] * label[j] != -1) {
+                return 0;
+            }
+        }
+    }
+    return 1;
+}
+
+/* Breadth-first two-colouring of the exact nonzero pattern. Returns 1 and
+   fills color on success; each component starts from seed[s] at its first
+   site. */
+static int exact_two_colouring(const Lattice *L, const int *seed, int *color)
+{
+    const int n = L->n;
+    int *q = malloc(sizeof(int) * (size_t)n);
+    if (q == NULL) {
+        return 0;
+    }
+    for (int i = 0; i < n; i++) {
+        color[i] = 0;
+    }
+    int ok = 1;
+    for (int s = 0; s < n && ok; s++) {
+        if (color[s] != 0) {
+            continue;
+        }
+        color[s] = seed[s];
+        int head = 0;
+        int tail = 0;
+        q[tail++] = s;
+        while (head < tail && ok) {
+            const int i = q[head++];
+            for (int j = 0; j < n; j++) {
+                if (i == j || L->t[i + j * n] == 0.0) {
+                    continue;
+                }
+                if (color[j] == 0) {
+                    color[j] = -color[i];
+                    q[tail++] = j;
+                } else if (color[j] != -color[i]) {
+                    ok = 0;
+                    break;
+                }
+            }
+        }
+    }
+    free(q);
+    return ok;
+}
+
+int lattice_square_tprime_bc(Lattice *L, int Lx, int Ly, double thop,
+                             double tprime, LatBoundary bc_x,
+                             LatBoundary bc_y)
+{
+    if (tprime == 0.0) {
+        return lattice_square_bc(L, Lx, Ly, thop, bc_x, bc_y);
+    }
+    if (Lx < 2 || Ly < 2 ||
+        lattice_square_bc(L, Lx, Ly, thop, bc_x, bc_y) != 0) {
+        lattice_set_empty(L);
+        return 1;
+    }
+
+#define IDX(x, y) ((x) + (y)*Lx)
+    for (int y = 0; y < Ly; y++) {
+        for (int x = 0; x < Lx; x++) {
+            for (int dy = 1; dy >= -1; dy -= 2) {
+                int xt = x + 1;
+                int yt = y + dy;
+                double amp = tprime;
+                if (xt == Lx) {
+                    if (!boundary_closes(bc_x, Lx)) {
+                        continue;
+                    }
+                    xt = 0;
+                    amp = closing_amplitude(bc_x, amp);
+                }
+                if (yt == Ly || yt < 0) {
+                    if (!boundary_closes(bc_y, Ly)) {
+                        continue;
+                    }
+                    yt = (yt < 0) ? Ly - 1 : 0;
+                    amp = closing_amplitude(bc_y, amp);
+                }
+                add_bond(L, IDX(x, y), IDX(xt, yt), amp);
+            }
+        }
+    }
+#undef IDX
+
+    if (labels_fit_hopping(L, L->bipart)) {
+        L->is_bipartite = 1;
+        return 0;
+    }
+    int *color = malloc(sizeof(int) * (size_t)L->n);
+    if (color == NULL) {
+        lattice_free(L);
+        lattice_set_empty(L);
+        return 1;
+    }
+    if (exact_two_colouring(L, L->bipart, color) &&
+        labels_fit_hopping(L, color)) {
+        memcpy(L->bipart, color, sizeof(int) * (size_t)L->n);
+        L->is_bipartite = 1;
+    } else {
+        L->is_bipartite = 0;
+    }
+    free(color);
+    return 0;
+}
+
 void lattice_square(Lattice *L, int Lx, int Ly, double thop, int pbc)
 {
     const LatBoundary bc = pbc ? LAT_BC_PERIODIC : LAT_BC_OPEN;
@@ -214,6 +332,44 @@ static void detect_bipartite_from_hopping(Lattice *L)
         }
     }
     free(q);
+}
+
+int lattice_is_exactly_symmetric(const Lattice *L)
+{
+    const int n = L->n;
+    for (int j = 0; j < n; j++) {
+        for (int i = j + 1; i < n; i++) {
+            if (L->t[i + j * n] != L->t[j + i * n]) {
+                return 0;
+            }
+        }
+    }
+    return 1;
+}
+
+int lattice_apply_exact_bipartite(Lattice *L)
+{
+    const int n = L->n;
+    int *seed = malloc(sizeof(int) * (size_t)n);
+    int *color = malloc(sizeof(int) * (size_t)n);
+    if (seed == NULL || color == NULL) {
+        free(seed);
+        free(color);
+        return 1;
+    }
+    int ok = lattice_is_exactly_symmetric(L);
+    for (int i = 0; i < n && ok; i++) {
+        ok = L->t[i + i * n] == 0.0;
+        seed[i] = 1;
+    }
+    ok = ok && exact_two_colouring(L, seed, color) && labels_fit_hopping(L, color);
+    for (int i = 0; i < n; i++) {
+        L->bipart[i] = ok ? color[i] : 0;
+    }
+    L->is_bipartite = ok;
+    free(seed);
+    free(color);
+    return 0;
 }
 
 int lattice_from_file(Lattice *L, const char *path)

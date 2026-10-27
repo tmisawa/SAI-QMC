@@ -1,8 +1,9 @@
 ---
-date: 2026-10-03
-datetime: 2026-10-03 11:17 JST
-model: OpenAI GPT-6 (Codex); OpenAI GPT-5.6 Sol (Codex; 2026-10-02 validation); OpenAI GPT-6 (Codex; 2026-10-03 metadata update)
+date: 2026-10-27
+datetime: 2026-10-27 17:16 JST
+model: OpenAI GPT-6 (Codex); OpenAI GPT-5.6 Sol (Codex; 2026-10-02 validation); OpenAI GPT-6 (Codex; 2026-10-03 metadata update); Claude Opus 5.5 (Claude Code; 2026-10-27 sign-reweighting ED comparison)
 summary: |
+  2026-10-27: adds the sign-reweighted (general mu, tprime) finite-temperature ED comparison dataset.
   Places the fixed-temperature spin residuals in the known sampling context motivating PT.
   Includes a matched 36-run P/P control; spin residuals occur in both boundaries.
   Adds the exploratory 4x4 AP/P U=4 ground-state ED comparison; spin agreement remains unresolved.
@@ -16,8 +17,8 @@ summary: |
 Most of these are historical numerical results used during development; they
 are not new calculations made with the current source snapshot. The
 exceptions are `tempering_L6_U4_ed_20260927/`, `antiperiodic_4x2_U4_ed/`,
-`antiperiodic_4x4_U4_ed/`, and `periodic_4x4_U4_control/`,
-which were computed with this repository's own source (see each directory's
+`antiperiodic_4x4_U4_ed/`, `periodic_4x4_U4_control/` and
+`sign_reweighting_ed_20261027/`, which were computed with this repository's own source (see each directory's
 README for the exact commit and binary checksums).
 
 | Directory | Contents |
@@ -26,6 +27,7 @@ README for the exact commit and binary checksums).
 | `L6_U4_mu2_dtau_ed_comparison/` | L=6, U=4 energy/doublon Trotter extrapolation tables and dtau=0.2/0.1/0.05 QMC output |
 | `tempering_L6_U4_ed_20260927/` | Periodic L=6 Hubbard chain, U=4, half filling: `tempering=dtau_ladder` PT (4 slots, `tempering_ltr=200`) vs. 4 independent (non-PT) chains at the same `(beta, dtau)`, with finite-T ED reported for context; inputs, QMC/PT output, analysis script and results |
 | `antiperiodic_4x2_U4_ed/` | 4x2 square lattice, x antiperiodic / y periodic, U=4, beta=2,4: 96 independent single-series runs at dtau=0.1/0.05/0.025 versus finite-T ED (AP/P and P/P); pre-registered seeds, inputs, outputs, ED, analysis and verdict |
+| `sign_reweighting_ed_20261027/` | Sign-reweighted path: 4-site chain, U=4, mu=0, P/AP, beta<=10, and 4x2 square with tprime=-0.2, U=4, mu=2,1, P/P and AP/P, beta<=4, at dtau=0.05/0.025 (and a post-hoc 0.0125 run) versus finite-T ED with general mu; inputs, outputs, ED, independent hopping checks, analysis and verdict (187/188) |
 | [`antiperiodic_4x4_U4_ed/`](antiperiodic_4x4_U4_ed/README.md) | Exploratory 4x4 AP/P, U=4, beta=4/8/16, three time steps, four seeds per point, versus archived ground-state ED; energy/doublon agree at beta=16 after extrapolation, spin convergence unresolved |
 | [`periodic_4x4_U4_control/`](periodic_4x4_U4_control/README.md) | Matched 36-run P/P control of the 4x4 AP/P study, same seeds and settings except bc_x; paired boundary comparison and uncertainty diagnostics |
 

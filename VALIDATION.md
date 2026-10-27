@@ -1,8 +1,11 @@
 ---
-date: 2026-10-03
-datetime: 2026-10-03 14:53 JST
-model: OpenAI GPT-6 (Codex; revision), Codex GPT-5 (original), Claude Sonnet 5 (Anthropic; 2026-09-27 addition), Claude Opus 5.5 (Anthropic; 2026-09-28 addition); OpenAI GPT-5.6 Sol (Codex; 2026-10-02 validation); OpenAI GPT-6 (Codex; 2026-10-03 metadata update)
+date: 2026-10-27
+datetime: 2026-10-27 17:16 JST
+model: OpenAI GPT-6 (Codex; revision), Codex GPT-5 (original), Claude Sonnet 5 (Anthropic; 2026-09-27 addition), Claude Opus 5.5 (Anthropic; 2026-09-28 addition); OpenAI GPT-5.6 Sol (Codex; 2026-10-02 validation); OpenAI GPT-6 (Codex; 2026-10-03 metadata update); Claude Opus 5.5 (Claude Code; 2026-10-27 sign reweighting); OpenAI GPT-6 (Codex; 2026-10-27 explicit sign_file and q validation)
 summary: |
+  2026-10-27: explicit sign_file=none selects exact file PH testing and extended headers; unmeasured q requires NaN.
+  2026-10-27: 一般μ・正方格子t′・符号付き合算比（§13）。負配位48/4096の3 site列挙、原子極限、U=0、旧入力の
+  byte同一性、4並列形態の一致は合格。L4・4×2 t′のED比較は事前規定188比較中187が合格、1点は事後の刻み追加で確認。
   10-03: tempering互換性testの比較先を公開履歴から取得できるcb077b2に訂正。過去の3215eee参照は当時の記録として保持する。
   方向別境界の実装検査と4×2 AP/P・U=4・β≤4の事前規定ED比較はPASS（§12）。
   Delta tau-ladder並列テンパリング（PT）の実装検証: cross-weight直接検査、厳密列挙χ²と負の対照、
@@ -34,7 +37,7 @@ T  E_hub dE_hub  E_gc dE_gc  E_ph dE_ph  ntot dN  doublon dD  sign
 
 ## 0. アンサンブルの整合
 
-DQMC は `mu=U/2` の grand-canonical ensemble。
+DQMC は既定で `mu=U/2` の grand-canonical ensemble（2026-10-27以降は`mu`を指定できる。§13）。
 粒子正孔対称点で `<N>=n_site` にはなるが、固定粒子数の canonical ensemble と有限温度・有限サイズで一致するとは限らない。
 
 比較の原則:
@@ -883,3 +886,121 @@ P2（全qのSzz、Sperp/2が|z|<4）、N1（β=4のD、Szz(1,1)、Szz(1,0)がP/P
 - `make test`、`make test_omp`、`OMPI_CC=cc make test_mpi`、`OMPI_CC=cc make test_hybrid`、`make test_slow`、
   `make test_tempering_default`、`make test_bc_default`が合格。`make test_global_default`は比較先`463dc75`が
   このrepositoryにないため実行できない（§10の2026-09-27の記録）。
+
+## 13. 一般μ・正方格子t′・符号付き合算比（2026-10-27）
+
+`mu`（既定`U/2`、丸めなし）、`lattice=square`の`tprime`（両対角結合）、`sign_file`を追加した。
+`mu`が厳密に`U/2`でホッピング行列が二部のとき（粒子・正孔対称）は従来の推定量・出力のまま。
+それ以外は両spinを伝播し、全replica binのraw和の合算比と同じbinを除くjackknifeを使う。
+全体または1 bin除去の符号和が非正なら、その温度の物理量と誤差を`nan`、`ratio_status`を記録して続行する。
+二部性は実際の行列の非ゼロ要素から判定し、微小な非ゼロ要素も無視しない。
+μは`replica_chain_init`の模型初期化まで渡し、測定のE_gc換算と一致を検査する。
+
+### 決定論的な実装検査（`make test`）
+
+- `tests/test_sign_ratio.c`: count 10の5例（`S=(0,4,6)`→2.3・ok、`(-2,6,6)`→2.5・ok、`(6,-2,0)`と`(4,0,0)`→
+  `nonpositive_loo`、`(-2,0,2)`→`nonpositive_total`）と全体負の例が手計算と一致。sign≡1・等countで従来の
+  jackknifeと1e-14で一致。replica平均符号とSE（nrep=1はNaN）、count不整合・非整数・偶奇違反・非有限値・
+  overflowはエラー。10^5 blockの補償和。
+- `tests/test_lattice_tprime.c`: 4×2 P/P・AP/Pの手書き行列、4×4の境界9組と4×2・2×4・2×2で独立なimage和と一致、
+  スペクトルのモーメント（Tr T^p, p≤6）が`t(a_x+a_y)+t' a_x a_y`と一致。`tprime=0`は`lattice_square_bc`とbyte一致。
+  4×4 P/P・`t=0,tprime=-0.2`は`eta=(-1)^x`で二部・PH判定、PH公式とtwo-spinの重みが一致。`t=-1`では非二部、
+  `tprime=1e-14`も非二部。mutation: y方向APの符号を落とすと114件、片方の対角を落とすと726件失敗。
+- `tests/test_io_sign.c`: μの丸めなし解決、拡張schemaの規則、`tprime`の拒否、新keyなし奇数長周期chainが
+  非PH・拡張schema、`replica_chain_init`の模型μ（`K`の対角`-mu`）。
+- hopping fileの厳密判定（`tests/test_lattice_tprime.c`）: 要素1e-13の三角形、1e-13の対角、1e-13の非対称は
+  旧読込みでは二部・対称として通るが、厳密判定では非PH。4環は両方で二部、結合のない行列は二部。
+- `tests/test_sign_triangle.c`: 3 site三角形（全非対角−1、U4、μ2、Δτ0.5、Ltr4）の4096配位中48が負。
+  NumPy列挙とFock trace（`tests/fixtures/sign_triangle/generate_oracle.py`）と、閉形式`exp(-dtau K)`・
+  素朴な行列積・Gauss-Jordanの試験内oracleでZ・Z_abs・平均符号0.986007057776458・E/N/Dと負配位の集合が一致。
+  green_rebuild 3種×stab 1–4（Ltr%stab≠0を含む）の全配位で、UDV経由の符号が全一致、Green関数の相対誤差
+  3.5e-11、log|W|の誤差6.5e-11以下（1+Aの条件数による）。全sliceの局所flip比と符号、負配位からの初期化、
+  大域更新（fixed・polarized）を挟む2000 sweepで負配位を訪問しつつ符号・Greenが厳密値と一致、大域flipの
+  受理・棄却時の復元、polarized選択重みの反転不変性（符号の変わる反転を含む）。
+- `tests/test_sign_output.py`: 原子極限（1 site、t=0、U4、μ=0,1,2,3.25,−1、β=1,2）が厳密値と5σ以内
+  （μ=0でntot≈0.67、半充填の1と区別）。U=0・`tprime=-0.2`・μ=−0.7の4×4（境界9組）と4×2（P/P、AP/P）が
+  自由フェルミ分布の厳密値と出力桁内で一致。1測定/binで負binを含むrun・符号和0のbinを含むrunが完走。
+  replica-bin TSVから符号統計（1e-12）・status・合算比・q値（1e-12）を再現し、SU(2)残差の誤差は同じbinの
+  対応jackknifeと一致（独立な二乗和とは異なる）。rebin・replica単位。test hookで`nonpositive_total`・
+  `nonpositive_loo`（NaN行、警告、次βは正常）とraw NaN・count不整合のERROR。PT・交互sweep・条件付き測定の
+  非PH拒否が出力open前。出力先衝突、`sign_file`のopen・write・close失敗、拡張header、旧schema読込、未知schema拒否。
+  単位変更: hopping・U・μを1e-13倍、Δτ・βを1e13倍した三角形（`mu`・`sign_file`あり）が非PHと判定され、
+  平均符号・ntot・doublon・E_hub/λが元の単位と一致し、PT・交互sweep・条件付き測定は出力open前に拒否。
+  新keyのない同じfileは旧判定（`bipartite=1`）のまま、非対称fileに`mu`を付けるとERROR。
+  再解析の表検査: 必須和のNaN/Inf（全行、replica当たり1 binをrebin・replica単位にした場合を含む）、測定済み
+  q列のNaN、未測定q列の値、count不正、中間・末尾replicaの欠落、末尾βの欠落、1 binの欠落、1行だけ異なるβ・Ltr、
+  seedの重複、空表、headerと異なる`--nrep`がすべてERROR。完全な表、未測定q列のある表、零・負binの表は解析できる。
+- `make test_sign_default`: 新keyなし・PHの28入力（既定・境界・bin・大域・polarized・SU(2)・profile・
+  uniform・各rebuild・方向別境界・PT・PT+条件付き・条件付き・file格子・要素1e-13のfile）の全出力・stdout・stderrが
+  `4384c37`とbyte一致（計時値は構造だけ比較）。`test_sign_default_parallel`でOpenMP・MPI・hybridの12入力も一致。
+
+### 並列形態（`make test_hybrid`の`test_sign_parallel`）
+
+原子極限・U=0・4×2 t′の非PH入力で、serial・OpenMP・MPI（2・3 rank）・hybridのscalar・sign・Szz・Sperp・
+SU(2)・replica-binのデータ行が一致。`sign_file`はrootだけが書く。MPI/hybridのhookでstatus行がserialと一致し、
+raw異常は全rankが非ゼロ終了（hangなし）。MPI buildとserial buildは同じcompilerにする（Open MPIでは
+`OMPI_CC=cc`）。compilerが異なると最終桁が変わり、既存のcross-mode比較も一致しない。
+
+### 確率的検査（`make test_slow`）
+
+`tests/test_sign_triangle_sampling_slow.c`: 上の三角形を本番のreplica経路（8 replica×40000測定）で標本化し、
+合算比が厳密値と4σ以内（事前固定）。局所更新のみ: sign 0.985931(280)、E_hub −2.000345(2779)、ntot 2.892114(445)、
+doublon 0.048604(160)、負符号測定2251。polarized大域更新あり: 0.985437(291)、−1.998892(2500)、2.892479(416)、
+0.048360(143)、負符号2330（厳密値 0.986007、−2.002871、2.891652、0.048481）。負配位数48/4096は一様列挙の
+個数比で、MCMCの`(1-sign)/2`=0.0070とは別の量である。開発時の補助検査として、sweep後の配位の頻度を
+4096配位の`|W|/Z_abs`と比べ（局所のみ1.8×10^7 sweep、大域fixed・polarized各8×10^6）、χ²/dof=0.97・1.01・1.05、
+負配位の割合0.00701・0.00705・0.00700（厳密0.00700）を得た。
+
+### 有限温度EDとの比較
+
+条件・規則・全結果は[data/sign_reweighting_ed_20261027](data/sign_reweighting_ed_20261027/README.md)。
+L4 chain（U4、μ0、P/AP、β≤10）と4×2正方格子（`tprime=-0.2`、U4、μ=2,1、P/P・AP/P、β≤4）をΔτ0.05・0.025で
+計算し、各hopping行列を独立な結合表で確認してから、μ対応のEDと比べた。規則（run前に固定）:
+`(4X(0.025)-X(0.05))/3`の|z0|≤3。この組み合わせは刻み依存の診断で、Δτ→0の採用値ではない。
+
+- 188比較中187が規則を満たす。例外は4×2 P/P・μ1・β4のdoublon（z0=3.2、各刻みのz=−18.0、−1.2）。
+- 事後にΔτ0.0125を追加すると、同じ条件の全観測量が全βでEDと1.8σ以内（doublon β4: z=−1.2）。
+  事前規定の判定は187/188のまま記録する。
+- 全温度で`ratio_status=ok`、非正のbinはなし。平均符号はL4 AP・β10で0.3995(46)（Δτ0.05）と0.4102(43)（0.025）。
+- Δτ0.05のE_hub・doublonはEDから最大18σずれ、0.025でおよそΔτ²に従って縮む。Trotter誤差は誤差棒に含まれない。
+
+### 範囲
+
+- 検証は小規模・中程度の温度で、平均符号が小さくない領域に限る。平均符号が小さい領域、4×4以上、低温の
+  物理量の精度は検証していない。PTを使えない非PHの混合時間は未評価。
+- `mu`も`sign_file`もないhopping file入力は、旧出力の互換性のため1e-12の許容幅を保つ。この範囲では、
+  1e-12以下の要素が粒子・正孔対称性を破るfileを対称として扱い得る（`docs/usage.md`）。`mu`または`sign_file`を
+  指定した入力と組み込み格子は、伝播する行列そのもので判定する。
+- `make test`、`make test_omp`、`OMPI_CC=cc make test_mpi`、`OMPI_CC=cc make test_hybrid`、`make test_slow`、
+  `make test_sign_default`、`OMPI_CC=cc make test_sign_default_parallel`、`make test_bc_default`、
+  `make test_tempering_default`が合格。`make test_global_default`は比較先`463dc75`がないため実行できない。
+
+### 独立レビュー後の修正（2026-10-27）
+
+独立レビューの指摘に対応した。(R1) `mu`・`sign_file`を指定したhopping file入力は、厳密に対称な行列を要求し、
+対角が厳密に0で全非ゼロ要素が2色に塗り分けられるときだけPHとする。修正前は1e-12以下の要素を二部性判定だけから
+除いたため、単位を1e-13倍した三角形がPH経路（平均符号1、N=3）に入った。修正後は元の単位と同じ結果になる。
+(R2) 再解析scriptは必須和の非有限値を未測定として除かず、rebin前の各行でERRORとする。(R3) 空表、replica・β・bin・
+seedの欠落や重複、行ごとのβ・Ltrの不一致を検出し、schema 2のheaderに`nrep`と`nbeta`を記録する。
+
+ED比較のdataは、headerの`nrep`・`nbeta`を含む修正後のbinaryで同じ入力・seedから再生成した。旧binaryの出力と
+全data行が一致し、比較結果（187/188）は変わらない（`data/sign_reweighting_ed_20261027/README.md`）。
+2つのΔτは同じbase seedを使い、`z0`の誤差は刻み間の共分散を0とする。両系列は格子時間の長さが異なるため
+乱数の使われ方は初めから異なるが、相関がないことは検証していない。事前規定と187/188はこの注記によって変えない。
+
+### 明示したsign_file=noneと未測定qの検査（2026-10-27）
+
+`sign_file`の指定を、符号fileの出力有無とは別に記録するよう修正した。
+以前はμ省略で`sign_file=none`だけを指定すると旧PH判定へ戻ったが、現在は保存先を指定した場合と同じ厳密判定・
+拡張schemaを使い、符号fileだけを出力しない。新keyを省略した旧入力の挙動は保つ。
+再解析の未測定q列はNaNだけを許し、`inf`・`-inf`をERRORとする。
+
+- `test_io_sign`: 明示した`none`の指定フラグと拡張schema、Params再読込み時のフラグ初期化を検査。
+- `test_sign_output.py`: μ省略・λ=1e-13の三角形で`sign_file=none`と`sign.dat`のscalarとbinのdata行が一致。
+  serial・OMP・MPI（2/3 rank）・hybridでも一致し、`none`で符号fileを作らない。
+  PT・交互sweep・条件付き測定は出力open前に拒否する。
+- 未測定のSzz_Q・Sperp_Q・Szz_0それぞれに±Infを入れると、API・CLIとも拒否する。
+  未測定NaNを含む正常表は解析でき、測定済みqのNaN拒否も維持する。
+- `make test`、`test_sign_parallel`、`test_sign_default`、`test_sign_default_parallel`が合格。
+  旧入力28 serial＋12 parallelの互換性を維持し、計時値は従来どおり構造だけを比較する。
+  公開dataの1296 checksumが合格し、EDの再集計も保存された187/188のJSONとbyte一致した。
