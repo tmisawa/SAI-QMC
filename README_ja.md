@@ -1,8 +1,10 @@
 ---
-date: 2026-10-03
-datetime: 2026-10-03 08:43 JST
-model: OpenAI GPT-6 (Codex); OpenAI GPT-5.6 Luna (Codex; 2026-10-02 directional boundaries); OpenAI GPT-6 (Codex; 2026-10-03 metadata update)
+date: 2026-10-27
+datetime: 2026-10-27 17:05 JST
+model: OpenAI GPT-6 (Codex); OpenAI GPT-5.6 Luna (Codex; 2026-10-02 directional boundaries); OpenAI GPT-6 (Codex; 2026-10-03 metadata update); Claude Opus 5.5 (Claude Code; 2026-10-27 sign reweighting); OpenAI GPT-6 (Codex; 2026-10-27 explicit sign_file and q validation)
 summary: |
+  2026-10-27: explicit sign_file=none selects exact file PH testing and extended headers; unmeasured q requires NaN.
+  2026-10-27: 一般のmu、正方格子のtprime、粒子・正孔対称性のない模型の符号付き推定量を追加。
   方向別の周期・反周期・開放境界とspin運動量selectorの対応を含む。
   SAI-QMC 0.1の日本語利用案内。英語READMEに対応する。
   ビルド、入出力、並列実行、検証範囲、開発記録を説明する。
@@ -12,8 +14,10 @@ summary: |
 
 [English](README.md) | [日本語](README_ja.md)
 
-SAI-QMCは、二部格子上の斥力・半充填Hubbard模型を対象とする、有限温度の
-行列式量子モンテカルロ法（DQMC/BSS）のC実装です。
+SAI-QMCは、斥力Hubbard模型を対象とする有限温度の行列式量子モンテカルロ法
+（DQMC/BSS）のC実装です。二部格子上の半充填は負符号がありません。一般の化学ポテンシャル、
+正方格子の次近接ホッピング`tprime`、その他の非二部ホッピングは符号reweightingで計算し、
+符号問題が生じ得ます。
 エネルギー、密度、二重占有率、等時刻の縦・横スピン構造因子を測定します。
 コマンドラインで実行するプログラム名は`dqmc`です。
 
@@ -76,14 +80,14 @@ seed=1
 `nwarm`と`nmeas`は各温度・各レプリカのウォームアップと測定のスイープ数です。
 `nbin`は誤差評価のために測定を分割するビン数で、2以上かつ`nmeas`を割り切る
 必要があります。各`beta/dtau`は整数との差が`1e-9`以内でなければなりません。
-化学ポテンシャルは`mu=U/2`に固定されており、`mu`という入力キーはありません。
+化学ポテンシャル`mu`の既定値は`U/2`（二部格子での半充填）です。`tprime`は
+`lattice=square`の2本の対角ホッピングを加えます。[符号reweighting](#符号reweightingと符号問題)を参照してください。
 
 長方形の正方格子には`lattice=square`と`Lx`、`Ly`を指定します。
 `pbc=1`が周期境界、`pbc=0`が開放境界です。方向ごとに指定するときは、`pbc`の代わりに
 `bc_x`と`bc_y`（`periodic`、`antiperiodic`、`open`）を使います。例えば
-`bc_x=antiperiodic`でx方向反周期・y方向周期になります。周期境界・反周期境界では、
-二部格子を保つため、長さが1より大きい各方向のサイズを偶数にする必要があり、
-反周期境界の方向には長さ4以上が必要です。
+`bc_x=antiperiodic`でx方向反周期・y方向周期になります。反周期境界の方向には
+4以上の偶数の長さが必要です。奇数長の閉じた方向は二部格子でなく、符号reweightingの経路で計算します。
 省略した設定の既定値は[入出力リファレンス](docs/usage_ja.md)に記載しています。
 
 ## 模型と観測量
@@ -91,11 +95,12 @@ seed=1
 シミュレーションで用いるグランドカノニカルHamiltonianは
 
 ```text
-H = K_hop + U sum_i n_i_up n_i_down - mu N,  mu = U/2.
+H = K_hop + U sum_i n_i_up n_i_down - mu N,  mu = U/2（指定しない場合）
 ```
 
-です。`U >= 0`で、格子は二部格子である必要があります。
-組み込みの鎖・正方格子では、最近接ホッピングの既定値は`t=-1`です。
+です。`U >= 0`です。組み込みの鎖・正方格子では、最近接ホッピングの既定値は`t=-1`です。
+`tprime`は正方格子の対角結合の行列要素です（`H = -t sum_NN - t' sum_NNN`で`t=1, t'=0.2`なら
+`t=-1`、`tprime=-0.2`と指定します）。
 `lattice=file`を使うと、対角要素がゼロの実対称ホッピング行列を直接指定できます。
 詳細は[入出力と観測量の規約](docs/usage_ja.md)を参照してください。
 
@@ -116,7 +121,7 @@ T  E_hub dE_hub  E_gc dE_gc  E_ph dE_ph  ntot dN  doublon dD  sign  acceptance d
 | `E_ph`, `dE_ph` | 相互作用を粒子・正孔対称な形で表したエネルギーと誤差 |
 | `ntot`, `dN` | 全粒子数と誤差 |
 | `doublon`, `dD` | サイト当たりの二重占有率と誤差 |
-| `sign` | モンテカルロ符号の平均 |
+| `sign` | モンテカルロ符号の平均（粒子・正孔対称なら`1`） |
 | `acceptance`, `dAcceptance` | 局所更新の採択率と誤差 |
 
 エネルギーと`ntot`は系全体の値、`doublon`はサイト当たりの値です。
@@ -153,6 +158,7 @@ spin_consistency_file=spin_consistency.dat
 | `szz.dat`, `sperp.dat`, `spin_consistency.dat` | 上記の設定で有効にするスピン観測量のデータ |
 | `replicas.dat` | レプリカの乱数種・計算条件・実行状態。`nrep>1`で既定で有効。`replica_log=none`で無効、`replica_log=path.dat`で出力先を指定 |
 | `profile.dat` | `profile=1`で有効にする時間計測のデータ。出力先は`profile_file`で変更 |
+| `sign_file` | 温度ごとの符号統計と比のstatus。`sign_file=path`を指定したときだけ出力 |
 
 新しく出力する表は、空白区切り・`#`から始まるコメントと列名に統一しています。
 入力設定とホッピング行列は`.txt`形式です。過去の参照データは当時のファイル名と
@@ -162,6 +168,27 @@ spin_consistency_file=spin_consistency.dat
 `./dqmc input.txt 2> run.err`と実行すると、診断メッセージを別に保存できます。
 スカラー観測量は自動保存されます。従来のリダイレクトによる保存には
 `output_file=none`を使用できます。
+
+## 符号reweightingと符号問題
+
+HS場は重み`|W|`で標本化し、符号`s = sign(W)`を測定します。粒子・正孔対称
+（`mu`が厳密に`U/2`で、ホッピング行列が二部）なら`s=1`で、結果・header・列は従来と同じです。
+それ以外（`mu`が`U/2`と異なる、非二部の`tprime`格子、奇数長の周期方向、非二部のホッピングfile）
+では両spinを伝播し、各観測量を全`nrep*nbin`個のreplica binの合算比
+`sum_b A_b / sum_b S_b`とし、同じbinを1つ除くjackknifeで誤差を付けます。符号和がゼロ・負の
+binも除外しません。全体の符号和、または1 binを除いた符号和が正でない温度では、物理量と誤差を
+`nan`とし、警告を出して計算を続けます。符号・受理率・raw和は出力します。並列テンパリング、
+`sweep_order=alternating`、条件付き測定は粒子・正孔対称な模型に限ります。hopping fileの厳密な判定
+（対角0、全非ゼロ要素）は`mu`または`sign_file`（`sign_file=none`を含む）を指定したときだけ行い、
+指定しない場合は従来の`1e-12`の許容幅を保ちます。`sign_file=none`を明示した場合も厳密判定と拡張headerを使いますが、
+符号fileは出力しません。
+
+`sign_file=sign.dat`は温度ごとに1行で、符号とその誤差、負符号の割合`(1-sign)/2`、replica統計、
+非正のbin・replica数、`ratio_status`を出力します。符号が誤差の2倍以内で0（`sign_unresolved=1`）、
+またはstatusが`ok`でない温度の物理量は分解できていません。有限標本で負符号が出なかったこと
+（`no_negative_observed=1`）は負符号がない模型であることを意味しません。
+`scripts/analyze_sign_bins.py`は`replica_bin_file`を同じ推定量で再解析し、replica内のrebinと
+replica単位のjackknifeにも対応します。詳細は[入出力リファレンス](docs/usage_ja.md#符号reweighting)を参照してください。
 
 ## 条件付き局所測定
 
@@ -427,6 +454,8 @@ python3 scripts/verify_reference_data.py
 テストでは、Green関数の更新と安定化、独立な非相互作用の参照値、スピンの総和則、
 粒子・正孔対称性、出力互換性、レプリカの集約、並列実行の整合性を確認します。
 時間のかかるテストは別のターゲットに分けています。
+`make test_sign_default`（と`test_sign_default_parallel`）は、新しいkeyを含まない入力を
+符号reweighting拡張の直前のcommitと比較します。Git履歴が必要です。
 
 本計算を行う前に[既知の制約](docs/limitations.md)を確認してください。
 特に次の点に注意が必要です。

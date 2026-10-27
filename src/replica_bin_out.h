@@ -26,6 +26,15 @@ typedef struct {
     int tempering;       /* 1: tempering=dtau_ladder; dtau is NAN, per-row dtau = beta_effective / Ltr */
     int tempering_ltr;
     int conditional_measure;
+    /* 0 or 1: legacy layout. 2: a "# replica_bin_schema=2 ..." first line with the
+       metadata below, and sum_sign_N, sum_sign_Egc appended after every
+       legacy column. */
+    int schema;
+    double mu, tprime;
+    int ph_symmetric;
+    const char *estimator;   /* "bin_ratio" (legacy PH) | "pooled_ratio" */
+    int nrep, nbeta;         /* schema 2: expected replicas and beta points, so
+                                that a missing replica or beta is detectable */
 } ReplicaBinMeta;
 
 /* Writes the header comment (only when write_header != 0) and one row per

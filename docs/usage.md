@@ -1,8 +1,10 @@
 ---
-date: 2026-10-03
-datetime: 2026-10-03 08:43 JST
-model: OpenAI GPT-6 (Codex); OpenAI GPT-5.6 Luna (Codex; 2026-10-02 directional boundaries); OpenAI GPT-6 (Codex; 2026-10-03 metadata update)
+date: 2026-10-27
+datetime: 2026-10-27 17:05 JST
+model: OpenAI GPT-6 (Codex); OpenAI GPT-5.6 Luna (Codex; 2026-10-02 directional boundaries); OpenAI GPT-6 (Codex; 2026-10-03 metadata update); Claude Opus 5.5 (Claude Code; 2026-10-27 sign reweighting); OpenAI GPT-6 (Codex; 2026-10-27 explicit sign_file and q validation)
 summary: |
+  2026-10-27: explicit sign_file=none selects exact file PH testing and extended headers; unmeasured q requires NaN.
+  2026-10-27: mu, tprime and sign_file keys; pooled sign-reweighted estimator, ratio_status and schemas.
   Includes directional boundary keys and resolved boundary labels for built-in lattices.
   Input/output reference for SAI-QMC 0.1, including defaults and file schemas.
   Documents scalar and spin conventions, output paths, and optional diagnostics.
@@ -38,6 +40,8 @@ and invalid combinations are errors. See [the examples](../input/) and
 | `bc_x`, `bc_y` | Unset | One direction: `periodic`, `antiperiodic`, or `open`; an omitted direction is periodic. Not combined with `pbc`/`bc`; `bc_y` needs `lattice=square` |
 | `latfile` | Unset | Hopping file, required for `lattice=file` |
 | `t`, `U` | `-1.0`, `4.0` | Built-in hopping amplitude and repulsive interaction (`U>=0`) |
+| `tprime` | `0` | `lattice=square` only: element of both diagonal bonds; a nonzero value needs `Lx>=2` and `Ly>=2` |
+| `mu` | `U/2` | Chemical potential, a finite number; `U/2` exactly (or omitted) is the half-filling candidate |
 | `dtau` | `0.1` | Positive imaginary-time step |
 | `beta_list` | `2.0` | Up to 64 positive inverse temperatures, comma-separated |
 | `nwarm`, `nmeas`, `nbin` | `200`, `2000`, `20` | Warmup sweeps, measurement sweeps, and measurement bins, per replica and temperature |
@@ -56,8 +60,13 @@ and invalid combinations are errors. See [the examples](../input/) and
 | `szz_q`, `sperp_q` | `none` | Spin momentum selectors: `none`, `af`, `all`, or `mx:my,...` |
 | `szz_file`, `sperp_file` | `szz.dat`, `sperp.dat` | Paths for enabled spin measurements |
 | `spin_consistency_file` | `none` | Path for paired `Sperp/2-Szz`; requires both selectors with the same ordered momenta |
+| `sign_file` | `none` | Path for per-temperature sign statistics; see [sign reweighting](#sign-reweighting) |
 
-The chemical potential is fixed to `mu=U/2`; there is no `mu` setting.
+The chemical potential is `mu=U/2` unless `mu` is given; the given value is
+used as is, without rounding to `U/2`. The model is particle-hole symmetric,
+and the sign is `+1`, only when `mu` is omitted or exactly `U/2` and the
+hopping matrix is bipartite; on a non-bipartite lattice `mu=U/2` does not imply
+density one. See [sign reweighting](#sign-reweighting) for the other cases.
 `nwarm>=0`, `nbin>=2`, `nmeas>=nbin`, and `nmeas` must be divisible by `nbin`.
 The reported means and errors combine the `nrep*nbin` measurement bins.
 The number of replicas is a separate setting from MPI ranks and OpenMP threads.
@@ -81,10 +90,23 @@ A periodic direction closes with a bond of amplitude `t` from its last site to
 its first (`x=Lx-1` to `x=0`, `y=Ly-1` to `y=0`). An antiperiodic direction
 uses `-t` for that bond and leaves all other bonds unchanged; an open direction
 has no closing bond. Closed (periodic or antiperiodic) directions longer than
-one must have even length to preserve bipartiteness; open directions also
-support odd lengths. An antiperiodic direction needs an even length of at
-least 4, because at length 2 its closing bond would cancel the ordinary bond.
-A periodic direction of length 2 connects the same pair twice (amplitude `2t`).
+one and of odd length make the lattice non-bipartite (sign-reweighted path);
+open directions support any length. An antiperiodic direction needs an even
+length of at least 4, because at length 2 its closing bond would cancel the
+ordinary bond. A periodic direction of length 2 connects the same pair twice
+(amplitude `2t`).
+
+`tprime` adds the diagonal bonds `(x,y)-(x+1,y+1)` and `(x,y)-(x+1,y-1)` of
+`lattice=square` with element `tprime`. A diagonal bond is absent when it
+crosses an open direction and changes sign once for each antiperiodic
+direction it crosses (twice for a corner, so the signs multiply); in a
+length-2 periodic direction both images accumulate, as for the nearest
+neighbours. Elements are hopping-matrix entries: the physical
+`H = -t sum_NN - t' sum_NNN` with `t=1, t'=0.2` is `t=-1`, `tprime=-0.2`.
+The lattice is bipartite only if a two-colouring of its nonzero elements
+exists (for example `t=0` with `tprime!=0`, coloured by `(-1)^x`); a tiny
+nonzero `tprime` is never neglected. `tprime` is rejected for `lattice=chain`
+and `lattice=file`, also when it is `0`.
 
 Output metadata records the boundary as `pbc=1` or `pbc=0` when both
 directions are periodic or both are open, as before. Otherwise the resolved
@@ -103,8 +125,19 @@ hopping matrix is:
 -1 0
 ```
 
-Do not include comment lines in a hopping file. Non-bipartite hopping graphs
-are rejected. `hopping_used.txt` records the constructed matrix in this same
+Do not include comment lines in a hopping file. A non-bipartite hopping graph
+runs on the sign-reweighted path. How the file is tested depends on the input:
+
+- An input that gives `mu` or `sign_file` (including `sign_file=none`) needs an exactly symmetric
+  matrix (the propagator reads one triangle) and is particle-hole symmetric
+  only if every diagonal element is exactly `0` and the nonzero off-diagonal
+  elements, however small, admit a two-colouring. The result does not depend
+  on the energy unit.
+- An input without those keys keeps the earlier behaviour and output: the
+  reader accepts diagonal elements and asymmetries up to `1e-12` and ignores
+  elements up to `1e-12` in the bipartite test, although they stay in the
+  propagated matrix. Such a file can be treated as particle-hole symmetric when
+  it is not; add `sign_file` (or `mu`) to get the exact test. `hopping_used.txt` records the constructed matrix in this same
 format. Spin momentum selectors require built-in chain or square geometry;
 they do not support `lattice=file`. For antiperiodic boundaries, use
 `bc_x`/`bc_y` rather than a hopping file so that the selectors stay available.
@@ -132,8 +165,10 @@ The [English README](../README.md#model-and-observables) and
 Energies and `ntot` are totals for the lattice; `doublon` is per site.
 Errors are estimated with bin jackknife and do not include finite-time-step
 bias or guarantee convergence. The three energy conventions are
-`E_hub=<K_hop+U sum n_up n_down>`, `E_gc=E_hub-(U/2)*ntot`, and
-`E_ph=E_gc+(U/4)*n_site`.
+`E_hub=<K_hop+U sum n_up n_down>`, `E_gc=E_hub-mu*ntot`, and
+`E_ph=E_hub-(U/2)*ntot+(U/4)*n_site` (`E_ph=E_gc+(U/4)*n_site` at `mu=U/2`).
+Without particle-hole symmetry the estimators, `sign` and `nan` rows follow
+[sign reweighting](#sign-reweighting); the column layout is unchanged.
 
 The scalar file aggregates replicas; it does not contain individual measurements
 or per-bin samples. The last two columns, `acceptance` and `dAcceptance`, were
@@ -184,6 +219,110 @@ At ensemble level, the present SU(2)-invariant model obeys `Sperp=2*Szz` at any
 time step; an individual auxiliary-field configuration need not.
 `DeltaSU2=Sperp/2-Szz` uses paired measurement bins and their jackknife error.
 It is a sampling/implementation diagnostic, not a direct estimator of Trotter bias.
+
+## Sign reweighting
+
+Configurations are sampled with `|W|` and each measurement carries
+`s=sign(W)=+-1`, set exactly from the stabilized determinants at every
+stabilization point and at the end of each sweep.
+
+Estimator. With particle-hole symmetry the estimators of earlier versions
+are kept (a per-bin ratio, then jackknife). Otherwise every scalar, Szz,
+Sperp and DeltaSU2 value of a temperature is a pooled ratio over all
+`B=nrep*nbin` replica bins, using the raw sums `C_b` (measurements),
+`S_b=sum s` and `A_b=sum s*O`:
+
+```text
+R = sum_b A_b / sum_b S_b
+R(-b) = (sum A - A_b) / (sum S - S_b)
+err^2 = (B-1)/B * sum_b (R(-b) - mean_b R(-b))^2
+```
+
+No bin is dropped, whatever its sign sum. `DeltaSU2` uses the same bins for
+both channels (paired). The scalar `sign` column is `sum S / sum C`;
+`acceptance` is a per-attempt statistic and is not sign-weighted. The S(q)
+sum rules are checked on the raw sums of every bin, valid for any sign sum.
+
+`ratio_status` of a temperature, shared by all of its observables:
+
+| Condition | Observables and errors | Sign, acceptance, raw sums | Run |
+| --- | --- | --- | --- |
+| `sum S > 0` and every `sum S - S_b > 0` | pooled ratio, jackknife | written | `ok` |
+| `sum S <= 0` | `nan` | written | `nonpositive_total`, warning, continues |
+| `sum S > 0`, some `sum S - S_b <= 0` | `nan` | written | `nonpositive_loo`, warning, continues |
+| non-finite raw sum, wrong count, numerical breakdown, incomplete MPI data, I/O failure | not certified | | error, nonzero exit |
+
+A finite pooled ratio is not a resolved measurement when the sign is within
+two errors of zero, when replicas have non-positive sign sums, or when the
+status is not `ok`. Check equilibration, autocorrelation (rebinning) and
+independent replicas as for any run; `sign` is computed even when the
+observables are `nan`.
+
+Restrictions: `tempering=dtau_ladder`, `sweep_order=alternating` and
+`conditional_measure=1` require particle-hole symmetry and are rejected
+before any output is opened. Forward sweeps and `global_update=site` with
+`fixed` or `polarized` site selection are supported. The staggered indicator
+`d` of `global_site_diag_file` has no physical meaning on a non-bipartite
+lattice. Standard error prints
+`INFO: ph_symmetric=0 (mu=..., tprime=..., bipartite=...); sign problem possible`.
+
+Extended schema. Inputs that give `mu`, `tprime` or `sign_file` (including
+`sign_file=none`), or
+whose model lacks particle-hole symmetry (including an odd periodic chain
+without any new key) write extended headers: `mu` with 17 digits and
+` tprime=... ph_symmetric=... estimator=bin_ratio|pooled_ratio` on the first
+scalar header line and on the lattice line of the spin files; columns are
+unchanged. The estimator follows `ph_symmetric`, not the schema. Other inputs
+keep the earlier headers byte for byte.
+
+Omitting `sign_file` and explicitly setting `sign_file=none` both disable the
+sign file, but only omission preserves the legacy input behaviour when no
+other new key is given. An explicit `none` selects the exact hopping-file PH
+test and extended headers just like a sign output path does.
+
+`replica_bin_file` of an extended input starts with
+`# replica_bin_schema=2 mu=... tprime=... ph_symmetric=... estimator=... nrep=... nbeta=...` and
+appends `sum_sign_N` and `sum_sign_Egc` after all earlier columns (after the
+conditional columns, if any). `sum_sign_Eph` is
+`sum_sign_Ehub-(U/2)*sum_sign_N+U*n_site*sum_sign/4`. Without that line the
+file has the earlier layout (schema 1).
+
+`sign_file` (default `none`) has `# sign_file_schema=1`, definitions, the run
+metadata and one row per temperature with the columns
+
+```text
+beta_index beta_requested beta_effective T Ltr dtau sign dsign f_neg df_neg
+replica_sign_mean replica_sign_se nrep nbin count_total sum_sign_total
+negative_count n_replica_nonpositive n_bins_nonpositive n_loo_nonpositive
+ratio_status sign_unresolved no_negative_observed
+```
+
+(one line in the file). `f_neg=(1-sign)/2` is the fraction of measured
+configurations with negative sign and `negative_count=(count_total-sum_sign_total)/2`;
+neither is clipped. `replica_sign_mean` averages `S_r/C_r` over all replicas,
+non-positive ones included; `replica_sign_se` is `nan` for `nrep=1`.
+`sign_unresolved=1` when `0<sign<=2*dsign`; `no_negative_observed=1` when the
+model lacks particle-hole symmetry and no negative sign was measured. With
+particle-hole symmetry `sign=1` and the counters are zero. The file is
+written by the root rank only and is included in the output-collision checks.
+
+`scripts/analyze_sign_bins.py BINS.tsv [--rebin K] [--unit bin|replica] [--json]`
+recomputes the sign statistics, statuses and pooled observables from a
+replica-bin file (schema 1 or 2; other schemas are rejected). `--rebin K`
+merges `K` consecutive bins inside each replica (`nbin` must be a multiple of
+`K`), and `--unit replica` uses replicas as jackknife blocks. Schema 1 files
+carry `E_hub`, `doublon` and the saved q columns only.
+Before any merging every row is checked, and a violation is an error (nonzero
+exit), unlike a non-positive sign sum, which is a status: the sign, energy,
+doublon (and in schema 2, `N` and `E_gc`) sums must be finite; a q column must
+be finite when `# szz_Q_index=...` marks it measured and NaN otherwise
+(`inf` and `-inf` are always errors); each temperature
+has one `beta_requested`, `beta_effective` and `Ltr`; each replica has one
+seed, distinct from the others, and bins `0..nbin-1` with their counts and
+sweep ranges; replicas and temperatures are `0..nrep-1` and `0..nbeta-1`. An
+empty table is an error. Schema 2 records `nrep` and `nbeta`; for schema 1
+only contiguity is checkable, and a missing last replica or temperature is
+detected only with `--nrep N --nbeta K`.
 
 ## Replica, timing, and stabilization diagnostics
 

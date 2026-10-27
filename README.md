@@ -1,8 +1,10 @@
 ---
-date: 2026-10-03
-datetime: 2026-10-03 08:43 JST
-model: OpenAI GPT-6 (Codex); OpenAI GPT-5.6 Luna (Codex; 2026-10-02 directional boundaries); OpenAI GPT-6 (Codex; 2026-10-03 metadata update)
+date: 2026-10-27
+datetime: 2026-10-27 17:05 JST
+model: OpenAI GPT-6 (Codex); OpenAI GPT-5.6 Luna (Codex; 2026-10-02 directional boundaries); OpenAI GPT-6 (Codex; 2026-10-03 metadata update); Claude Opus 5.5 (Claude Code; 2026-10-27 sign reweighting); OpenAI GPT-6 (Codex; 2026-10-27 explicit sign_file and q validation)
 summary: |
+  2026-10-27: explicit sign_file=none selects exact file PH testing and extended headers; unmeasured q requires NaN.
+  2026-10-27: general mu, square-lattice tprime and sign-reweighted estimators for models without particle-hole symmetry.
   Covers directional periodic, antiperiodic and open boundaries with spin momentum selectors.
   User guide for SAI-QMC 0.1, a finite-temperature determinant QMC code.
   Describes input syntax, output columns, build commands, validation, and development records.
@@ -13,7 +15,10 @@ summary: |
 [English](README.md) | [日本語](README_ja.md)
 
 SAI-QMC is a C implementation of finite-temperature determinant quantum Monte
-Carlo (DQMC/BSS) for the repulsive, half-filled Hubbard model on bipartite lattices.
+Carlo (DQMC/BSS) for the repulsive Hubbard model. Half filling on bipartite
+lattices is sign-free; a general chemical potential, a next-nearest-neighbour
+hopping `tprime` on the square lattice, and other non-bipartite hopping run with
+sign reweighting and may have a sign problem.
 It measures energies, density, double occupancy, and equal-time longitudinal
 and transverse spin structure factors. The command-line executable is `dqmc`.
 
@@ -78,14 +83,16 @@ seed=1
 temperature. `nbin` partitions the measurements for error estimation;
 it must be at least 2, and `nmeas` must be divisible by `nbin`.
 Each `beta/dtau` must be an integer to within `1e-9`.
-The chemical potential is fixed to `mu=U/2`; there is no `mu` input key.
+The chemical potential `mu` defaults to `U/2` (half filling on a bipartite
+lattice); `tprime` adds the two diagonal hoppings of `lattice=square`. See
+[sign reweighting](#sign-reweighting-and-the-sign-problem).
 
 Use `lattice=square` with `Lx` and `Ly` for a rectangular square lattice;
 `pbc=1` is periodic and `pbc=0` is open. To set each direction separately, use
 `bc_x` and `bc_y` (`periodic`, `antiperiodic`, or `open`) instead of `pbc`; for
-example, `bc_x=antiperiodic` gives x-antiperiodic, y-periodic boundaries. With
-periodic or antiperiodic boundaries, active directions must have even length to
-retain bipartiteness, and antiperiodic directions need length 4 or more. Omitted
+example, `bc_x=antiperiodic` gives x-antiperiodic, y-periodic boundaries. Antiperiodic
+directions need an even length of 4 or more. A closed direction of odd length
+is not bipartite and runs on the sign-reweighted path. Omitted
 settings use defaults documented in [the input/output reference](docs/usage.md).
 
 ## Model and observables
@@ -93,11 +100,13 @@ settings use defaults documented in [the input/output reference](docs/usage.md).
 The simulated grand-canonical Hamiltonian is
 
 ```text
-H = K_hop + U sum_i n_i_up n_i_down - mu N,  mu = U/2.
+H = K_hop + U sum_i n_i_up n_i_down - mu N,  mu = U/2 unless given.
 ```
 
-`U >= 0`; the lattice must be bipartite. Built-in chains and square lattices use
-`t=-1` by default for nearest-neighbor hopping. A real symmetric hopping matrix with zero
+`U >= 0`. Built-in chains and square lattices use `t=-1` by default for
+nearest-neighbor hopping; `tprime` is the element of the square lattice's
+diagonal bonds (for `H = -t sum_NN - t' sum_NNN` with `t=1, t'=0.2`, give
+`t=-1` and `tprime=-0.2`). A real symmetric hopping matrix with zero
 diagonal may also be supplied using `lattice=file`; see
 [input and observable conventions](docs/usage.md).
 
@@ -119,7 +128,7 @@ T  E_hub dE_hub  E_gc dE_gc  E_ph dE_ph  ntot dN  doublon dD  sign  acceptance d
 | `E_ph`, `dE_ph` | Energy in the particle-hole-symmetric interaction convention, and its error |
 | `ntot`, `dN` | Total particle number and its error |
 | `doublon`, `dD` | Double occupancy per site and its error |
-| `sign` | Mean Monte Carlo sign |
+| `sign` | Mean Monte Carlo sign (`1` with particle-hole symmetry) |
 | `acceptance`, `dAcceptance` | Local-update acceptance fraction and its error |
 
 Energies and `ntot` are totals. `doublon` is per site.
@@ -157,6 +166,7 @@ conventions are in [the input/output reference](docs/usage.md).
 | `szz.dat`, `sperp.dat`, `spin_consistency.dat` | Optional spin data files enabled by the settings above |
 | `replicas.dat` | Replica seeds, run parameters, and status; enabled by default for `nrep>1`. Set `replica_log=none` to disable, or `replica_log=path.dat` to choose a file |
 | `profile.dat` | Timing data when `profile=1`; change the path with `profile_file` |
+| `sign_file` | Per-temperature sign statistics and ratio status; off unless `sign_file=path` is given |
 
 All generated tables use space-separated fields and `#` comment headers.
 Inputs and the hopping-matrix file retain their `.txt` format. Historical
@@ -165,6 +175,35 @@ reference data keep their original names and formats.
 Error messages go to standard error. Run `./dqmc input.txt 2> run.err` to save
 them separately; scalar data are saved automatically. Existing redirection
 workflows remain available with `output_file=none`.
+
+## Sign reweighting and the sign problem
+
+The sampler draws Hubbard-Stratonovich fields with weight `|W|` and measures
+the sign `s = sign(W)`. With particle-hole symmetry (`mu=U/2` exactly and a
+bipartite hopping matrix) `s=1` and the results, headers and columns are those
+of earlier versions. Otherwise (`mu` different from `U/2`, a non-bipartite
+`tprime` lattice, an odd periodic direction, a non-bipartite hopping file)
+both spins are propagated and every observable is the pooled ratio
+`sum_b A_b / sum_b S_b` over all `nrep*nbin` replica bins, with a
+delete-one-bin jackknife error; bins with zero or negative sign sums are kept.
+If the total sign sum or a leave-one-out sign sum is not positive, that
+temperature's observables and errors are written as `nan`, a warning is
+printed and the run continues; the sign, acceptance and raw sums are still
+written. Parallel tempering, `sweep_order=alternating` and conditional
+measurements remain limited to particle-hole-symmetric models. A hopping file
+is tested exactly (zero diagonal, every nonzero element) only when `mu` or
+`sign_file` is given (including `sign_file=none`); without them the legacy
+`1e-12` tolerance is kept. Explicit `sign_file=none` selects the exact test
+and extended headers while leaving the sign file disabled.
+
+`sign_file=sign.dat` writes one row per temperature with the sign and its
+error, the negative fraction `(1-sign)/2`, replica statistics, counts of
+non-positive bins and replicas, and `ratio_status`. A sign within two errors
+of zero (`sign_unresolved=1`) or a non-`ok` status means the observables are
+not resolved. A finite sample without negative signs (`no_negative_observed=1`)
+does not prove a sign-free model. `scripts/analyze_sign_bins.py` re-analyzes a
+`replica_bin_file` with the same estimator, with rebinning inside each replica
+and replica-unit jackknife. See [the input/output reference](docs/usage.md#sign-reweighting).
 
 ## Conditional local measurements
 
@@ -462,6 +501,9 @@ as appropriate for a different MPI implementation.
 Tests cover Green-function updates and stabilization, independent noninteracting
 references, spin sum rules, particle-hole symmetry, output compatibility,
 replica aggregation, and parallel consistency. Slow tests are separate.
+`make test_sign_default` (and `test_sign_default_parallel`) compares inputs
+without the new keys against the commit preceding the sign-reweighting
+extension and needs the Git history.
 
 Read [known limitations](docs/limitations.md) before production use. In particular:
 

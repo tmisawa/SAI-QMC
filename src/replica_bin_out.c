@@ -18,7 +18,18 @@ int replica_bin_write(FILE *fp, const ReplicaBinView *v,
         m->nbin != v->nbin) {
         return 1;
     }
+    if (m->schema < 0 || m->schema > 2) {
+        return 1;
+    }
     if (write_header) {
+        if (m->schema == 2) {
+            fprintf(fp,
+                    "# replica_bin_schema=2 mu=%.17g tprime=%.17g "
+                    "ph_symmetric=%d estimator=%s nrep=%d nbeta=%d\n",
+                    m->mu, m->tprime, m->ph_symmetric,
+                    m->estimator != NULL ? m->estimator : "unknown", m->nrep,
+                    m->nbeta);
+        }
         fprintf(fp,
                 "# replica-bin sums; observable mean = sum_sign_O / sum_sign\n"
                 "# sum_sign_Ehub is the total energy (not per site); "
@@ -53,6 +64,9 @@ int replica_bin_write(FILE *fp, const ReplicaBinView *v,
         if (m->conditional_measure) {
             fputs("\tconditional_count\tsum_D_cond\tsum_K_cond\tsum_Ehub_cond", fp);
         }
+        if (m->schema == 2) {
+            fputs("\tsum_sign_N\tsum_sign_Egc", fp);
+        }
         fputc('\n', fp);
     }
     const int per = m->nmeas / m->nbin;
@@ -80,6 +94,10 @@ int replica_bin_write(FILE *fp, const ReplicaBinView *v,
                 }
                 fprintf(fp, "\t%d\t%.17g\t%.17g\t%.17g", bin->conditional_count,
                         bin->sum_D_cond, bin->sum_K_cond, bin->sum_Ehub_cond);
+            }
+            if (m->schema == 2) {
+                fprintf(fp, "\t%.17g\t%.17g", bin->sum_sign_N,
+                        bin->sum_sign_Egc);
             }
             fputc('\n', fp);
         }

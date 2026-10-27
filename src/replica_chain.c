@@ -111,7 +111,7 @@ int replica_chain_init(ReplicaChain *c, const Params *p, const Lattice *L,
 
     profiler_phase_set(prof, PROF_PHASE_SETUP);
     PROF_BEGIN(prof, t_model_init);
-    model_init(&c->m, L, p->U, dtau, 1, 0.0);
+    model_init(&c->m, L, p->U, dtau, params_mu_is_half(p), p->mu);
     PROF_END(prof, PROF_MODEL_INIT, t_model_init);
     c->have_model = 1;
 
@@ -330,6 +330,13 @@ int replica_chain_measure(ReplicaChain *c, ReplicaResult *result, int bi, int k,
     const double beta = c->beta;
     const double T = c->T;
 
+    if (mu != c->m.mu) {
+        fprintf(stderr,
+                "ERROR: measurement mu=%.17g differs from the model mu=%.17g "
+                "(beta_index=%d replica=%d)\n",
+                mu, c->m.mu, beta_index, replica_id);
+        return 1;
+    }
     if (D->status != 0) {
         fprintf(stderr,
                 "ERROR: dqmc measurement numerical breakdown "

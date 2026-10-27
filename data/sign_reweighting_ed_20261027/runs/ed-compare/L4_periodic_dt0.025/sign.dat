@@ -1,0 +1,12 @@
+# sign_file_schema=1
+# sign = sum_sign_total / count_total over every replica-bin block; dsign = delete-one-block jackknife error
+# f_neg = (1 - sign) / 2 = fraction of measured configurations with negative sign; df_neg = dsign / 2; neither is clipped
+# replica_sign_mean = mean of sum_sign_r / count_r over every replica (non-positive included); replica_sign_se = sample standard error (nan for nrep=1)
+# ratio_status: ok | nonpositive_total (sum_sign_total <= 0) | nonpositive_loo (a delete-one-block sign sum <= 0); observables are NaN unless ok
+# sign_unresolved=1: 0 < sign <= 2 dsign; no_negative_observed=1: ph_symmetric=0 and negative_count=0 (finite sample, not a sign-free model)
+# lattice=chain Lx=4 Ly=1 n=4 pbc=1 t=-1 U=4 mu=0 dtau=0.025000000000000001 tprime=0 ph_symmetric=0 estimator=pooled_ratio bipartite=1 nwarm=1000 nmeas=20000 nbin=20 nrep=8 seed=2026102711 parallel=omp
+# columns: beta_index beta_requested beta_effective T Ltr dtau sign dsign f_neg df_neg replica_sign_mean replica_sign_se nrep nbin count_total sum_sign_total negative_count n_replica_nonpositive n_bins_nonpositive n_loo_nonpositive ratio_status sign_unresolved no_negative_observed
+0 1 1 1 40 0.025000000000000001 1 0 0 0 1 0 8 20 160000 160000 0 0 0 0 ok 0 1
+1 2 2 0.5 80 0.025000000000000001 0.99988750000000004 3.6544428891606449e-05 5.6249999999979927e-05 1.8272214445803224e-05 0.99988750000000004 2.2658174179371649e-05 8 20 160000 159982 9 0 0 0 ok 0 0
+2 4 4 0.25 160 0.025000000000000001 0.98576249999999999 0.00059541536556185939 0.007118750000000007 0.0002977076827809297 0.98576249999999987 0.00046442648964687512 8 20 160000 157722 1139 0 0 0 ok 0 0
+3 10 10 0.10000000000000001 400 0.025000000000000001 0.99112500000000003 0.00066415111090262311 0.0044374999999999831 0.00033207555545131155 0.99112499999999981 0.00062813499458999047 8 20 160000 158580 710 0 0 0 ok 0 0

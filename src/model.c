@@ -14,7 +14,7 @@ void model_init(Model *m, const Lattice *L, double U, double dtau, int half,
     m->dtau = dtau;
     m->mu = half ? U / 2.0 : mu_in;
     m->half_filling = half ? 1 : 0;
-    m->ph_symmetric = (half && L->is_bipartite) ? 1 : 0;
+    m->ph_symmetric = model_ph_symmetric(L, half);
     m->bipart = L->bipart;
 
     m->K = malloc(sizeof(double) * (size_t)n * (size_t)n);
@@ -28,6 +28,11 @@ void model_init(Model *m, const Lattice *L, double U, double dtau, int half,
 
     la_expm_sym(n, m->K, -dtau, m->expK);
     la_expm_sym(n, m->K, dtau, m->expKinv);
+}
+
+int model_ph_symmetric(const Lattice *L, int half)
+{
+    return (half && L->is_bipartite) ? 1 : 0;
 }
 
 void model_free(Model *m)

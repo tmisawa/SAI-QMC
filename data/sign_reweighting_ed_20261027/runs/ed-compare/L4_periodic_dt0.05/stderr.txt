@@ -1,0 +1,4 @@
+INFO: ph_symmetric=0 (mu=0, tprime=0, bipartite=1); sign problem possible
+real 11.50
+user 80.98
+sys 1.32

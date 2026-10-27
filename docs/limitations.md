@@ -1,8 +1,10 @@
 ---
-date: 2026-10-03
-datetime: 2026-10-03 08:43 JST
-model: OpenAI GPT-6 (Codex); OpenAI GPT-5.6 Luna (Codex; 2026-10-02 directional boundaries); OpenAI GPT-5.6 Sol (Codex; 2026-10-02 validation); OpenAI GPT-6 (Codex; 2026-10-03 metadata update)
+date: 2026-10-27
+datetime: 2026-10-27 17:05 JST
+model: OpenAI GPT-6 (Codex); OpenAI GPT-5.6 Luna (Codex; 2026-10-02 directional boundaries); OpenAI GPT-5.6 Sol (Codex; 2026-10-02 validation); OpenAI GPT-6 (Codex; 2026-10-03 metadata update); Claude Opus 5.5 (Claude Code; 2026-10-27 sign reweighting); OpenAI GPT-6 (Codex; 2026-10-27 explicit sign_file and q validation)
 summary: |
+  2026-10-27: explicit sign_file=none selects exact file PH testing and extended headers; unmeasured q requires NaN.
+  2026-10-27: doping and non-bipartite hopping run with a sign problem; small-sign results are not certified.
   Limits interacting antiperiodic validation to the 4x2, U=4, beta<=4 ED comparison.
   Supported scope and known numerical/statistical limitations of the initial source snapshot.
   Separates passing implementation tests from unresolved production convergence checks.
@@ -13,15 +15,33 @@ summary: |
 
 ## Physical scope
 
-The command-line program targets the repulsive, half-filled Hubbard model on
-bipartite lattices. Doping, non-bipartite frustrated lattices, and general
-interactions are outside this distribution's validated scope. Historical
-planning documents may discuss features that are not implemented.
+The command-line program targets the repulsive Hubbard model. Half filling
+(`mu=U/2`) on bipartite lattices is sign-free. A general `mu`, the square-lattice
+`tprime`, odd periodic directions and non-bipartite hopping files run with sign
+reweighting and have a sign problem: the cost of a given precision grows as
+the mean sign decreases, typically exponentially in `beta` and system size.
+Physical results at a small mean sign are not certified. The mean sign itself
+is computed even when the observables are `nan`, but its value still requires
+equilibration, autocorrelation and numerical-precision checks; a finite run
+without negative signs does not establish a sign-free model. The
+sign-reweighted path is validated by exact enumeration of a 3-site model with
+negative weights, the atomic limit, U=0 references, and finite-temperature ED
+of a 4-site chain and a 4x2 tprime lattice at `beta<=10` and `beta<=4`
+(VALIDATION.md section 13); larger interacting lattices and low temperatures
+are not validated. Parallel tempering, alternating sweeps and conditional
+measurements remain restricted to particle-hole-symmetric models, and the
+spin-channel HS decomposition is the only one implemented. A hopping file read
+without `mu` or `sign_file` keeps the legacy `1e-12` tolerances, so elements
+below that size are ignored when particle-hole symmetry is decided although
+they are propagated; give `sign_file` (including `sign_file=none`) or `mu`
+for the exact test. General
+interactions and complex hopping are outside the scope. Historical planning
+documents may discuss features that are not implemented.
 
 Compare finite-temperature results with grand-canonical ED at the same chemical
-potential. The mean particle number equals the site count at half filling,
-but this does not make a finite system equivalent to canonical ED at finite
-temperature. Match hopping/boundary conventions, especially small periodic
+potential. The mean particle number equals the site count at half filling
+on a bipartite lattice (not on a non-bipartite one at `mu=U/2`), but this does
+not make a finite system equivalent to canonical ED at finite temperature. Match hopping/boundary conventions, especially small periodic
 lattices. Antiperiodic boundaries are built in through `bc_x`/`bc_y` for even
 lengths of at least 4; hopping files still have no spin momentum selectors.
 Their validation covers U=0 exact results and a 4x2, U=4, beta<=4

@@ -1,6 +1,91 @@
 # LOG
 
 ---
+date: 2026-10-27
+datetime: 2026-10-27 17:05 JST
+model: OpenAI GPT-6 (Codex)
+summary: |
+  Explicit sign_file=none now selects exact hopping-file PH testing and extended headers without writing a sign file.
+  Unmeasured q columns must be NaN; positive and negative infinity are rejected before rebinning.
+---
+
+## 2026-10-27: Sign output settings preserve the physical calculation
+
+The parser records whether `sign_file` was specified separately from whether its output is
+enabled. Explicit `sign_file=none` now selects the same exact hopping-file particle-hole test
+and extended schema as a filename. Previously, disabling that output with `mu` omitted could
+send a small-hopping triangle back to the legacy PH path. Omitting all new keys retains the
+legacy behaviour and output.
+
+The bin-table analyzer now requires NaN in unmeasured q columns and rejects both infinities.
+Measured q values still have to be finite. Regression tests cover every saved q column and
+compare sign-file settings on the scaled triangle in serial, OpenMP, MPI and hybrid modes,
+including rejection of PH-only options before files are opened.
+
+`make test`, `test_sign_parallel`, `test_sign_default` and `test_sign_default_parallel` pass;
+the 40 legacy inputs retain compatibility with `4384c37` (timing fields compared by structure).
+All 1296 public-data checksums pass. Re-analysis of the ED dataset is byte-identical to its
+saved 187/188 result; the underlying run data and its recorded provenance are unchanged.
+
+---
+date: 2026-10-27
+datetime: 2026-10-27 16:01 JST
+model: Claude Opus 5.5 (Claude Code)
+summary: |
+  Review fixes: hopping files with mu or sign_file decide particle-hole symmetry exactly; the bin
+  re-analysis rejects non-finite required sums and incomplete or inconsistent tables; schema 2 records nrep, nbeta.
+---
+
+## 2026-10-27: Exact particle-hole test for hopping files and bin-table checks
+
+An independent review found that a hopping file whose elements are all below `1e-12` (the
+3-site triangle in units scaled by `1e-13`) entered the particle-hole path although the small
+elements are propagated, giving sign 1 and N=3 instead of the values of the same model in
+ordinary units. Inputs that give `mu` or `sign_file` now require an exactly symmetric file and
+are particle-hole symmetric only with an exactly zero diagonal and a two-colouring of every
+nonzero element; the scaled triangle then reproduces the unscaled run. Inputs without those keys
+keep the legacy tolerance and their byte-identical output; the documents state that scope.
+
+`scripts/analyze_sign_bins.py` no longer treats a non-finite energy, doublon, N or E_gc sum as
+an unmeasured quantity: every row is checked before rebinning, and a q column may be NaN only when
+the header marks it unmeasured. Empty tables, missing or duplicated replicas, bins or seeds, a
+missing beta point and rows whose beta or Ltr differ within a beta point are errors. The schema 2
+header now records `nrep` and `nbeta`. The ED comparison data were regenerated with this binary
+from the same inputs and seeds; every data row equals the earlier output.
+
+---
+date: 2026-10-27
+datetime: 2026-10-27 15:04 JST
+model: Claude Opus 5.5 (Claude Code)
+summary: |
+  Added mu, the square-lattice tprime and sign_file. Models without particle-hole symmetry run on the
+  two-spin path with a pooled sign-reweighted estimator and ratio_status; legacy inputs are byte-identical.
+---
+
+## 2026-10-27: General mu, square tprime and sign reweighting
+
+`mu` (default `U/2`, never rounded) is passed to the replica model initialization, the E_gc
+conversion and the headers; previously `replica_chain_init` always built a half-filled model.
+`lattice=square` accepts `tprime` for both diagonal bonds, with the boundary phase of every
+crossed antiperiodic direction; `tprime=0` reproduces the old matrix exactly. Bipartiteness of
+the new lattice comes from the exact nonzero pattern of the matrix (for example `t=0,
+tprime!=0` is bipartite with `(-1)^x`). Non-bipartite lattices are no longer rejected.
+
+With particle-hole symmetry nothing changes. Otherwise every scalar, Szz, Sperp and SU(2)
+residual is the ratio of raw sums pooled over all replica bins, with a delete-one-bin
+jackknife; zero and negative bins are kept, and the S(q) sum rules are checked on the raw
+sums. A non-positive total or leave-one-out sign sum writes `nan` with a warning and the
+run continues (`ratio_status`); invalid raw data remain errors on every MPI rank. Parallel
+tempering, alternating sweeps and conditional measurements are rejected for these models
+before any output is opened. `sign_file` (default `none`) writes the sign statistics per
+temperature. Extended inputs use extended headers and replica-bin schema 2 (`sum_sign_N`,
+`sum_sign_Egc` appended); `scripts/analyze_sign_bins.py` re-analyzes the bin files.
+
+Validation: VALIDATION.md section 13 (3-site enumeration with 48 negative configurations,
+atomic limit, U=0, re-analysis, statuses, four parallel modes, 39 legacy inputs byte-identical
+to `4384c37`, and an ED comparison with 187 of 188 pre-registered points passing).
+
+---
 date: 2026-10-03
 datetime: 2026-10-03 08:43 JST
 model: OpenAI GPT-6 (Codex)
