@@ -1,0 +1,15 @@
+{
+  "case": "b8/dt0.1/r00",
+  "exit_code": 0,
+  "elapsed_seconds": 24.793574333190918,
+  "finished": "2026-10-03T10:59:46+0900",
+  "outputs": {
+    "bins.tsv": "6844a9a66e10fe91aa12a28989c0ee78b9ff7a6c7264ecbb0a15239baa53b07e",
+    "hopping_used.txt": "890370f291f5c4c06fe61f88f3ac1ed504d0283cf87017a79affebc6c80b152a",
+    "observables.dat": "ed78af5142f6c0e1c0f7ca10f96e7514e78716c36300de525d91442a9df11905",
+    "sperp.dat": "228e9d5ed60efbec8b5cfa328f62e4c13b0fd54eada8b907a304c7aeda9c4f0b",
+    "stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stdout.txt": "ed78af5142f6c0e1c0f7ca10f96e7514e78716c36300de525d91442a9df11905",
+    "szz.dat": "1828c6313b04c0dacb6da2035bf89f91b9217f0774eb1d086b6821b648f23ffd"
+  }
+}

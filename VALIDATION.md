@@ -1,11 +1,12 @@
 ---
 date: 2026-10-27
-datetime: 2026-10-27 17:05 JST
+datetime: 2026-10-27 17:16 JST
 model: OpenAI GPT-6 (Codex; revision), Codex GPT-5 (original), Claude Sonnet 5 (Anthropic; 2026-09-27 addition), Claude Opus 5.5 (Anthropic; 2026-09-28 addition); OpenAI GPT-5.6 Sol (Codex; 2026-10-02 validation); OpenAI GPT-6 (Codex; 2026-10-03 metadata update); Claude Opus 5.5 (Claude Code; 2026-10-27 sign reweighting); OpenAI GPT-6 (Codex; 2026-10-27 explicit sign_file and q validation)
 summary: |
   2026-10-27: explicit sign_file=none selects exact file PH testing and extended headers; unmeasured q requires NaN.
   2026-10-27: 一般μ・正方格子t′・符号付き合算比（§13）。負配位48/4096の3 site列挙、原子極限、U=0、旧入力の
   byte同一性、4並列形態の一致は合格。L4・4×2 t′のED比較は事前規定188比較中187が合格、1点は事後の刻み追加で確認。
+  10-03: tempering互換性testの比較先を公開履歴から取得できるcb077b2に訂正。過去の3215eee参照は当時の記録として保持する。
   方向別境界の実装検査と4×2 AP/P・U=4・β≤4の事前規定ED比較はPASS（§12）。
   Delta tau-ladder並列テンパリング（PT）の実装検証: cross-weight直接検査、厳密列挙χ²と負の対照、
   3215eeeとのbyte同一性、serial/OpenMP/MPI/hybrid一致、MPI失敗経路、L6 chain U=4のPT対独立chain
@@ -623,6 +624,12 @@ case (a)・(b)・(c)でそれぞれ50.2・66.2・60.7秒（負荷の高い共有
 定常分布であり、大きな系での混合の速さや、PTによるTrotter誤差の変化は対象外である。
 
 ### 3215eeeとのbyte同一性（`tempering`未指定・`tempering=none`）
+
+**2026-10-03の再現手順の訂正**: 現在の`make test_tempering_default`は、公開履歴の
+`cb077b2f4acfec138a9ad275248761ebdac5ab85`を比較先とする。このcommitと当時の
+`3215eee`の差分は`LOG.md`のみで、計算source・build設定・fixtureは同一である。
+legacy testでは比較先が検査対象HEADの祖先であることを確認し、full historyを必要とする。
+以下は当時の検証記録であり、保存データのsource識別子も当時の値を保持する。
 
 `tests/test_tempering_disabled_unchanged.sh`（`make test_tempering_default`）は、
 このPT開発の起点commit `3215eee700b9b6359242e228e515cf83a5a53732`を同じ

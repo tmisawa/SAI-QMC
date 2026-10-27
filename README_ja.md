@@ -1,10 +1,11 @@
 ---
 date: 2026-10-27
-datetime: 2026-10-27 17:05 JST
+datetime: 2026-10-27 17:16 JST
 model: OpenAI GPT-6 (Codex); OpenAI GPT-5.6 Luna (Codex; 2026-10-02 directional boundaries); OpenAI GPT-6 (Codex; 2026-10-03 metadata update); Claude Opus 5.5 (Claude Code; 2026-10-27 sign reweighting); OpenAI GPT-6 (Codex; 2026-10-27 explicit sign_file and q validation)
 summary: |
   2026-10-27: explicit sign_file=none selects exact file PH testing and extended headers; unmeasured q requires NaN.
   2026-10-27: 一般のmu、正方格子のtprime、粒子・正孔対称性のない模型の符号付き推定量を追加。
+  Adds guidance for the four pull-request CI configurations.
   方向別の周期・反周期・開放境界とspin運動量selectorの対応を含む。
   SAI-QMC 0.1の日本語利用案内。英語READMEに対応する。
   ビルド、入出力、並列実行、検証範囲、開発記録を説明する。
@@ -456,6 +457,10 @@ python3 scripts/verify_reference_data.py
 時間のかかるテストは別のターゲットに分けています。
 `make test_sign_default`（と`test_sign_default_parallel`）は、新しいkeyを含まない入力を
 符号reweighting拡張の直前のcommitと比較します。Git履歴が必要です。
+
+[PRごとのCI](docs/ci.md)はLinux/macOSの4構成で、GCC/Clang、
+OpenMP・MPI・hybrid、保存データの再解析を確認します。
+必須checkの設定候補は`ci-gate`です。定期実行は設定していません。
 
 本計算を行う前に[既知の制約](docs/limitations.md)を確認してください。
 特に次の点に注意が必要です。

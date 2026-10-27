@@ -1,10 +1,11 @@
 ---
 date: 2026-10-27
-datetime: 2026-10-27 17:05 JST
+datetime: 2026-10-27 17:16 JST
 model: OpenAI GPT-6 (Codex); OpenAI GPT-5.6 Luna (Codex; 2026-10-02 directional boundaries); OpenAI GPT-6 (Codex; 2026-10-03 metadata update); Claude Opus 5.5 (Claude Code; 2026-10-27 sign reweighting); OpenAI GPT-6 (Codex; 2026-10-27 explicit sign_file and q validation)
 summary: |
   2026-10-27: explicit sign_file=none selects exact file PH testing and extended headers; unmeasured q requires NaN.
   2026-10-27: general mu, square-lattice tprime and sign-reweighted estimators for models without particle-hole symmetry.
+  Adds guidance for the four pull-request CI configurations.
   Covers directional periodic, antiperiodic and open boundaries with spin momentum selectors.
   User guide for SAI-QMC 0.1, a finite-temperature determinant QMC code.
   Describes input syntax, output columns, build commands, validation, and development records.
@@ -504,6 +505,10 @@ replica aggregation, and parallel consistency. Slow tests are separate.
 `make test_sign_default` (and `test_sign_default_parallel`) compares inputs
 without the new keys against the commit preceding the sign-reweighting
 extension and needs the Git history.
+
+The [pull-request CI](docs/ci.md) uses four Linux/macOS configurations,
+covering GCC/Clang, OpenMP/MPI/hybrid execution and frozen-data reanalysis.
+The final required-check candidate is `ci-gate`; no scheduled runs are configured.
 
 Read [known limitations](docs/limitations.md) before production use. In particular:
 

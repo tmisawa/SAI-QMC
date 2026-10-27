@@ -2,6 +2,24 @@
 
 ---
 date: 2026-10-27
+datetime: 2026-10-27 17:16 JST
+model: OpenAI GPT-6 (Codex)
+summary: |
+  Integrates the sign-reweighting extension with the pull-request CI and matched 4x4 reference datasets.
+  Retains both sign regression targets and CI build-only targets, with both datasets listed in the public index.
+---
+
+## 2026-10-27: Integrate sign tests with pull-request validation
+
+The Makefile retains the sign-output, cross-mode and legacy compatibility targets alongside
+the build-only targets used by the four CI configurations. The standard test target runs
+the signed-output regressions, and the hybrid target runs the signed cross-mode comparisons.
+Documentation preserves the 4x4 reference-data limitations and the sign-reweighted ED result
+of 187/188 comparisons passing. The solver and stored numerical outputs are unchanged by
+this integration.
+
+---
+date: 2026-10-27
 datetime: 2026-10-27 17:05 JST
 model: OpenAI GPT-6 (Codex)
 summary: |
@@ -84,6 +102,140 @@ temperature. Extended inputs use extended headers and replica-bin schema 2 (`sum
 Validation: VALIDATION.md section 13 (3-site enumeration with 48 negative configurations,
 atomic limit, U=0, re-analysis, statuses, four parallel modes, 39 legacy inputs byte-identical
 to `4384c37`, and an ED comparison with 187 of 188 pre-registered points passing).
+
+---
+date: 2026-10-03
+datetime: 2026-10-03 14:54 JST
+model: OpenAI GPT-6 (Codex)
+summary: |
+  Corrected the tempering compatibility baseline to a commit available in public history.
+  Historical regressions now require their baseline to be an ancestor of the tested revision.
+---
+
+## 2026-10-03: Reproducible historical compatibility tests
+
+The first hosted GCC run passed the serial suite but could not find the
+tempering compatibility baseline. Local checkouts retained the older object,
+so local runs had not exposed its absence from the published history.
+The test now uses `cb077b2`, whose calculation sources, build settings and
+fixtures are identical to the prior baseline; only `LOG.md` differs.
+Historical validation identifiers remain in the original scientific records.
+
+Both legacy scripts now require their baseline commit to be an ancestor of
+the tested revision, so unrelated local objects cannot silently satisfy the
+history requirement. Both compatibility targets pass in a fresh public clone
+that lacks the old object. ShellCheck and shell syntax checks also pass.
+
+---
+date: 2026-10-03
+datetime: 2026-10-03 14:45 JST
+model: OpenAI GPT-6 (Codex)
+summary: |
+  Preserve each failed shell-test invocation in a unique evidence directory.
+  Clarified Linux lint requirements and the scope of dependency-download retries.
+---
+
+## 2026-10-03: CI failure evidence retention
+
+Shell-test cleanup now creates a unique directory for every failed invocation
+and copies its contents, including hidden files, directly into that directory.
+Repeated failures of the same script no longer nest or overwrite prior outputs.
+If archiving fails, cleanup keeps the original outputs, reports their location
+and preserves the test's original exit status even with `set -e` enabled.
+
+The helper regressions now cover three successive failures of the same script
+and an unavailable archive directory. All 13 helper tests pass with Python 3.10
+and 3.12; actionlint, ShellCheck and shell syntax checks also pass. The CI guide
+now states that `ci/lint.sh` requires Linux x86_64 and that its actionlint download
+is the dependency download with explicit retries in the CI scripts.
+
+---
+date: 2026-10-03
+datetime: 2026-10-03 12:01 JST
+model: OpenAI GPT-6 (Codex)
+summary: |
+  Added four pull-request CI configurations and a required-check gate.
+  Covers parallel replica layouts, legacy compatibility and frozen-data reanalysis.
+---
+
+## 2026-10-03: Pull-request continuous integration
+
+The [CI workflow](.github/workflows/ci.yml) defines Linux GCC serial with saved
+validation data, Linux Clang serial, Linux OpenMP/MPI/hybrid, and macOS
+serial/OpenMP jobs. It uses PR events only, bounded build parallelism, single
+BLAS threads, read-only permissions and pinned actions. The final `ci-gate`
+rejects unsuccessful jobs, stale revisions and missing stages or parallel cases.
+
+The new CLI driver compares 44 Linux parallel configurations and 12 macOS
+configurations against serial results, including uneven replica distribution,
+empty ranks and idle threads. It verifies actual rank/team sizes and retains
+per-rank exit status. Existing fixed-rank regressions remain intact. `MPIRUN`
+is consistently one executable path; CI uses an Open MPI wrapper. Build-only
+targets keep compilation parallel and test execution sequential, and serial
+unit tests now reuse common library objects.
+
+Frozen observations and registered scripts are unchanged. CI checks 1,958
+manifest entries and regenerates 22 analysis/report files in independent
+copies, with exact identifiers/verdicts and explicit floating-point tolerances.
+Python 3.10 and 3.12 both reproduce the accepted analysis; their differing
+floating-point output bytes are not treated as changes to the frozen data.
+
+Local validation passed serial, OpenMP, MPI and hybrid suites, both historical
+compatibility targets, the new parallel comparisons, helper negative controls,
+workflow lint and shell lint. These solver runs used Apple Clang/Accelerate;
+Linux GCC/Clang/OpenBLAS and hosted artifact/gate integration await the first
+GitHub Actions run. No additional scientific convergence claim is made.
+See [CI usage and scope](docs/ci.md) for reproduction and required-check setup.
+
+---
+date: 2026-10-03
+datetime: 2026-10-03 11:17 JST
+model: OpenAI GPT-6 (Codex)
+summary: |
+  Completed 36 P/P control runs with the same seeds and settings as the AP/P study.
+  Spin residuals occur in both boundaries; covariance-aware boundary differences remain diagnostic.
+---
+
+## 2026-10-03: Matched periodic-boundary control
+
+The [P/P control](data/periodic_4x4_U4_control/README.md) changes only bc_x
+from the frozen 4x4 AP/P dataset. All 36 runs and 720-bin integrity checks
+passed. At beta=16 after time-step extrapolation, S(Q) differs from its own
+ED by -2.98 nominal SE for P/P and -3.72 for AP/P. P/P also has a 3.09-SE
+SU(2) discrepancy at beta=8. Paired-seed analysis retains a 3.19-SE boundary
+SU(2) difference at beta=16; uncertainty-method sensitivity and thermal
+convergence limits are recorded rather than assigning a formal physics pass.
+The AP/P 382-file snapshot and QMC C source are unchanged. Independent raw-bin
+aggregation and matrix least squares reproduce both the P/P and paired results.
+
+These apparent SU(2) violations are considered in the context of the known
+low-temperature sampling and mixing problem motivating parallel tempering
+(see [spin statistics](docs/limitations.md#spin-statistics) and
+[PT validation](VALIDATION.md), section 10). The underlying model retains
+SU(2) symmetry. All 72 comparison runs use `tempering=none`, so this study
+does not establish how much PT improves these particular conditions.
+
+---
+date: 2026-10-03
+datetime: 2026-10-03 10:51 JST
+model: OpenAI GPT-6 (Codex)
+summary: |
+  Added 36 local 4x4 AP/P U=4 DQMC runs and a ground-state ED comparison.
+  Extrapolated energy and doublon agree at beta=16; spin agreement remains unresolved.
+---
+
+## 2026-10-03: Exploratory 4x4 antiperiodic ED comparison
+
+The [new dataset](data/antiperiodic_4x4_U4_ed/README.md) retains all inputs,
+raw bins, spin/scalar outputs, signed hopping matrices and executable bindings.
+All 36 runs and integrity checks passed. Three time steps at beta=4,8,16 were
+compared with an archived HΦ ground-state ED reference using four independent
+seeds per point. E/N and D at beta=16 agree with ED after time-step extrapolation.
+S(Q) differs by 3.72 nominal SE and paired extrapolated SU(2) by 3.17 SE;
+all-q and half-run diagnostics also flag limited spin statistics. This is an
+exploratory result, not a full interacting 4x4 validation. No QMC source changes
+or data exclusions were made. Numerical reanalysis and an independent matrix
+least-squares check reproduce the reported estimates.
 
 ---
 date: 2026-10-03

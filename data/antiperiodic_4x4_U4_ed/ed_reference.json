@@ -1,0 +1,99 @@
+{
+  "source": "HPhi 3.5.2 CG/LOBPCG calculation, 2026-08-14",
+  "source_case_summary_sha256": "94c44ce17a4fae7ca67d7ed6e0c9a58925bd589f7a48b2957402f3937a08e97d",
+  "physics": {
+    "boundary_conditions": [
+      {
+        "direction": "x",
+        "type": "antiperiodic"
+      },
+      {
+        "direction": "y",
+        "type": "periodic"
+      }
+    ],
+    "dimension": 2,
+    "filling": {
+      "density": 1.0,
+      "hole_doping": 0.0,
+      "n_down": 8,
+      "n_up": 8
+    },
+    "hamiltonian": {
+      "chemical_potential": null,
+      "hopping_t": 1.0,
+      "interaction_convention": "U_n_up_n_down",
+      "next_nearest_hopping_t_prime": 0.0,
+      "onsite_u": 4.0
+    },
+    "lattice": "square",
+    "shape": [
+      4,
+      4
+    ],
+    "sites": 16,
+    "thermodynamics": {
+      "beta_t": null,
+      "state": "ground",
+      "temperature_over_t": null
+    }
+  },
+  "observables": {
+    "double_occupancy_per_site": 0.1438872044875,
+    "doublon_total_from_zvo_energy": 2.302195271674089,
+    "energy_per_site": -0.9120936825597628,
+    "energy_total": -14.593498920956204,
+    "local_moment_per_site": 0.712225591025,
+    "spin_structure_factor_peak": {
+      "momentum_index": [
+        2,
+        2,
+        0
+      ],
+      "q": [
+        3.141592653589793,
+        3.141592653589793,
+        0.0
+      ],
+      "value": {
+        "im": 1.8103741477240017e-32,
+        "re": 1.9055141286718746
+      }
+    },
+    "spin_structure_factor_pi_pi": {
+      "im": 1.8103741477240017e-32,
+      "re": 1.9055141286718746
+    },
+    "spin_structure_factor_q0": {
+      "im": 0.0,
+      "re": -2.187500874883952e-11
+    },
+    "total_sz": 0.0
+  },
+  "diagnostics": {
+    "analysis_gates": {
+      "doublon_energy_vs_correlation_residual": 7.869427331996803e-12,
+      "lobpcg_reported_converged": true,
+      "particle_number_max_residual": 1.000000082740371e-10,
+      "spin_correlation_hermiticity_residual": 0.0,
+      "spin_sum_rule_residual": 1.7763748277464662e-15,
+      "structure_factor_max_imaginary": 9.201287114983889e-18
+    },
+    "lobpcg_convergence": {
+      "converged": true,
+      "energy": -14.5935,
+      "final_step": 78,
+      "residual_2_norm": 1.40432e-06,
+      "threshold": 1.45935e-06
+    }
+  },
+  "raw_artifact_sha256": {
+    "convergence": "a0acdd4928a1edc74da349a67a1d2730d0d1e7e7c8480a18864efe102cfa720c",
+    "energy": "02f58283322e06f3abdef4fbb1991888b56aa054fd76d8623f0f4f41b69f7805",
+    "one_body": "61f819cf8a7fa81a1622093f2d2315eaecaad791200afd7965910f41a636fcd7",
+    "spin_correlations": "12158b08e2d9c3f269c35fbca1c90ec803944689466d2ee4eadd4f13042458ae",
+    "two_body": "38b43dbc3d04ae26dbd610c28d1dc15d954cf53b391812b49b865a65355c1899"
+  },
+  "ed_input_sha256": "3caf2c588a2b3199ccb189dff1205ff86ecdde47ae75c3e785ea54a956c13b30",
+  "reference_limitations": "Archived ED summary and input were checked; full eigenvector/raw correlations are not present locally and ED was not rerun."
+}

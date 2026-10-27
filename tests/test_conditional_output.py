@@ -4,7 +4,6 @@ import math
 import json
 import os
 from pathlib import Path
-import shlex
 import subprocess
 import sys
 import tempfile
@@ -37,7 +36,7 @@ def run(folder, text, mode="serial", binary=None):
     (folder / "input.in").write_text(text + f"parallel={mode}\n")
     command = [str(binary or ROOT / ("dqmc" if mode == "serial" else f"dqmc_{mode}")), "input.in"]
     if mode in ("mpi", "hybrid"):
-        command = shlex.split(os.environ.get("MPIRUN", "mpirun")) + ["-n", "2"] + command
+        command = [os.environ.get("MPIRUN", "mpirun")] + ["-n", "2"] + command
     env = dict(os.environ, OMP_NUM_THREADS="2", VECLIB_MAXIMUM_THREADS="1", OPENBLAS_NUM_THREADS="1")
     result = subprocess.run(command, cwd=folder, env=env, capture_output=True, text=True)
     assert result.returncode == 0, (command, result.stderr)

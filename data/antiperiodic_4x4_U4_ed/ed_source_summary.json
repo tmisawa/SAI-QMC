@@ -1,0 +1,129 @@
+{
+  "artifacts": {
+    "convergence": {
+      "path": "cases/sq4x4_ap_p_u4_half_hphi_ed/output/zvo_Lanczos_Step.dat",
+      "sha256": "a0acdd4928a1edc74da349a67a1d2730d0d1e7e7c8480a18864efe102cfa720c"
+    },
+    "energy": {
+      "path": "cases/sq4x4_ap_p_u4_half_hphi_ed/output/zvo_energy.dat",
+      "sha256": "02f58283322e06f3abdef4fbb1991888b56aa054fd76d8623f0f4f41b69f7805"
+    },
+    "one_body": {
+      "path": "cases/sq4x4_ap_p_u4_half_hphi_ed/output/zvo_cisajs_eigen0.dat",
+      "sha256": "61f819cf8a7fa81a1622093f2d2315eaecaad791200afd7965910f41a636fcd7"
+    },
+    "spin_correlations": {
+      "path": "cases/sq4x4_ap_p_u4_half_hphi_ed/analysis/spin_correlations.json",
+      "sha256": "12158b08e2d9c3f269c35fbca1c90ec803944689466d2ee4eadd4f13042458ae"
+    },
+    "two_body": {
+      "path": "cases/sq4x4_ap_p_u4_half_hphi_ed/output/zvo_cisajscktalt_eigen0.dat",
+      "sha256": "38b43dbc3d04ae26dbd610c28d1dc15d954cf53b391812b49b865a65355c1899"
+    }
+  },
+  "case_id": "sq4x4_ap_p_u4_half_hphi_ed",
+  "diagnostics": {
+    "analysis_gates": {
+      "doublon_energy_vs_correlation_residual": 7.869427331996803e-12,
+      "lobpcg_reported_converged": true,
+      "particle_number_max_residual": 1.000000082740371e-10,
+      "spin_correlation_hermiticity_residual": 0.0,
+      "spin_sum_rule_residual": 1.7763748277464662e-15,
+      "structure_factor_max_imaginary": 9.201287114983889e-18
+    },
+    "lobpcg_convergence": {
+      "converged": true,
+      "energy": -14.5935,
+      "final_step": 78,
+      "residual_2_norm": 1.40432e-06,
+      "threshold": 1.45935e-06
+    }
+  },
+  "ed_status": {
+    "exit_code": 0,
+    "finished_at_utc": "2026-08-14T12:27:30Z",
+    "started_at_utc": "2026-08-14T12:25:24Z",
+    "walltime_seconds": 126.181626889
+  },
+  "observables": {
+    "double_occupancy_per_site": 0.1438872044875,
+    "doublon_total_from_zvo_energy": 2.302195271674089,
+    "energy_per_site": -0.9120936825597628,
+    "energy_total": -14.593498920956204,
+    "local_moment_per_site": 0.712225591025,
+    "spin_structure_factor_peak": {
+      "momentum_index": [
+        2,
+        2,
+        0
+      ],
+      "q": [
+        3.141592653589793,
+        3.141592653589793,
+        0.0
+      ],
+      "value": {
+        "im": 1.8103741477240017e-32,
+        "re": 1.9055141286718746
+      }
+    },
+    "spin_structure_factor_pi_pi": {
+      "im": 1.8103741477240017e-32,
+      "re": 1.9055141286718746
+    },
+    "spin_structure_factor_q0": {
+      "im": 0.0,
+      "re": -2.187500874883952e-11
+    },
+    "total_sz": 0.0
+  },
+  "physics": {
+    "boundary_conditions": [
+      {
+        "direction": "x",
+        "type": "antiperiodic"
+      },
+      {
+        "direction": "y",
+        "type": "periodic"
+      }
+    ],
+    "dimension": 2,
+    "filling": {
+      "density": 1.0,
+      "hole_doping": 0.0,
+      "n_down": 8,
+      "n_up": 8
+    },
+    "hamiltonian": {
+      "chemical_potential": null,
+      "hopping_t": 1.0,
+      "interaction_convention": "U_n_up_n_down",
+      "next_nearest_hopping_t_prime": 0.0,
+      "onsite_u": 4.0
+    },
+    "lattice": "square",
+    "shape": [
+      4,
+      4
+    ],
+    "sites": 16,
+    "thermodynamics": {
+      "beta_t": null,
+      "state": "ground",
+      "temperature_over_t": null
+    }
+  },
+  "schema_version": 1,
+  "solver": {
+    "name": "HPhi",
+    "parameters": {
+      "LanczosEps": 14,
+      "algorithm": "LOBPCG",
+      "method": "CG",
+      "version": "3.5.2"
+    },
+    "variant": "Standard mode CG LOBPCG ED"
+  },
+  "status": "completed"
+}

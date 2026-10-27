@@ -1,9 +1,15 @@
 #!/bin/sh
 set -eu
+MPIRUN="${MPIRUN:-mpirun}"
 
-repo_dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+repo_dir=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 run_dir=$(mktemp -d /tmp/afqmc-sperp-parallel.XXXXXX)
-trap 'rm -rf "$run_dir"' EXIT HUP INT TERM
+# shellcheck source=tests/test_cleanup.sh
+. "$repo_dir/tests/test_cleanup.sh"
+trap 'test_cleanup "$run_dir"' EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 for mode in serial omp mpi2 mpi4 hybrid; do
     mkdir "$run_dir/$mode"
@@ -31,11 +37,11 @@ write_input hybrid hybrid
 (cd "$run_dir/serial" && "$repo_dir/dqmc" input.txt > stdout.txt)
 (cd "$run_dir/omp" && OMP_NUM_THREADS=2 \
     "$repo_dir/dqmc_omp" input.txt > stdout.txt)
-(cd "$run_dir/mpi2" && mpirun -np 2 \
+(cd "$run_dir/mpi2" && "$MPIRUN" -np 2 \
     "$repo_dir/dqmc_mpi" input.txt > stdout.txt)
-(cd "$run_dir/mpi4" && mpirun -np 4 \
+(cd "$run_dir/mpi4" && "$MPIRUN" -np 4 \
     "$repo_dir/dqmc_mpi" input.txt > stdout.txt)
-(cd "$run_dir/hybrid" && OMP_NUM_THREADS=2 mpirun -np 2 \
+(cd "$run_dir/hybrid" && OMP_NUM_THREADS=2 "$MPIRUN" -np 2 \
     "$repo_dir/dqmc_hybrid" input.txt > stdout.txt)
 
 for mode in serial omp mpi2 mpi4 hybrid; do
@@ -64,7 +70,7 @@ printf '%s\n' \
     'szz_q=3:0,0:0' 'szz_file=szz-selected.dat' \
     'sperp_q=all' 'sperp_file=sperp-all.dat' \
     > "$run_dir/different_q/input.txt"
-(cd "$run_dir/different_q" && mpirun -np 4 \
+(cd "$run_dir/different_q" && "$MPIRUN" -np 4 \
     "$repo_dir/dqmc_mpi" input.txt > stdout.txt)
 test "$(awk '!/^#/ {n++} END {print n+0}' \
     "$run_dir/different_q/szz-selected.dat")" = 2

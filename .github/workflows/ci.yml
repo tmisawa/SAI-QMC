@@ -1,0 +1,121 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: ${{ matrix.id }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: ${{ matrix.timeout }}
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        include:
+          - id: linux-gcc
+            os: ubuntu-24.04
+            cc: gcc-13
+            python: '3.10'
+            depth: 0
+            timeout: 30
+          - id: linux-clang
+            os: ubuntu-24.04
+            cc: clang-18
+            python: '3.12'
+            depth: 1
+            timeout: 30
+          - id: linux-parallel
+            os: ubuntu-24.04
+            cc: gcc-13
+            python: '3.12'
+            depth: 1
+            timeout: 45
+          - id: macos
+            os: macos-15
+            cc: clang
+            python: '3.12'
+            depth: 1
+            timeout: 45
+    env:
+      CC: ${{ matrix.cc }}
+      OMPI_CC: ${{ matrix.cc }}
+      PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      OPENBLAS_NUM_THREADS: '1'
+      VECLIB_MAXIMUM_THREADS: '1'
+      MKL_NUM_THREADS: '1'
+      BLIS_NUM_THREADS: '1'
+      OMP_DYNAMIC: 'FALSE'
+      OMP_NUM_THREADS: '2'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: ${{ matrix.depth }}
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential gcc-13 clang-18 libopenblas-pthread-dev shellcheck
+          blas_dir="/usr/lib/$(gcc-13 -print-multiarch)/openblas-pthread"
+          echo "LDLIBS=-L$blas_dir -Wl,-rpath,$blas_dir -lopenblas -lm" >> "$GITHUB_ENV"
+      - name: Install Open MPI
+        if: matrix.id == 'linux-parallel'
+        run: sudo apt-get install -y libopenmpi-dev openmpi-bin
+      - name: Install macOS OpenMP
+        if: runner.os == 'macOS'
+        run: |
+          brew list libomp >/dev/null 2>&1 || brew install libomp
+          echo "LIBOMP_PREFIX=$(brew --prefix libomp)" >> "$GITHUB_ENV"
+      - name: Install analysis dependencies
+        if: matrix.id == 'linux-gcc'
+        run: python3 -m pip install -r ci/requirements.txt
+      - name: Check workflow and shell helpers
+        if: matrix.id == 'linux-clang'
+        run: sh ci/lint.sh
+      - name: Build and test
+        run: sh ci/run.sh "$CI_CONFIG"
+        env:
+          CI_CONFIG: ${{ matrix.id }}
+      - name: Save logs and results
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ci-${{ matrix.id }}-${{ github.sha }}
+          path: ci-results/
+          if-no-files-found: error
+          retention-days: 14
+
+  ci-gate:
+    name: ci-gate
+    if: always()
+    needs: checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: ci-*-${{ github.sha }}
+          path: ci-results-download
+      - name: Require all four complete results
+        env:
+          MATRIX_STATUS: ${{ needs.checks.result }}
+          SOURCE_SHA: ${{ github.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python3 ci/check_gate.py ci-results-download \
+            --matrix-status "$MATRIX_STATUS" --source-sha "$SOURCE_SHA" --head-sha "$PR_HEAD_SHA"
