@@ -1,6 +1,6 @@
 ---
-date: 2026-10-03
-datetime: 2026-10-03 14:53 JST
+date: 2026-10-27
+datetime: 2026-10-27 17:18 JST
 model: OpenAI GPT-6 (Codex)
 summary: |
   Four pull-request CI configurations cover compilers, operating systems,
@@ -56,8 +56,9 @@ remain in their original tests. Across compilers, operating systems and BLAS
 implementations, the suites check their own physical identities and numerical
 tolerances; CI does not require identical Monte Carlo trajectories across jobs.
 
-The GCC job checks 1,958 manifest entries: 1,174 historical entries, 12 AP/P
-4x2 preregistration files, 382 AP/P 4x4 files and 390 P/P 4x4 files. It runs the
+The GCC job checks 2,080 manifest entries: 1,296 main-manifest entries, 12 AP/P
+4x2 preregistration files, 382 AP/P 4x4 files and 390 P/P 4x4 files. The main
+manifest includes the 122 sign-reweighting ED dataset entries. It runs the
 11 analysis self-tests and 17 registered analysis regressions, and regenerates
 22 numerical/report files from saved observations. It launches no production
 QMC runs or ED calculations. Every analysis starts from an independent copy;

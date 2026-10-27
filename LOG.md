@@ -16,7 +16,9 @@ the build-only targets used by the four CI configurations. The standard test tar
 the signed-output regressions, and the hybrid target runs the signed cross-mode comparisons.
 Documentation preserves the 4x4 reference-data limitations and the sign-reweighted ED result
 of 187/188 comparisons passing. The solver and stored numerical outputs are unchanged by
-this integration.
+this integration. The saved-data CI check expects 1,296 main-manifest entries
+including the 122 sign-reweighting data entries, for 2,080 entries across all
+manifests; the previous fixed count of 1,174 would reject the expanded dataset.
 
 ---
 date: 2026-10-27
