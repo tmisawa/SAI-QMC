@@ -220,6 +220,16 @@ time step; an individual auxiliary-field configuration need not.
 `DeltaSU2=Sperp/2-Szz` uses paired measurement bins and their jackknife error.
 It is a sampling/implementation diagnostic, not a direct estimator of Trotter bias.
 
+For a spin-rotation-invariant Hamiltonian and ensemble (no magnetic field or
+spin-orbit coupling), report the total spin structure factor as `3*Szz(q)`.
+The Ising-type auxiliary field couples to `Sz`; `Sperp` is built from products of
+the two spin Green functions, and at low temperature its replica distribution has
+a long upper tail, so its mean and standard error are unstable
+([VALIDATION.md](../VALIDATION.md) §14). Keep `Sperp` and `DeltaSU2` as
+diagnostics of the measurement code and of equilibration. `3*Szz(q)` triples any
+bias of `Szz(q)`, so equilibration checks of the field still apply. Half filling
+is not required for this choice.
+
 ## Sign reweighting
 
 Configurations are sampled with `|W|` and each measurement carries

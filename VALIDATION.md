@@ -1,8 +1,10 @@
 ---
 date: 2026-10-27
-datetime: 2026-10-27 17:16 JST
-model: OpenAI GPT-6 (Codex; revision), Codex GPT-5 (original), Claude Sonnet 5 (Anthropic; 2026-09-27 addition), Claude Opus 5.5 (Anthropic; 2026-09-28 addition); OpenAI GPT-5.6 Sol (Codex; 2026-10-02 validation); OpenAI GPT-6 (Codex; 2026-10-03 metadata update); Claude Opus 5.5 (Claude Code; 2026-10-27 sign reweighting); OpenAI GPT-6 (Codex; 2026-10-27 explicit sign_file and q validation)
+datetime: 2026-10-29 11:17 JST
+model: OpenAI GPT-6 (Codex; revision), Codex GPT-5 (original), Claude Sonnet 5 (Anthropic; 2026-09-27 addition), Claude Opus 5.5 (Anthropic; 2026-09-28 addition); OpenAI GPT-5.6 Sol (Codex; 2026-10-02 validation); OpenAI GPT-6 (Codex; 2026-10-03 metadata update); Claude Opus 5.5 (Claude Code; 2026-10-27 sign reweighting); OpenAI GPT-6 (Codex; 2026-10-27 explicit sign_file and q validation); Claude Opus 5.5 (Claude Code; 2026-10-29 4x4 U8 PT reference values)
 summary: |
+  2026-10-29: 4×4 P/P・U/t=8・β16–24のPT参照値（§14）。有限Δτ（β/1920）とΔτ→0の値を記録し、物理の参照値はΔτ→0とする。
+  独立な大正準cTPQ（14 bin）とはΔτ→0の値が24項目すべてで|z|≤1.06、有限Δτの値とはβ24のDで|z|=13.5離れる。
   2026-10-27: explicit sign_file=none selects exact file PH testing and extended headers; unmeasured q requires NaN.
   2026-10-27: 一般μ・正方格子t′・符号付き合算比（§13）。負配位48/4096の3 site列挙、原子極限、U=0、旧入力の
   byte同一性、4並列形態の一致は合格。L4・4×2 t′のED比較は事前規定188比較中187が合格、1点は事後の刻み追加で確認。
@@ -1004,3 +1006,81 @@ ED比較のdataは、headerの`nrep`・`nbeta`を含む修正後のbinaryで同�
 - `make test`、`test_sign_parallel`、`test_sign_default`、`test_sign_default_parallel`が合格。
   旧入力28 serial＋12 parallelの互換性を維持し、計時値は従来どおり構造だけを比較する。
   公開dataの1296 checksumが合格し、EDの再集計も保存された187/188のJSONとbyte一致した。
+
+
+## 14. 4×4 U/t=8のPT参照値とΔτ→0外挿（2026-10-05〜10-29）
+
+§10のΔτ-ladder PTと§11の条件付き測定で求めた、4×4 PBC・U/t=8・half fillingのβ16–24の値を記録する。
+物理の参照値はΔτ→0の値とする。有限Δτの値は、同じΔτで再現を確かめるために残す。
+
+### 条件とprovenance
+
+- source `a614a8f`。square 4×4、P/P、`t=-1`、`U=8`、half filling（`mu`省略）。
+- `tempering=dtau_ladder`の6 slot（β=16, 17.6, 19.2, 20.8, 22.4, 24）。全slotで`tempering_ltr`を共通にし、
+  各slotのΔτはβ/`tempering_ltr`になる。`tempering_interval=1`。
+- warmup 10000・測定50000 sweep、100 bin、`conditional_measure=1`、`green_rebuild=centered`、`stab=4`、
+  `sweep_order=alternating`、`global_update=site`（`global_site_select=fixed`、`global_interval=10`）。
+- `tempering_ltr=1920`は240 ladder（`field_init`がrandomとuniformで各120）、960と3840は各120 ladder（random）。
+  独立単位はladderとし、同じladderのslotは交換で相関するので独立な標本として扱わない。どのbin・ladderも除いていない。
+
+### 推定量
+
+- D・E/N・K/Nは§11の条件付き推定量（E/N=Ehub/N、K/N=E/N−UD、Dはper site）。
+  S(Q)（Q=(π,π)）は3Szz(Q)（`Stot_from_3Szz_Q`）、M2はN Szz(0)。
+- 通常推定量のD・E/N、Sperp(Q)、Stotは参照値に使わない。ladder平均の過剰尖度が最大38（D・E）と80（Sperp）、
+  SEのbootstrap変動係数が最大30%と43%で、SEが安定しない。出力は診断用に残す。
+
+### 有限Δτ（Δτ=β/1920）の値
+
+240 ladderをまとめた値（括弧内は統計SEで末尾の桁）。
+
+| β | Δτ | 条件付きD | 条件付きE/N | 条件付きK/N | 3Szz(Q) | M2 |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 16 | 0.008333 | 0.0533903(19) | −0.528209(30) | −0.955332(41) | 3.7610(70) | 0.0932(17) |
+| 17.6 | 0.009167 | 0.0534017(18) | −0.528655(26) | −0.955869(37) | 3.7633(59) | 0.0717(14) |
+| 19.2 | 0.010000 | 0.0534088(15) | −0.529099(22) | −0.956369(30) | 3.7675(52) | 0.0546(11) |
+| 20.8 | 0.010833 | 0.0534102(14) | −0.529388(21) | −0.956669(29) | 3.7667(48) | 0.04153(87) |
+| 22.4 | 0.011667 | 0.0534120(14) | −0.529715(19) | −0.957011(26) | 3.7706(46) | 0.03153(69) |
+| 24 | 0.012500 | 0.0534072(15) | −0.529973(19) | −0.957230(26) | 3.7711(51) | 0.02349(54) |
+
+- random対uniformの30比較で最大|z|=1.48。前後半の差の最大|z|=1.64、最初の5000 sweepと残りの差は最大|z|=1.75。
+- 隣接slotの交換受理率は0.19–0.27。全walkerがround tripした（walkerあたり177回以上）。
+- PTなしの固定β計算（120 replica、β24・Δτ0.0125）とは、E・D・K・3Szz・M2の全比較で|z|≤2.01。
+
+### Δτ→0の値
+
+各slotで`tempering_ltr`=960・1920・3840の値に、ladder SEを重みとして`O(Δτ)=O(0)+aΔτ²`をfitした（方法はrun前に固定）。
+30 fit（6 slot×5量）は全てp≥0.117だった。表記は`値(統計SE)[|3点−細かい2点|]`で、括弧内は末尾の桁。
+
+| β | 条件付きD | 条件付きE/N | 条件付きK/N | 3Szz(Q) | M2 |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 16 | 0.0534222(22)[26] | −0.527743(33)[32] | −0.955120(46)[11] | 3.7578(69)[72] | 0.0932(18)[7] |
+| 17.6 | 0.0534379(18)[10] | −0.528084(28)[2] | −0.955588(39)[10] | 3.7594(60)[82] | 0.0716(15)[9] |
+| 19.2 | 0.0534526(16)[8] | −0.528423(24)[12] | −0.956044(34)[19] | 3.7669(55)[32] | 0.0548(12)[3] |
+| 20.8 | 0.0534607(15)[1] | −0.528575(23)[17] | −0.956260(31)[16] | 3.7668(53)[34] | 0.04182(96)[4] |
+| 22.4 | 0.0534701(14)[33] | −0.528795(20)[15] | −0.956557(28)[43] | 3.7674(50)[67] | 0.03188(75)[2] |
+| 24 | 0.0534737(15)[18] | −0.528896(21)[20] | −0.956687(29)[36] | 3.7677(55)[117] | 0.02402(60)[47] |
+
+- Δτ²の係数は、E/Nが−6.6〜−6.9、K/Nが−3.0〜−3.4、Dが約−0.44で、β16–24でほぼ一定。3Szz(Q)とM2では有意でない。
+  β24のE/Nは、有限Δτの値から+1.08×10⁻³（統計SEの約50倍）動く。
+- 固定β計算から別に求めたΔτ→0の値（β16・24）とは、全10項目で|z|≤1.52。
+- `[ ]`の|3点−細かい2点|は外挿の形への感度の目安で、統計SEを超えるslotがある。使うときは統計SEと並べて示す。
+
+### 大正準cTPQとの比較
+
+HPhiの大正準cTPQで、同じ4×4 P/P・U/t=8を独立に計算した。比べたβ16–24の範囲は14 binである。
+
+- Δτ→0の値とは、条件付きD・E/N・K/N・3Szz(Q)の24項目（4量×6温度）すべてで|z|≤1.06。
+  固定β計算のΔτ→0の値（β16・24）とも|z|≤1.43。
+- 有限Δτの値とは、β24でDが|z|=13.5、E/Nが|z|=7.9離れる（K/Nは最大2.3）。cTPQはTrotterのずれを区別でき、
+  Δτ→0の値の方と一致する。3Szz(Q)は有限Δτとの差も|z|≤0.52で、この量ではどちらとも区別できない。
+- cTPQの各温度は同じbinから求めるので、温度間で相関する。zの符号は温度によらずそろう（E/Nが+、Dが−）ので、
+  実質は約1σのずれが1つである。
+
+### 範囲
+
+- 4×4 P/P・U/t=8・half filling・β16–24の参照値であり、他の境界条件・U・格子の大きさには使わない。
+- Δτ≤β/960で`O(0)+aΔτ²`を仮定する。高次項は自由度0で確かめられない。
+- 初期化・前後半・round tripの一致は、すべての遅いモードの平衡化や信頼区間のcoverageの証明にはならない。
+- 3Szz(Q)は、スピン回転対称なハミルトニアンと集団（磁場・スピン軌道相互作用なし）でだけ使える。
+- この節の数値は表の値として記録し、全binはこのrepositoryに含めない。

@@ -1,6 +1,28 @@
 # LOG
 
 ---
+date: 2026-10-29
+datetime: 2026-10-29 11:17 JST
+model: Claude Opus 5.5 (Claude Code)
+summary: |
+  Records the 4x4 P/P, U/t=8, beta=16-24 parallel-tempering reference values at finite dtau and extrapolated to dtau->0.
+  An independent grand-canonical cTPQ calculation agrees with the dtau->0 values and resolves the finite-dtau shift.
+---
+
+## 2026-10-29: Record the 4x4 U/t=8 reference values
+
+VALIDATION.md section 14 records the dtau-ladder parallel-tempering values of the
+conditional D, E/N and K/N, `3*Szz(pi,pi)` and M2 for the 4x4 P/P, U/t=8
+half-filled model at beta=16-24. The finite-dtau values (dtau=beta/1920, 240
+ladders) are kept for same-dtau reproduction; the physical reference is the
+dtau^2 extrapolation through tempering_ltr=960, 1920 and 3840. An independent
+grand-canonical cTPQ calculation (14 bins) agrees with the extrapolated values
+for all 24 items (|z|<=1.06) and differs from the finite-dtau values by up to
+|z|=13.5 (D at beta=24). docs/usage.md now recommends `3*Szz(q)` for the total
+spin structure factor of spin-rotation-invariant runs. The solver, tests and
+stored data are unchanged.
+
+---
 date: 2026-10-27
 datetime: 2026-10-27 17:16 JST
 model: OpenAI GPT-6 (Codex)
